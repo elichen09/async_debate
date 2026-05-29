@@ -19,8 +19,8 @@ interface Round {
   pro_id: string;
   con_id: string;
   challenger_id: string;
-  pro: { username: string; display_name: string; elo: number };
-  con: { username: string; display_name: string; elo: number };
+  pro: { username: string; display_name: string; elo: number }[];
+  con: { username: string; display_name: string; elo: number }[];
 }
 
 export default function DashboardPage() {
@@ -126,7 +126,7 @@ export default function DashboardPage() {
           <p style={sectionLabel}>Incoming challenges</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {incoming.map(r => {
-              const opponent = r.challenger_id === r.pro_id ? r.pro : r.con;
+              const opponent = r.challenger_id === r.pro_id ? r.pro[0] : r.con[0];
               const myRole = r.pro_id === userId ? "Pro" : "Con";
               return (
                 <div key={r.id} style={card}>
@@ -151,7 +151,7 @@ export default function DashboardPage() {
           <p style={sectionLabel}>Sent challenges</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {outgoing.map(r => {
-              const opponent = r.pro_id === userId ? r.con : r.pro;
+              const opponent = r.pro_id === userId ? r.con[0] : r.pro[0];
               return (
                 <div key={r.id} style={{ ...card, opacity: 0.7 }}>
                   <p style={{ fontWeight: 500, margin: "0 0 4px", fontSize: 15 }}>{r.topic}</p>
