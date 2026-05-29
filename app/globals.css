@@ -15,15 +15,15 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
+
   :root {
-    --background: #111110;
-    --foreground: #edebe7;
-    --muted: #8a8780;
-    --border: #2a2926;
-    --card: #1c1b1a;
+    --background: #ffebcd;
+  --foreground: #1a1814;
+  --muted: #6b6760;
+  --border: #1f1f1f;
+  --card: #ffffff;
   }
-}
+
 
 body {
   background: var(--background);
