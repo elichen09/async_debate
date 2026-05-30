@@ -33,6 +33,14 @@ interface Round {
   con: { username: string; display_name: string };
 }
 
+interface Ballot {
+  winner_id: string;
+  pro_speaks: number;
+  con_speaks: number;
+  reasoning: string;
+  submitted_at: string;
+}
+
 export default function RoundPage() {
   const router = useRouter();
   const { id } = useParams();
@@ -42,6 +50,7 @@ export default function RoundPage() {
   const [myRole, setMyRole] = useState<"pro" | "con">("pro");
   const [uploading, setUploading] = useState(false);
   const [audioUrls, setAudioUrls] = useState<Record<string, string>>({});
+  const [ballot, setBallot] = useState<Ballot | null>(null);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -57,13 +66,11 @@ export default function RoundPage() {
         .from("rounds")
         .select(`
           id, topic, status, pro_id, con_id, current_speech,
-          pro:profiles!rounds_pro_id_fkey(username, display_name),
-          con:profiles!rounds_con_id_fkey(username, display_name)
+          pro:profiles!pro_id(username, display_name),
+          con:profiles!con_id(username, display_name)
         `)
         .eq("id", id)
         .single();
-
-        
 
       if (!roundData) { router.push("/dashboard"); return; }
       setRound(roundData as unknown as Round);
@@ -77,7 +84,6 @@ export default function RoundPage() {
 
       setSpeeches(speechData || []);
 
-      // Get signed URLs for each speech
       const urls: Record<string, string> = {};
       for (const s of speechData || []) {
         const { data } = await supabase.storage
@@ -86,6 +92,14 @@ export default function RoundPage() {
         if (data) urls[s.position] = data.signedUrl;
       }
       setAudioUrls(urls);
+
+      const { data: ballotData } = await supabase
+        .from("ballots")
+        .select("winner_id, pro_speaks, con_speaks, reasoning, submitted_at")
+        .eq("round_id", id)
+        .single();
+
+      if (ballotData) setBallot(ballotData as Ballot);
     }
     load();
   }, [id]);
@@ -97,16 +111,23 @@ export default function RoundPage() {
 
     const currentIndex = round.current_speech - 1;
     const position = SPEECH_ORDER[currentIndex].label.toLowerCase().replace(/ /g, "_");
-    const path = `${round.id}/${position}.mp3`;
+    const path = `${round.id}/${position}_${Date.now()}.mp3`;
 
-    // Upload to storage
     const { error: uploadError } = await supabase.storage
       .from("speeches")
       .upload(path, file, { upsert: true });
 
     if (uploadError) { setError(uploadError.message); setUploading(false); return; }
 
-    // Insert speech record
+    console.log("inserting speech:", {
+      round_id: round.id,
+      speaker_id: userId,
+      position,
+      speech_number: round.current_speech,
+      storage_path: path,
+    });
+    console.log("current user:", userId);
+
     const { error: insertError } = await supabase.from("speeches").insert({
       round_id: round.id,
       speaker_id: userId,
@@ -117,9 +138,8 @@ export default function RoundPage() {
 
     if (insertError) { setError(insertError.message); setUploading(false); return; }
 
-    // Advance or complete the round
     const nextSpeech = round.current_speech + 1;
-    const newStatus = nextSpeech > 8 ? "judging" : "active";
+    const newStatus = nextSpeech > 2 ? "judging" : "active";
 
     await supabase.from("rounds").update({
       current_speech: nextSpeech,
@@ -138,7 +158,7 @@ export default function RoundPage() {
   const opponent = myRole === "pro" ? round.con : round.pro;
 
   return (
-    <div style={{ fontFamily: "sans-serif", maxWidth: 520, margin: "3rem auto", padding: "0 1rem" }}>
+    <div style={{ fontFamily: "sans-serif", maxWidth: 520, margin: "3rem auto", padding: "0 1rem 4rem" }}>
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "2rem" }}>
@@ -152,9 +172,13 @@ export default function RoundPage() {
         <p style={{ fontSize: 13, color: "#6b6760", margin: "0 0 12px" }}>
           vs @{opponent?.username} · You are {myRole === "pro" ? "Pro" : "Con"}
         </p>
-        <div style={{ display: "flex", gap: 8 }}>
-          <span style={{ ...badge, background: round.status === "judging" ? "#fef9c3" : "#f0fdf4", color: round.status === "judging" ? "#854d0e" : "#166534" }}>
-            {round.status === "judging" ? "Awaiting judge" : `Speech ${round.current_speech} of 8`}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span style={{
+            ...badge,
+            background: round.status === "judging" ? "#fef9c3" : round.status === "complete" ? "#f0fdf4" : "#f0fdf4",
+            color: round.status === "judging" ? "#854d0e" : round.status === "complete" ? "#166534" : "#166534",
+          }}>
+            {round.status === "judging" ? "⏳ Awaiting judge" : round.status === "complete" ? "✓ Complete" : `Speech ${round.current_speech} of 8`}
           </span>
           {isMyTurn && <span style={{ ...badge, background: "#1a1814", color: "#fff" }}>Your turn</span>}
         </div>
@@ -181,7 +205,7 @@ export default function RoundPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: "50%",
-                    background: isPast ? "#1a1814" : isCurrent ? "#f9f7f4" : "#f9f7f4",
+                    background: isPast ? "#1a1814" : "#f9f7f4",
                     border: isCurrent ? "2px solid #1a1814" : "1px solid #e5e2dc",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 12, fontWeight: 500,
@@ -199,8 +223,6 @@ export default function RoundPage() {
                     )}
                   </div>
                 </div>
-
-                {/* Audio player */}
                 {audioUrls[position] && (
                   <audio controls src={audioUrls[position]} style={{ height: 32, width: 160 }} />
                 )}
@@ -217,13 +239,11 @@ export default function RoundPage() {
           <p style={{ fontSize: 13, color: "#6b6760", margin: "0 0 14px" }}>
             Upload an MP3 recording of your speech.
           </p>
-
           {error && (
             <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#b91c1c", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 14 }}>
               {error}
             </div>
           )}
-
           <input
             ref={fileRef}
             type="file"
@@ -231,12 +251,7 @@ export default function RoundPage() {
             style={{ display: "none" }}
             onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }}
           />
-
-          <button
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            style={primaryBtn}
-          >
+          <button onClick={() => fileRef.current?.click()} disabled={uploading} style={primaryBtn}>
             {uploading ? "Uploading…" : "Upload MP3"}
           </button>
         </div>
@@ -252,6 +267,37 @@ export default function RoundPage() {
         <div style={{ ...card, textAlign: "center" }}>
           <p style={{ fontWeight: 500, margin: "0 0 4px" }}>All speeches submitted!</p>
           <p style={{ fontSize: 14, color: "#6b6760", margin: 0 }}>This round is now awaiting a judge.</p>
+        </div>
+      )}
+
+      {/* Ballot */}
+      {ballot && round.status === "complete" && (
+        <div style={{ ...card, borderColor: "#1a1814" }}>
+          <p style={sectionLabel}>Judge's decision</p>
+          <p style={{
+            fontSize: 18,
+            fontWeight: 500,
+            margin: "0 0 16px",
+            color: ballot.winner_id === userId ? "#166534" : "#b91c1c",
+          }}>
+            {ballot.winner_id === userId ? "✓ You won!" : "✗ You lost"}
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+            <div style={statBox}>
+              <p style={statLabel}>Pro speaks</p>
+              <p style={statValue}>{ballot.pro_speaks}</p>
+            </div>
+            <div style={statBox}>
+              <p style={statLabel}>Con speaks</p>
+              <p style={statValue}>{ballot.con_speaks}</p>
+            </div>
+          </div>
+          {ballot.reasoning && (
+            <div>
+              <p style={{ fontSize: 12, fontWeight: 500, color: "#6b6760", margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Reasoning</p>
+              <p style={{ fontSize: 14, margin: 0, lineHeight: 1.6 }}>{ballot.reasoning}</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -277,6 +323,12 @@ const speechRow = {
   alignItems: "center",
 } as const;
 
+const statBox = {
+  background: "#f9f7f4",
+  borderRadius: 8,
+  padding: "10px 12px",
+} as const;
+
 const sectionLabel = {
   fontSize: 11,
   fontWeight: 500 as const,
@@ -284,6 +336,21 @@ const sectionLabel = {
   textTransform: "uppercase" as const,
   letterSpacing: "0.5px",
   margin: "0 0 10px",
+};
+
+const statLabel = {
+  fontSize: 11,
+  fontWeight: 500,
+  color: "#6b6760",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.5px",
+  margin: "0 0 4px",
+};
+
+const statValue = {
+  fontSize: 20,
+  fontWeight: 500,
+  margin: 0,
 };
 
 const badge = {
