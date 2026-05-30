@@ -19,8 +19,9 @@ interface Round {
   pro_id: string;
   con_id: string;
   challenger_id: string;
-  pro: { username: string; display_name: string; elo: number }[];
-  con: { username: string; display_name: string; elo: number }[];
+  current_speech: number;
+  pro: { username: string; display_name: string; elo: number };
+  con: { username: string; display_name: string; elo: number };
 }
 
 export default function DashboardPage() {
@@ -28,6 +29,7 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [userId, setUserId] = useState<string>("");
   const [incoming, setIncoming] = useState<Round[]>([]);
+  const [active, setActive] = useState<Round[]>([]);
   const [outgoing, setOutgoing] = useState<Round[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -49,17 +51,17 @@ export default function DashboardPage() {
       const { data: rounds } = await supabase
         .from("rounds")
         .select(`
-          id, topic, status, pro_id, con_id, challenger_id,
-          pro:profiles!rounds_pro_id_fkey(username, display_name, elo),
-          con:profiles!rounds_con_id_fkey(username, display_name, elo)
+          id, topic, status, pro_id, con_id, challenger_id, current_speech,
+          pro:profiles!pro_id(username, display_name, elo),
+          con:profiles!con_id(username, display_name, elo)
         `)
         .in("status", ["pending", "active"])
         .or(`pro_id.eq.${id},con_id.eq.${id}`);
-
-      const allRounds = (rounds || []) as Round[];
+      
+      const allRounds = (rounds || []) as unknown as Round[];
       setIncoming(allRounds.filter(r => r.challenger_id !== id && r.status === "pending"));
       setOutgoing(allRounds.filter(r => r.challenger_id === id && r.status === "pending"));
-
+      setActive(allRounds.filter(r => r.status === "active"));
       setLoading(false);
     }
     load();
@@ -126,8 +128,8 @@ export default function DashboardPage() {
           <p style={sectionLabel}>Incoming challenges</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {incoming.map(r => {
-              const opponent = r.challenger_id === r.pro_id ? r.pro[0] : r.con[0];
-              const myRole = r.pro_id === userId ? "Pro" : "Con";
+             const opponent = r.challenger_id === r.pro_id ? r.pro : r.con;
+             const myRole = r.pro_id === userId ? "Pro" : "Con";
               return (
                 <div key={r.id} style={card}>
                   <p style={{ fontWeight: 500, margin: "0 0 4px", fontSize: 15 }}>{r.topic}</p>
@@ -151,7 +153,7 @@ export default function DashboardPage() {
           <p style={sectionLabel}>Sent challenges</p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {outgoing.map(r => {
-              const opponent = r.pro_id === userId ? r.con[0] : r.pro[0];
+              const opponent = r.pro_id === userId ? r.con : r.pro;
               return (
                 <div key={r.id} style={{ ...card, opacity: 0.7 }}>
                   <p style={{ fontWeight: 500, margin: "0 0 4px", fontSize: 15 }}>{r.topic}</p>
@@ -164,7 +166,44 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-
+    {/* Active rounds */}
+    {active.length > 0 && (
+      <div style={{ marginBottom: "1.5rem" }}>
+        <p style={sectionLabel}>Active rounds</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {active.map(r => {
+            const myRole = r.pro_id === userId ? "pro" : "con";
+            const opponent = myRole === "pro" ? r.con : r.pro;
+            const speeches = ["Pro Constructive","Con Constructive","Pro Rebuttal","Con Rebuttal","Pro Summary","Con Summary","Pro Final Focus","Con Final Focus"];
+            const currentSpeech = (r as any).current_speech || 1;
+            const isMyTurn = (currentSpeech % 2 === 1 && myRole === "pro") || (currentSpeech % 2 === 0 && myRole === "con");
+            return (
+              <div
+                key={r.id}
+                onClick={() => router.push(`/round/${r.id}`)}
+                style={{ ...card, cursor: "pointer", borderColor: isMyTurn ? "#1a1814" : "#e5e2dc" }}
+              >
+                <p style={{ fontWeight: 500, margin: "0 0 4px", fontSize: 15 }}>{r.topic}</p>
+                <p style={{ fontSize: 13, color: "#6b6760", margin: "0 0 10px" }}>
+                  vs @{opponent?.username} · You are {myRole === "pro" ? "Pro" : "Con"}
+                </p>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 12, color: "#6b6760" }}>
+                    Speech {currentSpeech}/8 · {speeches[currentSpeech - 1]}
+                  </span>
+                  <span style={{
+                    fontSize: 12, fontWeight: 500,
+                    color: isMyTurn ? "#1a1814" : "#6b6760",
+                  }}>
+                    {isMyTurn ? "Your turn →" : "Waiting..."}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
       {/* Challenge button */}
       <button onClick={() => router.push("/challenge")} style={primaryBtn}>
         Challenge a debater
