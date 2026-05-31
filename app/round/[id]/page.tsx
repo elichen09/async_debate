@@ -114,7 +114,6 @@ export default function RoundPage() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
       chunksRef.current = [];
-
       recorder.ondataavailable = e => chunksRef.current.push(e.data);
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
@@ -122,11 +121,10 @@ export default function RoundPage() {
         setAudioPreview(URL.createObjectURL(blob));
         stream.getTracks().forEach(t => t.stop());
       };
-
       recorder.start();
       setMediaRecorder(recorder);
       setRecording(true);
-    } catch (err) {
+    } catch {
       setError("Microphone access denied. Please allow microphone access or upload an MP3.");
     }
   }
@@ -140,35 +138,15 @@ export default function RoundPage() {
     if (!round) return;
     setError("");
     setUploading(true);
-
     const currentIndex = round.current_speech - 1;
     const position = SPEECH_ORDER[currentIndex].label.toLowerCase().replace(/ /g, "_");
     const path = `${round.id}/${position}_${Date.now()}.webm`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("speeches")
-      .upload(path, blob, { contentType: "audio/webm" });
-
+    const { error: uploadError } = await supabase.storage.from("speeches").upload(path, blob, { contentType: "audio/webm" });
     if (uploadError) { setError(uploadError.message); setUploading(false); return; }
-
-    const { error: insertError } = await supabase.from("speeches").insert({
-      round_id: round.id,
-      speaker_id: userId,
-      position,
-      speech_number: round.current_speech,
-      storage_path: path,
-    });
-
+    const { error: insertError } = await supabase.from("speeches").insert({ round_id: round.id, speaker_id: userId, position, speech_number: round.current_speech, storage_path: path });
     if (insertError) { setError(insertError.message); setUploading(false); return; }
-
     const nextSpeech = round.current_speech + 1;
-    const newStatus = nextSpeech > 8 ? "judging" : "active";
-
-    await supabase.from("rounds").update({
-      current_speech: nextSpeech,
-      status: newStatus,
-    }).eq("id", round.id);
-
+    await supabase.from("rounds").update({ current_speech: nextSpeech, status: nextSpeech > 8 ? "judging" : "active" }).eq("id", round.id);
     setUploading(false);
     window.location.reload();
   }
@@ -177,40 +155,20 @@ export default function RoundPage() {
     if (!round) return;
     setError("");
     setUploading(true);
-
     const currentIndex = round.current_speech - 1;
     const position = SPEECH_ORDER[currentIndex].label.toLowerCase().replace(/ /g, "_");
     const path = `${round.id}/${position}_${Date.now()}.mp3`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("speeches")
-      .upload(path, file, { contentType: "audio/mpeg" });
-
+    const { error: uploadError } = await supabase.storage.from("speeches").upload(path, file, { contentType: "audio/mpeg" });
     if (uploadError) { setError(uploadError.message); setUploading(false); return; }
-
-    const { error: insertError } = await supabase.from("speeches").insert({
-      round_id: round.id,
-      speaker_id: userId,
-      position,
-      speech_number: round.current_speech,
-      storage_path: path,
-    });
-
+    const { error: insertError } = await supabase.from("speeches").insert({ round_id: round.id, speaker_id: userId, position, speech_number: round.current_speech, storage_path: path });
     if (insertError) { setError(insertError.message); setUploading(false); return; }
-
     const nextSpeech = round.current_speech + 1;
-    const newStatus = nextSpeech > 2 ? "judging" : "active";
-
-    await supabase.from("rounds").update({
-      current_speech: nextSpeech,
-      status: newStatus,
-    }).eq("id", round.id);
-
+    await supabase.from("rounds").update({ current_speech: nextSpeech, status: nextSpeech > 2 ? "judging" : "active" }).eq("id", round.id);
     setUploading(false);
     window.location.reload();
   }
 
-  if (!round) return <p style={{ textAlign: "center", marginTop: "4rem" }}>Loading...</p>;
+  if (!round) return <p style={{ textAlign: "center", marginTop: "4rem", color: "#4a5580" }}>Loading...</p>;
 
   const currentIndex = round.current_speech - 1;
   const currentSpeech = SPEECH_ORDER[currentIndex];
@@ -218,36 +176,43 @@ export default function RoundPage() {
   const opponent = myRole === "pro" ? round.con : round.pro;
 
   return (
-    <div style={{ fontFamily: "sans-serif", maxWidth: 520, margin: "3rem auto", padding: "0 1rem 4rem" }}>
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 20px 80px" }}>
 
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "2rem" }}>
+      {/* Back + title */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 0 20px" }}>
         <button onClick={() => router.push("/dashboard")} style={ghostBtn}>← Back</button>
-        <h1 style={{ fontSize: 20, fontWeight: 500, margin: 0 }}>Round</h1>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "#fff", margin: 0 }}>Round</h1>
       </div>
 
-      {/* Round info */}
+      {/* Round info card */}
       <div style={card}>
-        <p style={{ fontWeight: 500, fontSize: 16, margin: "0 0 6px" }}>{round.topic}</p>
-        <p style={{ fontSize: 13, color: "#6b6760", margin: "0 0 12px" }}>
-          vs @{opponent?.username} · You are {myRole === "pro" ? "Pro" : "Con"}
+        {/* inner glow */}
+        <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, rgba(240,208,112,0.08), transparent 70%)", pointerEvents: "none" }} />
+        <p style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 6px", position: "relative", zIndex: 1 }}>topic</p>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", margin: "0 0 6px", position: "relative", zIndex: 1 }}>{round.topic}</h2>
+        <p style={{ fontSize: 13, color: "#4a5580", margin: "0 0 14px", position: "relative", zIndex: 1 }}>
+          vs @{opponent?.username} &nbsp;·&nbsp; You are {myRole === "pro" ? "Pro" : "Con"}
         </p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
           <span style={{
-            ...badge,
-            background: round.status === "judging" ? "#fef9c3" : round.status === "complete" ? "#f0fdf4" : "#f0fdf4",
-            color: round.status === "judging" ? "#854d0e" : round.status === "complete" ? "#166534" : "#166534",
+            fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20,
+            background: round.status === "judging" ? "rgba(240,208,112,0.1)" : round.status === "complete" ? "rgba(77,223,196,0.1)" : "rgba(255,255,255,0.06)",
+            color: round.status === "judging" ? "#f0d070" : round.status === "complete" ? "#4ddfc4" : "#8a9abf",
           }}>
             {round.status === "judging" ? "⏳ Awaiting judge" : round.status === "complete" ? "✓ Complete" : `Speech ${round.current_speech} of 8`}
           </span>
-          {isMyTurn && <span style={{ ...badge, background: "#1a1814", color: "#fff" }}>Your turn</span>}
+          {isMyTurn && (
+            <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: "#f0d070", color: "#0a0f1e" }}>
+              Your turn
+            </span>
+          )}
         </div>
       </div>
 
       {/* Speech list */}
-      <div style={{ marginBottom: "1.5rem" }}>
+      <div style={{ marginBottom: 20 }}>
         <p style={sectionLabel}>Speeches</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {SPEECH_ORDER.map((s, i) => {
             const speechNum = i + 1;
             const position = s.label.toLowerCase().replace(/ /g, "_");
@@ -258,33 +223,37 @@ export default function RoundPage() {
 
             return (
               <div key={i} style={{
-                ...speechRow,
-                opacity: isFuture ? 0.4 : 1,
-                borderColor: isCurrent ? "#1a1814" : "#e5e2dc",
+                background: "rgba(255,255,255,0.03)",
+                border: `0.5px solid ${isCurrent ? "rgba(240,208,112,0.4)" : "rgba(255,255,255,0.07)"}`,
+                borderRadius: 10,
+                padding: "11px 14px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                opacity: isFuture ? 0.35 : 1,
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{
-                    width: 28, height: 28, borderRadius: "50%",
-                    background: isPast ? "#1a1814" : "#f9f7f4",
-                    border: isCurrent ? "2px solid #1a1814" : "1px solid #e5e2dc",
+                    width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                    background: isPast ? "#f0d070" : isCurrent ? "rgba(240,208,112,0.1)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${isPast ? "#f0d070" : isCurrent ? "rgba(240,208,112,0.4)" : "rgba(255,255,255,0.1)"}`,
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 12, fontWeight: 500,
-                    color: isPast ? "#fff" : "#1a1814",
-                    flexShrink: 0,
+                    fontSize: 11, fontWeight: 600,
+                    color: isPast ? "#0a0f1e" : isCurrent ? "#f0d070" : "#4a5580",
                   }}>
                     {isPast ? "✓" : speechNum}
                   </div>
                   <div>
-                    <p style={{ margin: 0, fontSize: 14, fontWeight: isCurrent ? 500 : 400 }}>{s.label}</p>
+                    <p style={{ margin: 0, fontSize: 13, fontWeight: isCurrent ? 500 : 400, color: isCurrent ? "#fff" : "#8a9abf" }}>{s.label}</p>
                     {submitted && (
-                      <p style={{ margin: 0, fontSize: 12, color: "#6b6760" }}>
-                        Submitted {new Date(submitted.submitted_at).toLocaleDateString()}
+                      <p style={{ margin: 0, fontSize: 11, color: "#4a5580" }}>
+                        {new Date(submitted.submitted_at).toLocaleDateString()}
                       </p>
                     )}
                   </div>
                 </div>
                 {audioUrls[position] && (
-                  <audio controls src={audioUrls[position]} style={{ height: 32, width: 160 }} />
+                  <audio controls src={audioUrls[position]} style={{ height: 28, width: 150 }} />
                 )}
               </div>
             );
@@ -294,64 +263,48 @@ export default function RoundPage() {
 
       {/* Upload section */}
       {isMyTurn && (
-        <div style={{ ...card, borderColor: "#1a1814" }}>
-          <p style={sectionLabel}>Submit your speech — {currentSpeech?.label}</p>
+        <div style={{ ...card, borderColor: "rgba(240,208,112,0.35)" }}>
+          <p style={sectionLabel}>Submit — {currentSpeech?.label}</p>
 
           {error && (
-            <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#b91c1c", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 14 }}>
+            <div style={{ background: "rgba(255,107,107,0.1)", border: "0.5px solid rgba(255,107,107,0.3)", color: "#ff6b6b", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
               {error}
             </div>
           )}
 
-          {/* Recording */}
-          <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 10px" }}>Record directly</p>
+          <p style={{ fontSize: 12, fontWeight: 500, color: "#8a9abf", margin: "0 0 10px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Record directly</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             {!recording ? (
-              <button onClick={startRecording} style={{ ...secondaryBtn, flex: 1 }}>
-                🎙 Start recording
-              </button>
+              <button onClick={startRecording} style={{ ...secondaryBtn, flex: 1 }}>🎙 Start recording</button>
             ) : (
-              <button onClick={stopRecording} style={{ ...secondaryBtn, flex: 1, borderColor: "#b91c1c", color: "#b91c1c" }}>
-                ⏹ Stop recording
-              </button>
+              <button onClick={stopRecording} style={{ ...secondaryBtn, flex: 1, borderColor: "rgba(255,107,107,0.4)", color: "#ff6b6b" }}>⏹ Stop recording</button>
             )}
           </div>
 
           {recording && (
-            <div style={{ fontSize: 13, color: "#b91c1c", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#b91c1c", display: "inline-block" }} />
-              Recording...
+            <div style={{ fontSize: 13, color: "#ff6b6b", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#ff6b6b", display: "inline-block" }} />
+              Recording…
             </div>
           )}
 
           {audioPreview && !recording && (
             <div style={{ marginBottom: 12 }}>
               <audio controls src={audioPreview} style={{ width: "100%", marginBottom: 8 }} />
-              <button
-                onClick={() => handleUploadBlob(audioBlob!)}
-                disabled={uploading}
-                style={primaryBtn}
-              >
+              <button onClick={() => handleUploadBlob(audioBlob!)} disabled={uploading} style={primaryBtn}>
                 {uploading ? "Uploading…" : "Submit recording"}
               </button>
             </div>
           )}
 
-          {/* Divider */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
-            <div style={{ flex: 1, height: 1, background: "#e5e2dc" }} />
-            <span style={{ fontSize: 12, color: "#6b6760" }}>or upload a file</span>
-            <div style={{ flex: 1, height: 1, background: "#e5e2dc" }} />
+            <div style={{ flex: 1, height: "0.5px", background: "rgba(255,255,255,0.08)" }} />
+            <span style={{ fontSize: 11, color: "#4a5580" }}>or upload a file</span>
+            <div style={{ flex: 1, height: "0.5px", background: "rgba(255,255,255,0.08)" }} />
           </div>
 
-          {/* File upload fallback */}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="audio/mp3,audio/mpeg,audio/*"
-            style={{ display: "none" }}
-            onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }}
-          />
+          <input ref={fileRef} type="file" accept="audio/mp3,audio/mpeg,audio/*" style={{ display: "none" }}
+            onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }} />
           <button onClick={() => fileRef.current?.click()} disabled={uploading} style={secondaryBtn}>
             {uploading ? "Uploading…" : "Upload MP3"}
           </button>
@@ -359,44 +312,37 @@ export default function RoundPage() {
       )}
 
       {!isMyTurn && round.status === "active" && (
-        <div style={{ ...card, textAlign: "center", color: "#6b6760" }}>
-          <p style={{ margin: 0, fontSize: 14 }}>Waiting for opponent to submit their speech...</p>
+        <div style={{ ...card, textAlign: "center" }}>
+          <p style={{ margin: 0, fontSize: 14, color: "#4a5580" }}>Waiting for opponent to submit their speech…</p>
         </div>
       )}
 
       {round.status === "judging" && (
         <div style={{ ...card, textAlign: "center" }}>
-          <p style={{ fontWeight: 500, margin: "0 0 4px" }}>All speeches submitted!</p>
-          <p style={{ fontSize: 14, color: "#6b6760", margin: 0 }}>This round is now awaiting a judge.</p>
+          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "#f0d070", margin: "0 0 6px" }}>All speeches submitted!</p>
+          <p style={{ fontSize: 13, color: "#4a5580", margin: 0 }}>This round is now awaiting a judge.</p>
         </div>
       )}
 
       {/* Ballot */}
       {ballot && round.status === "complete" && (
-        <div style={{ ...card, borderColor: "#1a1814" }}>
+        <div style={{ ...card, borderColor: ballot.winner_id === userId ? "rgba(77,223,196,0.3)" : "rgba(255,107,107,0.3)" }}>
           <p style={sectionLabel}>Judge's decision</p>
-          <p style={{
-            fontSize: 18,
-            fontWeight: 500,
-            margin: "0 0 16px",
-            color: ballot.winner_id === userId ? "#166534" : "#b91c1c",
-          }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 22, margin: "0 0 16px", color: ballot.winner_id === userId ? "#4ddfc4" : "#ff6b6b" }}>
             {ballot.winner_id === userId ? "✓ You won!" : "✗ You lost"}
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
-            <div style={statBox}>
-              <p style={statLabel}>Pro speaks</p>
-              <p style={statValue}>{ballot.pro_speaks}</p>
-            </div>
-            <div style={statBox}>
-              <p style={statLabel}>Con speaks</p>
-              <p style={statValue}>{ballot.con_speaks}</p>
-            </div>
+            {[{ label: "Pro speaks", value: ballot.pro_speaks }, { label: "Con speaks", value: ballot.con_speaks }].map(s => (
+              <div key={s.label} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "10px 12px" }}>
+                <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 4px" }}>{s.label}</p>
+                <p style={{ fontSize: 20, fontWeight: 500, color: "#fff", margin: 0 }}>{s.value}</p>
+              </div>
+            ))}
           </div>
           {ballot.reasoning && (
             <div>
-              <p style={{ fontSize: 12, fontWeight: 500, color: "#6b6760", margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Reasoning</p>
-              <p style={{ fontSize: 14, margin: 0, lineHeight: 1.6 }}>{ballot.reasoning}</p>
+              <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 8px" }}>Reasoning</p>
+              <p style={{ fontSize: 14, margin: 0, lineHeight: 1.6, color: "#8a9abf" }}>{ballot.reasoning}</p>
             </div>
           )}
         </div>
@@ -406,90 +352,55 @@ export default function RoundPage() {
   );
 }
 
-const card = {
-  background: "#ffffff",
-  border: "1px solid #e5e2dc",
-  borderRadius: 12,
-  padding: "1.25rem",
-  marginBottom: "1rem",
-} as const;
-
-const speechRow = {
-  background: "#ffffff",
-  border: "1px solid #e5e2dc",
-  borderRadius: 10,
-  padding: "12px 14px",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-} as const;
-
-const statBox = {
-  background: "#f9f7f4",
-  borderRadius: 8,
-  padding: "10px 12px",
-} as const;
-
-const sectionLabel = {
-  fontSize: 11,
-  fontWeight: 500 as const,
-  color: "#6b6760",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.5px",
-  margin: "0 0 10px",
+const card: React.CSSProperties = {
+  background: "rgba(255,255,255,0.03)",
+  border: "0.5px solid rgba(255,255,255,0.07)",
+  borderRadius: 14,
+  padding: "18px 20px",
+  marginBottom: 12,
+  position: "relative",
+  overflow: "hidden",
 };
 
-const statLabel = {
-  fontSize: 11,
+const sectionLabel: React.CSSProperties = {
+  fontSize: 10,
   fontWeight: 500,
-  color: "#6b6760",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.5px",
-  margin: "0 0 4px",
+  color: "#4a5580",
+  textTransform: "uppercase",
+  letterSpacing: "0.12em",
+  margin: "0 0 12px",
 };
 
-const statValue = {
-  fontSize: 20,
-  fontWeight: 500,
-  margin: 0,
-};
-
-const badge = {
-  fontSize: 12,
-  fontWeight: 500,
-  padding: "4px 10px",
-  borderRadius: 20,
-} as const;
-
-const primaryBtn = {
-  width: "100%",
-  height: 44,
-  background: "#1a1814",
-  color: "#fff",
-  border: "none",
-  borderRadius: 8,
-  fontSize: 15,
-  fontWeight: 500,
-  cursor: "pointer",
-} as const;
-
-const secondaryBtn = {
-  width: "100%",
-  height: 44,
+const ghostBtn: React.CSSProperties = {
   background: "transparent",
-  color: "#1a1814",
-  border: "1px solid #e5e2dc",
-  borderRadius: 8,
-  fontSize: 15,
-  fontWeight: 500,
-  cursor: "pointer",
-} as const;
-
-const ghostBtn = {
-  background: "transparent",
-  border: "1px solid #e5e2dc",
+  border: "0.5px solid rgba(255,255,255,0.1)",
   borderRadius: 8,
   padding: "8px 14px",
   fontSize: 14,
+  color: "#4a5580",
   cursor: "pointer",
-} as const;
+};
+
+const primaryBtn: React.CSSProperties = {
+  width: "100%",
+  height: 44,
+  background: "#f0d070",
+  color: "#0a0f1e",
+  border: "none",
+  borderRadius: 8,
+  fontSize: 14,
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const secondaryBtn: React.CSSProperties = {
+  width: "100%",
+  height: 42,
+  background: "transparent",
+  color: "#8a9abf",
+  border: "0.5px solid rgba(255,255,255,0.1)",
+  borderRadius: 8,
+  fontSize: 14,
+  fontWeight: 500,
+  cursor: "pointer",
+};

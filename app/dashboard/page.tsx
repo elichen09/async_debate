@@ -86,7 +86,11 @@ export default function DashboardPage() {
     router.push("/login");
   }
 
-  if (loading) return <p style={{ textAlign: "center", marginTop: "4rem", fontFamily: "var(--font-body)" }}>Loading...</p>;
+  if (loading) return (
+    <p style={{ textAlign: "center", marginTop: "4rem", color: "#4a5580", fontFamily: "var(--font-body)" }}>
+      Loading...
+    </p>
+  );
   if (!profile) return null;
 
   const winRate = profile.wins + profile.losses > 0
@@ -94,7 +98,6 @@ export default function DashboardPage() {
     : 0;
 
   const displayName = profile.display_name || profile.username;
-  const initials = displayName.slice(0, 1).toUpperCase();
 
   const speechLabels = [
     "Pro Constructive", "Con Constructive",
@@ -104,147 +107,141 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="db-page" style={{ maxWidth: 600, margin: "0 auto", padding: "0 20px 80px" }}>
+    <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 20px 80px" }}>
 
       {/* ── Judge link ── */}
       {isJudge && (
-        <div style={{ marginBottom: 12 }}>
-          <button onClick={() => router.push("/judge")} className="db-btn db-btn--ghost db-btn--sm">
+        <div style={{ marginBottom: 16 }}>
+          <button onClick={() => router.push("/judge")} style={ghostBtn}>
             Judge dashboard →
           </button>
         </div>
       )}
 
       {/* ── Hero card ── */}
-      <div className="db-rise" style={{
-        background: "#111",
-        borderRadius: "var(--radius)",
-        overflow: "hidden",
-        marginTop: 0,
-        marginBottom: 14,
+      <div style={{
         position: "relative",
-        minHeight: 180,
-        padding: "28px 24px 22px",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "flex-end",
+        background: "rgba(255,255,255,0.03)",
+        border: "0.5px solid rgba(255,255,255,0.07)",
+        borderRadius: 14,
+        padding: "22px 24px 20px",
+        marginBottom: 14,
+        overflow: "hidden",
       }}>
-        {/* decorative geometric bg */}
-        <svg aria-hidden="true" style={{ position: "absolute", right: 0, top: 0, opacity: 0.1, pointerEvents: "none", width: 280 }} viewBox="0 0 300 220" fill="none">
-          <circle cx="240" cy="60" r="80" stroke="white" strokeWidth="0.6"/>
-          <circle cx="240" cy="60" r="55" stroke="white" strokeWidth="0.6"/>
-          <circle cx="240" cy="60" r="30" stroke="white" strokeWidth="0.6"/>
-          <line x1="80" y1="20" x2="280" y2="180" stroke="white" strokeWidth="0.5"/>
-          <line x1="120" y1="10" x2="260" y2="200" stroke="white" strokeWidth="0.5"/>
-          <path d="M60 110 Q150 40 280 90" stroke="white" strokeWidth="0.5" fill="none"/>
-          <path d="M40 150 Q160 70 290 130" stroke="white" strokeWidth="0.5" fill="none"/>
-          <rect x="190" y="30" width="90" height="120" rx="4" stroke="white" strokeWidth="0.5"/>
-          <line x1="190" y1="60" x2="280" y2="60" stroke="white" strokeWidth="0.4"/>
-          <line x1="190" y1="90" x2="280" y2="90" stroke="white" strokeWidth="0.4"/>
-          <line x1="190" y1="120" x2="280" y2="120" stroke="white" strokeWidth="0.4"/>
-        </svg>
+        {/* inner glows */}
+        <div style={{
+          position: "absolute", top: -60, right: -60,
+          width: 220, height: 220, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(240,208,112,0.12), transparent 70%)",
+          pointerEvents: "none",
+        }} />
+        <div style={{
+          position: "absolute", bottom: -80, left: -40,
+          width: 200, height: 200, borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(30,60,180,0.2), transparent 70%)",
+          pointerEvents: "none",
+        }} />
 
-        <div style={{ position: "relative", zIndex: 1 }}>
-          <p className="db-eyebrow" style={{ color: "#555", marginBottom: 6 }}>debater profile</p>
-          <h1 style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "clamp(28px, 5vw, 38px)",
-            color: "#fff",
-            letterSpacing: "-0.02em",
-            marginBottom: 4,
-          }}>
-            {displayName}
-          </h1>
-          <p style={{ fontSize: 13, color: "#555", marginBottom: 18 }}>@{profile.username}</p>
+        <p style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4a5580", marginBottom: 8, position: "relative", zIndex: 1 }}>
+          debater profile
+        </p>
+        <h1 style={{
+          fontFamily: "var(--font-display)",
+          fontSize: "clamp(26px, 5vw, 34px)",
+          color: "#fff",
+          letterSpacing: "-0.02em",
+          lineHeight: 1,
+          marginBottom: 4,
+          position: "relative",
+          zIndex: 1,
+        }}>
+          {displayName}
+        </h1>
+        <p style={{ fontSize: 13, color: "#4a5580", marginBottom: 18, position: "relative", zIndex: 1 }}>
+          @{profile.username}
+        </p>
 
-          <div style={{ display: "flex", gap: 0 }}>
-            {[
-              { label: "ELO rating", value: profile.elo },
-              { label: "record", value: `${profile.wins}–${profile.losses}` },
-              { label: "win rate", value: `${winRate}%` },
-            ].map((s, i, arr) => (
-              <div key={s.label} style={{
-                padding: "10px 18px",
-                background: "rgba(255,255,255,0.05)",
-                border: "0.5px solid rgba(255,255,255,0.08)",
-                borderRadius: i === 0 ? "8px 0 0 8px" : i === arr.length - 1 ? "0 8px 8px 0" : "0",
-              }}>
-                <p className="db-mono" style={{ fontSize: 20, fontWeight: 600, color: "#fff", margin: 0, lineHeight: 1 }}>{s.value}</p>
-                <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#555", margin: "4px 0 0" }}>{s.label}</p>
-              </div>
-            ))}
-          </div>
+        {/* stat strip */}
+        <div style={{ display: "flex", position: "relative", zIndex: 1 }}>
+          {[
+            { label: "ELO rating", value: String(profile.elo), gold: true },
+            { label: "record", value: `${profile.wins}–${profile.losses}`, gold: false },
+            { label: "win rate", value: `${winRate}%`, gold: false },
+          ].map((s, i, arr) => (
+            <div key={s.label} style={{
+              padding: "10px 18px",
+              background: "rgba(255,255,255,0.04)",
+              border: "0.5px solid rgba(255,255,255,0.07)",
+              borderRadius: i === 0 ? "8px 0 0 8px" : i === arr.length - 1 ? "0 8px 8px 0" : "0",
+            }}>
+              <p style={{ fontSize: 20, fontWeight: 500, color: s.gold ? "#f0d070" : "#fff", lineHeight: 1, margin: 0 }}>
+                {s.value}
+              </p>
+              <p style={{ fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "#4a5580", marginTop: 3 }}>
+                {s.label}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* ── Incoming challenges ── */}
       {incoming.length > 0 && (
-        <section style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "20px 0 10px" }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 18, color: "var(--ink)" }}>
+        <section style={{ marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "18px 0 10px" }}>
+            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "#c8b86a" }}>
               Incoming challenges
             </h2>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--muted)" }}>{incoming.length} pending</span>
+            <span style={{ fontSize: 11, color: "#4a5580", letterSpacing: "0.04em" }}>{incoming.length} pending</span>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {incoming.map(r => {
               const opponent = r.challenger_id === r.pro_id ? r.pro : r.con;
               const myRole = r.pro_id === userId ? "Pro" : "Con";
               return (
-                <div key={r.id} className="db-card db-card--accent" style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  gap: 0,
-                  padding: 0,
+                <div key={r.id} style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "0.5px solid rgba(240,208,112,0.25)",
+                  borderRadius: 12,
                   overflow: "hidden",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 72px",
                 }}>
-                  <div style={{ padding: "18px 20px" }}>
-                    <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 8px", display: "flex", alignItems: "center", gap: 6 }}>
-                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />
+                  <div style={{ padding: "16px 18px" }}>
+                    <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#f0d070", margin: "0 0 8px", display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#f0d070", display: "inline-block", flexShrink: 0 }} />
                       new challenge
                     </p>
-                    <h3 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--ink)", marginBottom: 6 }}>{r.topic}</h3>
-                    <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 12px" }}>
+                    <h3 style={{ fontFamily: "var(--font-display)", fontSize: 19, color: "#fff", marginBottom: 5 }}>{r.topic}</h3>
+                    <p style={{ fontSize: 12, color: "#4a5580", margin: "0 0 11px" }}>
                       from @{opponent?.username} &nbsp;·&nbsp; you are {myRole} &nbsp;·&nbsp; ELO {opponent?.elo}
                     </p>
                     <blockquote style={{
                       fontFamily: "var(--font-display)",
                       fontStyle: "italic",
-                      fontSize: 13,
-                      color: "var(--ink-soft)",
+                      fontSize: 12,
+                      color: "#8a9abf",
                       lineHeight: 1.55,
-                      margin: "0 0 16px",
-                      padding: "10px 14px",
-                      background: "var(--paper-2)",
-                      borderRadius: "0 8px 8px 0",
-                      borderLeft: "2px solid var(--accent)",
+                      margin: "0 0 13px",
+                      padding: "9px 12px",
+                      background: "rgba(255,255,255,0.03)",
+                      borderRadius: "0 7px 7px 0",
+                      borderLeft: "2px solid rgba(240,208,112,0.5)",
                     }}>
                       "{r.topic}"
                     </blockquote>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => handleAccept(r.id)} className="db-btn db-btn--primary db-btn--sm" style={{ flex: 1 }}>
-                        Accept challenge
-                      </button>
-                      <button onClick={() => handleDecline(r.id)} className="db-btn db-btn--ghost db-btn--sm" style={{ flex: 1 }}>
-                        Decline
-                      </button>
+                    <div style={{ display: "flex", gap: 7 }}>
+                      <button onClick={() => handleAccept(r.id)} style={acceptBtn}>Accept</button>
+                      <button onClick={() => handleDecline(r.id)} style={declineBtn}>Decline</button>
                     </div>
                   </div>
-                  {/* decorative side panel */}
-                  <div style={{
-                    width: 80,
-                    background: "var(--paper-2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}>
-                    <svg aria-hidden="true" style={{ opacity: 0.18, width: 48 }} viewBox="0 0 60 80" fill="none">
-                      <rect x="5" y="5" width="50" height="70" rx="3" stroke="currentColor" strokeWidth="1.5"/>
-                      <line x1="14" y1="22" x2="46" y2="22" stroke="currentColor" strokeWidth="1.2"/>
-                      <line x1="14" y1="34" x2="46" y2="34" stroke="currentColor" strokeWidth="1.2"/>
-                      <line x1="14" y1="46" x2="36" y2="46" stroke="currentColor" strokeWidth="1.2"/>
+                  <div style={{ background: "rgba(255,255,255,0.02)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <svg width="48" viewBox="0 0 60 80" fill="none" style={{ opacity: 0.12 }}>
+                      <rect x="5" y="5" width="50" height="70" rx="3" stroke="white" strokeWidth="1.5"/>
+                      <line x1="14" y1="22" x2="46" y2="22" stroke="white" strokeWidth="1.2"/>
+                      <line x1="14" y1="34" x2="46" y2="34" stroke="white" strokeWidth="1.2"/>
+                      <line x1="14" y1="46" x2="36" y2="46" stroke="white" strokeWidth="1.2"/>
                     </svg>
                   </div>
                 </div>
@@ -256,28 +253,30 @@ export default function DashboardPage() {
 
       {/* ── Outgoing challenges ── */}
       {outgoing.length > 0 && (
-        <section style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "20px 0 10px" }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 18, color: "var(--ink)" }}>
+        <section style={{ marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "18px 0 10px" }}>
+            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "#c8b86a" }}>
               Sent challenges
             </h2>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {outgoing.map(r => {
               const opponent = r.pro_id === userId ? r.con : r.pro;
               return (
-                <div key={r.id} className="db-card" style={{ opacity: 0.65, display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 8,
-                    background: "var(--paper-2)",
-                    border: "1px solid var(--line)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0,
-                    fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--muted)",
-                  }}>…</div>
+                <div key={r.id} style={{
+                  background: "rgba(255,255,255,0.02)",
+                  border: "0.5px solid rgba(255,255,255,0.06)",
+                  borderRadius: 12,
+                  padding: "13px 16px",
+                  opacity: 0.6,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", border: "0.5px solid rgba(255,255,255,0.2)", display: "inline-block", flexShrink: 0 }} />
                   <div>
-                    <p style={{ fontWeight: 500, margin: "0 0 2px", fontSize: 14, color: "var(--ink)" }}>{r.topic}</p>
-                    <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>
+                    <p style={{ fontWeight: 500, fontSize: 14, margin: "0 0 2px", color: "#fff" }}>{r.topic}</p>
+                    <p style={{ fontSize: 12, color: "#4a5580", margin: 0 }}>
                       waiting for @{opponent?.username} to respond
                     </p>
                   </div>
@@ -290,15 +289,15 @@ export default function DashboardPage() {
 
       {/* ── Active rounds ── */}
       {active.length > 0 && (
-        <section style={{ marginBottom: 20 }}>
-          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "20px 0 10px" }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 18, color: "var(--ink)" }}>
+        <section style={{ marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "18px 0 10px" }}>
+            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "#c8b86a" }}>
               Active rounds
             </h2>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--muted)" }}>{active.length} in play</span>
+            <span style={{ fontSize: 11, color: "#4a5580", letterSpacing: "0.04em" }}>{active.length} in play</span>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {active.map(r => {
               const myRole = r.pro_id === userId ? "pro" : "con";
               const opponent = myRole === "pro" ? r.con : r.pro;
@@ -309,50 +308,44 @@ export default function DashboardPage() {
                 <div
                   key={r.id}
                   onClick={() => router.push(`/round/${r.id}`)}
-                  className="db-card db-card--interactive"
                   style={{
-                    borderColor: isMyTurn ? "var(--ink)" : "var(--line)",
+                    background: "rgba(255,255,255,0.03)",
+                    border: `0.5px solid ${isMyTurn ? "rgba(240,208,112,0.35)" : "rgba(255,255,255,0.07)"}`,
+                    borderRadius: 12,
+                    padding: "13px 16px",
                     display: "flex",
                     alignItems: "center",
-                    gap: 16,
-                    padding: "14px 18px",
+                    gap: 14,
+                    cursor: "pointer",
                   }}
                 >
-                  {/* speech number */}
-                  <div style={{
-                    fontFamily: "var(--font-display)",
-                    fontSize: 26,
-                    color: "var(--muted)",
-                    width: 32,
-                    flexShrink: 0,
-                    lineHeight: 1,
-                    textAlign: "center",
-                  }}>{currentSpeech}</div>
-
-                  <div style={{ width: "0.5px", height: 40, background: "var(--line)", flexShrink: 0 }} />
-
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "#4a5580", width: 28, flexShrink: 0, textAlign: "center", lineHeight: 1 }}>
+                    {currentSpeech}
+                  </div>
+                  <div style={{ width: "0.5px", height: 36, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 500, fontSize: 14, margin: "0 0 3px", color: "var(--ink)" }}>{r.topic}</p>
-                    <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 8px" }}>
+                    <p style={{ fontSize: 14, fontWeight: 500, color: "#fff", margin: "0 0 3px" }}>{r.topic}</p>
+                    <p style={{ fontSize: 11, color: "#4a5580", margin: "0 0 7px" }}>
                       vs @{opponent?.username} &nbsp;·&nbsp; {myRole === "pro" ? "Pro" : "Con"} &nbsp;·&nbsp; {speechLabels[currentSpeech - 1]}
                     </p>
-                    {/* progress dots */}
                     <div style={{ display: "flex", gap: 3 }}>
                       {Array.from({ length: 8 }).map((_, i) => (
                         <span key={i} style={{
-                          width: 6, height: 6, borderRadius: "50%",
-                          background: i < currentSpeech ? "var(--ink)" : "var(--line-strong)",
-                          display: "inline-block",
+                          width: 6, height: 6, borderRadius: "50%", display: "inline-block",
+                          background: i < currentSpeech ? "#f0d070" : "rgba(255,255,255,0.1)",
                         }} />
                       ))}
                     </div>
                   </div>
-
                   <div style={{ flexShrink: 0, textAlign: "right" }}>
                     {isMyTurn ? (
-                      <span className="db-badge db-badge--turn" style={{ fontSize: 11 }}>your turn →</span>
+                      <span style={{ fontSize: 10, padding: "4px 10px", background: "#f0d070", color: "#0a0f1e", borderRadius: 20, fontWeight: 600, whiteSpace: "nowrap" }}>
+                        your turn →
+                      </span>
                     ) : (
-                      <span className="db-badge db-badge--wait" style={{ fontSize: 11 }}>waiting…</span>
+                      <span style={{ fontSize: 10, padding: "4px 10px", background: "rgba(255,255,255,0.06)", color: "#4a5580", borderRadius: 20, whiteSpace: "nowrap" }}>
+                        waiting…
+                      </span>
                     )}
                   </div>
                 </div>
@@ -362,26 +355,28 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* ── CTA bar ── */}
+      {/* ── CTA ── */}
       <div style={{
-        background: "#111",
-        borderRadius: "var(--radius)",
-        padding: "18px 22px",
-        marginTop: 24,
+        marginTop: 12,
+        background: "rgba(255,255,255,0.03)",
+        border: "0.5px solid rgba(240,208,112,0.2)",
+        borderRadius: 12,
+        padding: "16px 20px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        gap: 16,
+        gap: 14,
+        position: "relative",
+        overflow: "hidden",
       }}>
-        <div>
-          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "#fff", margin: "0 0 3px" }}>
+        <div style={{ position: "absolute", right: -30, top: -30, width: 120, height: 120, borderRadius: "50%", background: "radial-gradient(circle, rgba(240,208,112,0.1), transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "relative", zIndex: 1 }}>
+          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 15, color: "#fff", margin: "0 0 3px" }}>
             Ready for a new challenge?
           </p>
-          <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "#555", margin: 0, letterSpacing: "0.04em" }}>
-            debate new ideas · climb the ranks
-          </p>
+          <p style={{ fontSize: 11, color: "#4a5580" }}>debate new ideas · climb the ranks</p>
         </div>
-        <button onClick={() => router.push("/challenge")} className="db-btn db-btn--accent" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+        <button onClick={() => router.push("/challenge")} style={ctaBtn}>
           Challenge a debater
         </button>
       </div>
@@ -389,3 +384,51 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+const ghostBtn: React.CSSProperties = {
+  background: "transparent",
+  border: "0.5px solid rgba(255,255,255,0.1)",
+  borderRadius: 8,
+  padding: "8px 14px",
+  fontSize: 14,
+  color: "#4a5580",
+  cursor: "pointer",
+};
+
+const acceptBtn: React.CSSProperties = {
+  flex: 1,
+  padding: "8px 0",
+  background: "#f0d070",
+  color: "#0a0f1e",
+  border: "none",
+  borderRadius: 7,
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const declineBtn: React.CSSProperties = {
+  flex: 1,
+  padding: "8px 0",
+  background: "transparent",
+  color: "#4a5580",
+  border: "0.5px solid rgba(255,255,255,0.1)",
+  borderRadius: 7,
+  fontSize: 12,
+  cursor: "pointer",
+};
+
+const ctaBtn: React.CSSProperties = {
+  padding: "10px 18px",
+  background: "#f0d070",
+  color: "#0a0f1e",
+  border: "none",
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+  position: "relative",
+  zIndex: 1,
+};
