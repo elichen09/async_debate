@@ -1,42 +1,60 @@
 import Link from "next/link";
 
+const STEPS = [
+  {
+    n: "01",
+    t: "Challenge anyone",
+    d: "Search for a debater, pick your side, send the resolution. Skip the calendar entirely.",
+  },
+  {
+    n: "02",
+    t: "Speak on your clock",
+    d: "Record and upload each speech whenever it suits you. The round moves at your pace.",
+  },
+  {
+    n: "03",
+    t: "Get judged, climb",
+    d: "A real judge writes a full ballot. Win your round and your ELO climbs.",
+  },
+];
+
 export default function Home() {
   return (
-    <div style={{ fontFamily: "sans-serif", maxWidth: 480, margin: "6rem auto", padding: "0 1rem", textAlign: "center" }}>
-      <h1 style={{ fontSize: 42, fontWeight: 500, letterSpacing: "-1px", marginBottom: 12 }}>
-        Async Debate
-      </h1>
-      <p style={{ color: "#6b6760", fontSize: 17, marginBottom: 40, lineHeight: 1.6 }}>
-        Challenge opponents, submit your speeches, and climb the rankings — on your schedule.
-      </p>
+    <div className="ad-container ad-page ad-home">
+      <section className="ad-home__hero ad-rise">
+        <p className="ad-eyebrow">Public Forum · Asynchronous</p>
+        <h1 className="ad-home__title">
+          Debate anyone,
+          <br />
+          <span className="ad-home__title-em">anywhere</span>, anytime.
+        </h1>
+        <p className="ad-home__lede">
+          Real rounds without the scheduling headache. Send a challenge, record your
+          speeches whenever you have a free minute, and let the ladder show who is sharpest.
+        </p>
+        <div className="ad-home__cta">
+          <Link href="/signup" className="ad-btn ad-btn--accent">
+            Start debating
+          </Link>
+          <Link href="/login" className="ad-btn ad-btn--ghost">
+            Sign in
+          </Link>
+        </div>
+      </section>
 
-      <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
-        <Link href="/signup" style={primaryBtn}>Get started</Link>
-        <Link href="/login" style={secondaryBtn}>Sign in</Link>
-      </div>
+      <section className="ad-home__steps">
+        {STEPS.map((s, i) => (
+          <div
+            key={s.n}
+            className="ad-card ad-home__step ad-rise"
+            style={{ animationDelay: `${0.08 * (i + 1)}s` }}
+          >
+            <span className="ad-home__step-n">{s.n}</span>
+            <h3 className="ad-home__step-t">{s.t}</h3>
+            <p className="ad-home__step-d">{s.d}</p>
+          </div>
+        ))}
+      </section>
     </div>
   );
 }
-
-const primaryBtn = {
-  display: "inline-block",
-  padding: "12px 28px",
-  background: "#1a1814",
-  color: "#fff",
-  borderRadius: 8,
-  fontSize: 15,
-  fontWeight: 500,
-  textDecoration: "none",
-} as const;
-
-const secondaryBtn = {
-  display: "inline-block",
-  padding: "12px 28px",
-  background: "transparent",
-  color: "#1a1814",
-  border: "1px solid #e5e2dc",
-  borderRadius: 8,
-  fontSize: 15,
-  fontWeight: 500,
-  textDecoration: "none",
-} as const;

@@ -52,7 +52,12 @@ export default function RoundPage() {
   const [audioUrls, setAudioUrls] = useState<Record<string, string>>({});
   const [ballot, setBallot] = useState<Ballot | null>(null);
   const [error, setError] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioPreview, setAudioPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -104,6 +109,70 @@ export default function RoundPage() {
     load();
   }, [id]);
 
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      chunksRef.current = [];
+
+      recorder.ondataavailable = e => chunksRef.current.push(e.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        setAudioBlob(blob);
+        setAudioPreview(URL.createObjectURL(blob));
+        stream.getTracks().forEach(t => t.stop());
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setRecording(true);
+    } catch (err) {
+      setError("Microphone access denied. Please allow microphone access or upload an MP3.");
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorder?.stop();
+    setRecording(false);
+  }
+
+  async function handleUploadBlob(blob: Blob) {
+    if (!round) return;
+    setError("");
+    setUploading(true);
+
+    const currentIndex = round.current_speech - 1;
+    const position = SPEECH_ORDER[currentIndex].label.toLowerCase().replace(/ /g, "_");
+    const path = `${round.id}/${position}_${Date.now()}.webm`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("speeches")
+      .upload(path, blob, { contentType: "audio/webm" });
+
+    if (uploadError) { setError(uploadError.message); setUploading(false); return; }
+
+    const { error: insertError } = await supabase.from("speeches").insert({
+      round_id: round.id,
+      speaker_id: userId,
+      position,
+      speech_number: round.current_speech,
+      storage_path: path,
+    });
+
+    if (insertError) { setError(insertError.message); setUploading(false); return; }
+
+    const nextSpeech = round.current_speech + 1;
+    const newStatus = nextSpeech > 2 ? "judging" : "active";
+
+    await supabase.from("rounds").update({
+      current_speech: nextSpeech,
+      status: newStatus,
+    }).eq("id", round.id);
+
+    setUploading(false);
+    window.location.reload();
+  }
+
   async function handleUpload(file: File) {
     if (!round) return;
     setError("");
@@ -115,18 +184,9 @@ export default function RoundPage() {
 
     const { error: uploadError } = await supabase.storage
       .from("speeches")
-      .upload(path, file, { upsert: true });
+      .upload(path, file, { contentType: "audio/mpeg" });
 
     if (uploadError) { setError(uploadError.message); setUploading(false); return; }
-
-    console.log("inserting speech:", {
-      round_id: round.id,
-      speaker_id: userId,
-      position,
-      speech_number: round.current_speech,
-      storage_path: path,
-    });
-    console.log("current user:", userId);
 
     const { error: insertError } = await supabase.from("speeches").insert({
       round_id: round.id,
@@ -236,14 +296,55 @@ export default function RoundPage() {
       {isMyTurn && (
         <div style={{ ...card, borderColor: "#1a1814" }}>
           <p style={sectionLabel}>Submit your speech — {currentSpeech?.label}</p>
-          <p style={{ fontSize: 13, color: "#6b6760", margin: "0 0 14px" }}>
-            Upload an MP3 recording of your speech.
-          </p>
+
           {error && (
             <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#b91c1c", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 14 }}>
               {error}
             </div>
           )}
+
+          {/* Recording */}
+          <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 10px" }}>Record directly</p>
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {!recording ? (
+              <button onClick={startRecording} style={{ ...secondaryBtn, flex: 1 }}>
+                🎙 Start recording
+              </button>
+            ) : (
+              <button onClick={stopRecording} style={{ ...secondaryBtn, flex: 1, borderColor: "#b91c1c", color: "#b91c1c" }}>
+                ⏹ Stop recording
+              </button>
+            )}
+          </div>
+
+          {recording && (
+            <div style={{ fontSize: 13, color: "#b91c1c", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#b91c1c", display: "inline-block" }} />
+              Recording...
+            </div>
+          )}
+
+          {audioPreview && !recording && (
+            <div style={{ marginBottom: 12 }}>
+              <audio controls src={audioPreview} style={{ width: "100%", marginBottom: 8 }} />
+              <button
+                onClick={() => handleUploadBlob(audioBlob!)}
+                disabled={uploading}
+                style={primaryBtn}
+              >
+                {uploading ? "Uploading…" : "Submit recording"}
+              </button>
+            </div>
+          )}
+
+          {/* Divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
+            <div style={{ flex: 1, height: 1, background: "#e5e2dc" }} />
+            <span style={{ fontSize: 12, color: "#6b6760" }}>or upload a file</span>
+            <div style={{ flex: 1, height: 1, background: "#e5e2dc" }} />
+          </div>
+
+          {/* File upload fallback */}
           <input
             ref={fileRef}
             type="file"
@@ -251,7 +352,7 @@ export default function RoundPage() {
             style={{ display: "none" }}
             onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }}
           />
-          <button onClick={() => fileRef.current?.click()} disabled={uploading} style={primaryBtn}>
+          <button onClick={() => fileRef.current?.click()} disabled={uploading} style={secondaryBtn}>
             {uploading ? "Uploading…" : "Upload MP3"}
           </button>
         </div>
@@ -366,6 +467,18 @@ const primaryBtn = {
   background: "#1a1814",
   color: "#fff",
   border: "none",
+  borderRadius: 8,
+  fontSize: 15,
+  fontWeight: 500,
+  cursor: "pointer",
+} as const;
+
+const secondaryBtn = {
+  width: "100%",
+  height: 44,
+  background: "transparent",
+  color: "#1a1814",
+  border: "1px solid #e5e2dc",
   borderRadius: 8,
   fontSize: 15,
   fontWeight: 500,
