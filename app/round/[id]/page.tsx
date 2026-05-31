@@ -162,7 +162,7 @@ export default function RoundPage() {
     if (insertError) { setError(insertError.message); setUploading(false); return; }
 
     const nextSpeech = round.current_speech + 1;
-    const newStatus = nextSpeech > 2 ? "judging" : "active";
+    const newStatus = nextSpeech > 8 ? "judging" : "active";
 
     await supabase.from("rounds").update({
       current_speech: nextSpeech,
