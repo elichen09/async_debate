@@ -55,10 +55,12 @@ export default function NavBar() {
           </span>
           <span className="db-nav__word">Async&nbsp;Debate</span>
         </Link>
-
         <nav className="db-nav__links">
           <Link href="/dashboard" className={`db-nav__link ${isActive("/dashboard") ? "is-active" : ""}`}>
             Rounds
+          </Link>
+          <Link href="/history" className={`db-nav__link ${isActive("/history") ? "is-active" : ""}`}>
+            History
           </Link>
           <Link href="/challenge" className={`db-nav__link ${isActive("/challenge") ? "is-active" : ""}`}>
             Challenge

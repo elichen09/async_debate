@@ -33,8 +33,6 @@ export default function DashboardPage() {
   const [incoming, setIncoming] = useState<Round[]>([]);
   const [outgoing, setOutgoing] = useState<Round[]>([]);
   const [active, setActive] = useState<Round[]>([]);
-  const [judging, setJudging] = useState<Round[]>([]);
-  const [completed, setCompleted] = useState<Round[]>([]);
   const [loading, setLoading] = useState(true);
   const [isJudge, setIsJudge] = useState(false);
 
@@ -61,15 +59,13 @@ export default function DashboardPage() {
           pro:profiles!pro_id(username, display_name, elo),
           con:profiles!con_id(username, display_name, elo)
         `)
-        .in("status", ["pending", "active", "judging", "complete"])
+        .in("status", ["pending", "active"])
         .or(`pro_id.eq.${id},con_id.eq.${id}`);
 
       const allRounds = (rounds || []) as unknown as Round[];
       setIncoming(allRounds.filter(r => r.challenger_id !== id && r.status === "pending"));
       setOutgoing(allRounds.filter(r => r.challenger_id === id && r.status === "pending"));
       setActive(allRounds.filter(r => r.status === "active"));
-      setJudging(allRounds.filter(r => r.status === "judging"));
-      setCompleted(allRounds.filter(r => r.status === "complete"));
       setLoading(false);
     }
     load();
@@ -218,63 +214,6 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Awaiting judge */}
-      {judging.length > 0 && (
-        <div style={{ marginBottom: "1.5rem" }}>
-          <p style={sectionLabel}>Awaiting scoring</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {judging.map(r => {
-              const myRole = r.pro_id === userId ? "Pro" : "Con";
-              const opponent = r.pro_id === userId ? r.con : r.pro;
-              return (
-                <div key={r.id} style={{ ...card, marginBottom: 0, opacity: 0.8 }}>
-                  <p style={{ fontWeight: 500, margin: "0 0 4px", fontSize: 15 }}>{r.topic}</p>
-                  <p style={{ fontSize: 13, color: "#6b6760", margin: "0 0 10px" }}>
-                    vs @{opponent?.username} · You are {myRole}
-                  </p>
-                  <span style={{ ...badge, background: "#fef9c3", color: "#854d0e" }}>
-                    ⏳ Awaiting judge
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Completed rounds */}
-      {completed.length > 0 && (
-        <div style={{ marginBottom: "1.5rem" }}>
-          <p style={sectionLabel}>Completed rounds</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {completed.map(r => {
-              const myRole = r.pro_id === userId ? "Pro" : "Con";
-              const opponent = r.pro_id === userId ? r.con : r.pro;
-              const won = r.winner_id === userId;
-              return (
-                <div
-                  key={r.id}
-                  onClick={() => router.push(`/round/${r.id}`)}
-                  style={{ ...card, marginBottom: 0, cursor: "pointer" }}
-                >
-                  <p style={{ fontWeight: 500, margin: "0 0 4px", fontSize: 15 }}>{r.topic}</p>
-                  <p style={{ fontSize: 13, color: "#6b6760", margin: "0 0 10px" }}>
-                    vs @{opponent?.username} · You are {myRole}
-                  </p>
-                  <span style={{
-                    ...badge,
-                    background: won ? "#f0fdf4" : "#fef2f2",
-                    color: won ? "#166534" : "#b91c1c",
-                  }}>
-                    {won ? "✓ Win" : "✗ Loss"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Challenge button */}
       <button onClick={() => router.push("/challenge")} style={primaryBtn}>
         Challenge a debater
@@ -295,14 +234,6 @@ const statBox = {
   background: "#f9f7f4",
   borderRadius: 8,
   padding: "10px 12px",
-} as const;
-
-const badge = {
-  fontSize: 12,
-  fontWeight: 500,
-  padding: "4px 10px",
-  borderRadius: 20,
-  display: "inline-block",
 } as const;
 
 const sectionLabel = {
