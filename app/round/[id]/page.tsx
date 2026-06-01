@@ -95,6 +95,13 @@ export default function RoundPage() {
           .from("speeches")
           .createSignedUrl(s.storage_path, 3600);
         if (data) urls[s.position] = data.signedUrl;
+        else {
+          // fallback to public URL
+          const { data: pubData } = supabase.storage
+            .from("speeches")
+            .getPublicUrl(s.storage_path);
+          if (pubData) urls[s.position] = pubData.publicUrl;
+        }
       }
       setAudioUrls(urls);
 
