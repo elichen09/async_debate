@@ -65,6 +65,9 @@ export default function NavBar() {
           <Link href="/challenge" className={`db-nav__link ${isActive("/challenge") ? "is-active" : ""}`}>
             Challenge
           </Link>
+          <Link href="/watch" className={`db-nav__link ${isActive("/watch") ? "is-active" : ""}`}>
+            Watch
+          </Link>
           {profile?.is_judge && (
             <Link href="/judge" className={`db-nav__link ${isActive("/judge") ? "is-active" : ""}`}>
               Judge

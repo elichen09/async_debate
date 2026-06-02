@@ -359,33 +359,45 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* Live ranked rounds */}
+      {/* Top ranked round */}
       {otherPublicRounds.length > 0 && (
         <section style={{ marginBottom: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "18px 0 10px" }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "#c8b86a" }}>Live ranked rounds</h2>
-            <span style={{ fontSize: 11, color: "#4a5580", letterSpacing: "0.04em" }}>{otherPublicRounds.length} live</span>
+            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "#c8b86a" }}>Top ranked round</h2>
+            <span
+              onClick={() => router.push("/watch")}
+              style={{ fontSize: 11, color: "#f0d070", letterSpacing: "0.04em", cursor: "pointer" }}
+            >
+              See all →
+            </span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {otherPublicRounds.map(r => {
-              const currentSpeech = r.current_speech || 1;
-              const progress = ((currentSpeech - 1) / 8) * 100;
-              return (
-                <div key={r.id} onClick={() => router.push(`/round/${r.id}`)} style={{ background: "rgba(255,255,255,0.03)", border: "0.5px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 14, fontWeight: 500, color: "#fff", margin: "0 0 3px" }}>{r.topic}</p>
-                    <p style={{ fontSize: 11, color: "#4a5580", margin: "0 0 8px" }}>
-                      @{r.pro?.username} (Pro) vs @{r.con?.username} (Con)
-                    </p>
-                    <div style={{ height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${progress}%`, background: "#f0d070", borderRadius: 2 }} />
-                    </div>
+          {(() => {
+            const r = [...otherPublicRounds].sort((a, b) => {
+              const eloA = (a.pro?.elo || 0) + (a.con?.elo || 0);
+              const eloB = (b.pro?.elo || 0) + (b.con?.elo || 0);
+              return eloB - eloA;
+            })[0];
+            const currentSpeech = r.current_speech || 1;
+            const progress = ((currentSpeech - 1) / 8) * 100;
+            const speechLabels = ["Pro Constructive","Con Constructive","Pro Rebuttal","Con Rebuttal","Pro Summary","Con Summary","Pro Final Focus","Con Final Focus"];
+            return (
+              <div onClick={() => router.push(`/round/${r.id}`)} style={{ background: "rgba(255,255,255,0.03)", border: "0.5px solid rgba(240,208,112,0.2)", borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 14, fontWeight: 500, color: "#fff", margin: "0 0 4px" }}>{r.topic}</p>
+                  <p style={{ fontSize: 11, color: "#4a5580", margin: "0 0 8px" }}>
+                    @{r.pro?.username} <span style={{ color: "#f0d070" }}>{r.pro?.elo}</span> (Pro) vs @{r.con?.username} <span style={{ color: "#f0d070" }}>{r.con?.elo}</span> (Con)
+                  </p>
+                  <div style={{ height: 3, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${progress}%`, background: "#f0d070", borderRadius: 2 }} />
                   </div>
-                  <span style={{ fontSize: 11, color: "#4a5580", flexShrink: 0 }}>{speechLabels[currentSpeech - 1]}</span>
                 </div>
-              );
-            })}
-          </div>
+                <div style={{ flexShrink: 0, textAlign: "right" }}>
+                  <p style={{ fontSize: 11, color: "#4a5580", margin: "0 0 3px" }}>{speechLabels[currentSpeech - 1]}</p>
+                  <p style={{ fontSize: 10, color: "rgba(240,208,112,0.6)", margin: 0 }}>⚡ {(r.pro?.elo || 0) + (r.con?.elo || 0)} ELO</p>
+                </div>
+              </div>
+            );
+          })()}
         </section>
       )}
 
