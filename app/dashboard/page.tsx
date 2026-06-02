@@ -23,6 +23,7 @@ interface Round {
   current_speech: number;
   winner_id: string;
   is_ranked: boolean;
+  created_at: string;
   pro: { username: string; display_name: string; elo: number };
   con: { username: string; display_name: string; elo: number };
 }
@@ -35,6 +36,8 @@ export default function DashboardPage() {
   const [outgoing, setOutgoing] = useState<Round[]>([]);
   const [active, setActive] = useState<Round[]>([]);
   const [publicRounds, setPublicRounds] = useState<Round[]>([]);
+  const [staleRounds, setStaleRounds] = useState<Round[]>([]);
+  const [lastSpeechMap, setLastSpeechMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [isJudge, setIsJudge] = useState(false);
 
@@ -57,7 +60,7 @@ export default function DashboardPage() {
       const { data: rounds } = await supabase
         .from("rounds")
         .select(`
-          id, topic, status, pro_id, con_id, challenger_id, current_speech, winner_id, is_ranked,
+          id, topic, status, pro_id, con_id, challenger_id, current_speech, winner_id, is_ranked, created_at,
           pro:profiles!pro_id(username, display_name, elo),
           con:profiles!con_id(username, display_name, elo)
         `)
@@ -65,14 +68,37 @@ export default function DashboardPage() {
         .or(`pro_id.eq.${id},con_id.eq.${id}`);
 
       const allRounds = (rounds || []) as unknown as Round[];
+      const activeRounds = allRounds.filter(r => r.status === "active");
+
       setIncoming(allRounds.filter(r => r.challenger_id !== id && r.status === "pending"));
       setOutgoing(allRounds.filter(r => r.challenger_id === id && r.status === "pending"));
-      setActive(allRounds.filter(r => r.status === "active"));
+      setActive(activeRounds);
+
+      // fetch last speech for each active round
+      const speechMap: Record<string, string> = {};
+      if (activeRounds.length > 0) {
+        const { data: lastSpeeches } = await supabase
+          .from("speeches")
+          .select("round_id, submitted_at")
+          .in("round_id", activeRounds.map(r => r.id))
+          .order("submitted_at", { ascending: false });
+
+        for (const s of lastSpeeches || []) {
+          if (!speechMap[s.round_id]) speechMap[s.round_id] = s.submitted_at;
+        }
+      }
+      setLastSpeechMap(speechMap);
+
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      setStaleRounds(activeRounds.filter(r => {
+        const lastActivity = speechMap[r.id] || r.created_at;
+        return lastActivity < oneDayAgo;
+      }));
 
       const { data: pubRounds } = await supabase
         .from("rounds")
         .select(`
-          id, topic, status, pro_id, con_id, challenger_id, current_speech, winner_id, is_ranked,
+          id, topic, status, pro_id, con_id, challenger_id, current_speech, winner_id, is_ranked, created_at,
           pro:profiles!pro_id(username, display_name, elo),
           con:profiles!con_id(username, display_name, elo)
         `)
@@ -133,6 +159,48 @@ export default function DashboardPage() {
           <button onClick={() => router.push("/judge")} style={ghostBtn}>
             Judge dashboard →
           </button>
+        </div>
+      )}
+
+      {/* Stale round warnings */}
+      {staleRounds.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          {staleRounds.map(r => {
+            const myRole = r.pro_id === userId ? "pro" : "con";
+            const opponent = myRole === "pro" ? r.con : r.pro;
+            const lastActivity = lastSpeechMap[r.id] || r.created_at;
+            const hoursLeft = Math.max(0, 48 - Math.floor((Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60)));
+            return (
+              <div key={r.id} style={{
+                background: "rgba(240,100,50,0.08)",
+                border: "0.5px solid rgba(240,100,50,0.35)",
+                borderRadius: 12, padding: "12px 16px",
+                marginBottom: 8,
+                display: "flex", alignItems: "center",
+                justifyContent: "space-between", gap: 12,
+              }}>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: "#ff8c5a", margin: "0 0 2px" }}>
+                    ⚠ Round expiring soon — {r.topic}
+                  </p>
+                  <p style={{ fontSize: 11, color: "#4a5580", margin: 0 }}>
+                    vs @{opponent?.username} · {hoursLeft}h left before deletion
+                  </p>
+                </div>
+                <button
+                  onClick={() => router.push(`/round/${r.id}`)}
+                  style={{
+                    padding: "7px 14px", background: "#ff8c5a",
+                    color: "#fff", border: "none", borderRadius: 8,
+                    fontSize: 12, fontWeight: 600, cursor: "pointer",
+                    whiteSpace: "nowrap", flexShrink: 0,
+                  }}
+                >
+                  Submit speech →
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -256,8 +324,9 @@ export default function DashboardPage() {
               const opponent = myRole === "pro" ? r.con : r.pro;
               const currentSpeech = r.current_speech || 1;
               const isMyTurn = (currentSpeech % 2 === 1 && myRole === "pro") || (currentSpeech % 2 === 0 && myRole === "con");
+              const isStale = staleRounds.some(s => s.id === r.id);
               return (
-                <div key={r.id} onClick={() => router.push(`/round/${r.id}`)} style={{ background: "rgba(255,255,255,0.03)", border: `0.5px solid ${isMyTurn ? "rgba(240,208,112,0.35)" : "rgba(255,255,255,0.07)"}`, borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
+                <div key={r.id} onClick={() => router.push(`/round/${r.id}`)} style={{ background: "rgba(255,255,255,0.03)", border: `0.5px solid ${isStale ? "rgba(240,100,50,0.35)" : isMyTurn ? "rgba(240,208,112,0.35)" : "rgba(255,255,255,0.07)"}`, borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
                   <div style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "#4a5580", width: 28, flexShrink: 0, textAlign: "center", lineHeight: 1 }}>
                     {currentSpeech}
                   </div>
