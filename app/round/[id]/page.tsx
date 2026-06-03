@@ -50,6 +50,7 @@ export default function RoundPage() {
   const [speeches, setSpeeches] = useState<Speech[]>([]);
   const [userId, setUserId] = useState("");
   const [myRole, setMyRole] = useState<"pro" | "con">("pro");
+  const [isParticipant, setIsParticipant] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [audioUrls, setAudioUrls] = useState<Record<string, string>>({});
   const [ballot, setBallot] = useState<Ballot | null>(null);
@@ -82,6 +83,9 @@ export default function RoundPage() {
 
       if (!roundData) { router.push("/dashboard"); return; }
       setRound(roundData as unknown as Round);
+
+      const participant = roundData.pro_id === uid || roundData.con_id === uid;
+      setIsParticipant(participant);
       setMyRole(roundData.pro_id === uid ? "pro" : "con");
 
       const { data: speechData } = await supabase
@@ -228,13 +232,13 @@ export default function RoundPage() {
 
   const currentIndex = round.current_speech - 1;
   const currentSpeech = SPEECH_ORDER[currentIndex];
-  const isMyTurn = currentSpeech?.role === myRole && round.status === "active";
+  const isMyTurn = currentSpeech?.role === myRole && round.status === "active" && isParticipant;
   const opponent = myRole === "pro" ? round.con : round.pro;
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 20px 80px" }}>
 
-      {/* Back + title */}
+      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 0 20px" }}>
         <button onClick={() => router.push("/dashboard")} style={ghostBtn}>← Back</button>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "#fff", margin: 0 }}>Round</h1>
@@ -243,15 +247,23 @@ export default function RoundPage() {
             Unranked
           </span>
         )}
+        {!isParticipant && (
+          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "rgba(122,160,212,0.1)", color: "#7aa0d4", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            Spectating
+          </span>
+        )}
       </div>
 
-      {/* Round info card */}
+      {/* Round info */}
       <div style={card}>
         <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, rgba(240,208,112,0.08), transparent 70%)", pointerEvents: "none" }} />
         <p style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 6px", position: "relative", zIndex: 1 }}>topic</p>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", margin: "0 0 6px", position: "relative", zIndex: 1 }}>{round.topic}</h2>
         <p style={{ fontSize: 13, color: "#4a5580", margin: "0 0 14px", position: "relative", zIndex: 1 }}>
-          vs @{opponent?.username} · You are {myRole === "pro" ? "Pro" : "Con"}
+          {isParticipant
+            ? `vs @${opponent?.username} · You are ${myRole === "pro" ? "Pro" : "Con"}`
+            : `@${round.pro?.username} (Pro) vs @${round.con?.username} (Con)`
+          }
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
           <span style={{
@@ -286,40 +298,39 @@ export default function RoundPage() {
                 background: "rgba(255,255,255,0.03)",
                 border: `0.5px solid ${isCurrent ? "rgba(240,208,112,0.4)" : "rgba(255,255,255,0.07)"}`,
                 borderRadius: 10, padding: "11px 14px",
-                display: "flex", justifyContent: "space-between", alignItems: "center",
                 opacity: isFuture ? 0.35 : 1,
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{
-                    width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
-                    background: isPast ? "#f0d070" : isCurrent ? "rgba(240,208,112,0.1)" : "rgba(255,255,255,0.04)",
-                    border: `1px solid ${isPast ? "#f0d070" : isCurrent ? "rgba(240,208,112,0.4)" : "rgba(255,255,255,0.1)"}`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 11, fontWeight: 600,
-                    color: isPast ? "#0a0f1e" : isCurrent ? "#f0d070" : "#4a5580",
-                  }}>
-                    {isPast ? "✓" : speechNum}
-                  </div>
-                  <div>
-                    <p style={{ margin: 0, fontSize: 13, fontWeight: isCurrent ? 500 : 400, color: isCurrent ? "#fff" : "#8a9abf" }}>{s.label}</p>
-                    {submitted && (
-                      <p style={{ margin: 0, fontSize: 11, color: "#4a5580" }}>
-                        {new Date(submitted.submitted_at).toLocaleDateString()}
-                      </p>
-                    )}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: audioUrls[position] ? 10 : 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{
+                      width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                      background: isPast ? "#f0d070" : isCurrent ? "rgba(240,208,112,0.1)" : "rgba(255,255,255,0.04)",
+                      border: `1px solid ${isPast ? "#f0d070" : isCurrent ? "rgba(240,208,112,0.4)" : "rgba(255,255,255,0.1)"}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 11, fontWeight: 600,
+                      color: isPast ? "#0a0f1e" : isCurrent ? "#f0d070" : "#4a5580",
+                    }}>
+                      {isPast ? "✓" : speechNum}
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: isCurrent ? 500 : 400, color: isCurrent ? "#fff" : "#8a9abf" }}>{s.label}</p>
+                      {submitted && (
+                        <p style={{ margin: 0, fontSize: 11, color: "#4a5580" }}>
+                          {new Date(submitted.submitted_at).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-                {audioUrls[position] && (
-                  <AudioPlayer src={audioUrls[position]} />
-                )}
+                {audioUrls[position] && <AudioPlayer src={audioUrls[position]} />}
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* Upload section */}
-      {isMyTurn && (
+      {/* Upload section — participants only */}
+      {isMyTurn && isParticipant && (
         <div style={{ ...card, borderColor: "rgba(240,208,112,0.35)" }}>
           <p style={sectionLabel}>Submit — {currentSpeech?.label}</p>
 
@@ -368,9 +379,17 @@ export default function RoundPage() {
         </div>
       )}
 
-      {!isMyTurn && round.status === "active" && (
+      {/* Waiting message — participants only */}
+      {!isMyTurn && round.status === "active" && isParticipant && (
         <div style={{ ...card, textAlign: "center" }}>
           <p style={{ margin: 0, fontSize: 14, color: "#4a5580" }}>Waiting for opponent to submit their speech…</p>
+        </div>
+      )}
+
+      {/* Spectator message */}
+      {!isParticipant && round.status === "active" && (
+        <div style={{ ...card, textAlign: "center" }}>
+          <p style={{ margin: 0, fontSize: 14, color: "#4a5580" }}>You are watching this round as a spectator.</p>
         </div>
       )}
 
@@ -381,7 +400,7 @@ export default function RoundPage() {
         </div>
       )}
 
-      {/* Unranked complete — speeches deleted */}
+      {/* Unranked complete */}
       {(speechesDeleted || (round.status === "complete" && !round.is_ranked)) && (
         <div style={{ ...card, textAlign: "center" }}>
           <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "#4ddfc4", margin: "0 0 6px" }}>
