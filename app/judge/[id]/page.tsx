@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AudioPlayer from "@/app/components/AudioPlayer";
 
 const SPEECH_ORDER = [
   { label: "Pro Constructive", role: "pro" },
@@ -83,10 +84,9 @@ export default function JudgeRoundPage() {
 
       const urls: Record<string, string> = {};
       for (const s of speechData || []) {
-        const { data, error } = await supabase.storage
+        const { data } = await supabase.storage
           .from("speeches")
           .createSignedUrl(s.storage_path, 3600);
-        console.log("speech:", s.storage_path, "url:", data, "error:", error);
         if (data) urls[s.position] = data.signedUrl;
       }
       setAudioUrls(urls);
@@ -126,50 +126,51 @@ export default function JudgeRoundPage() {
   async function handleDeleteSpeeches() {
     if (!round) return;
     const paths = speeches.map(s => s.storage_path);
-
     await supabase.storage.from("speeches").remove(paths);
     await supabase.from("speeches").delete().eq("round_id", round.id);
-
     router.push("/judge");
   }
 
-  if (!round) return <p style={{ textAlign: "center", marginTop: "4rem" }}>Loading...</p>;
+  if (!round) return <p style={{ textAlign: "center", marginTop: "4rem", color: "#4a5580" }}>Loading...</p>;
 
   return (
-    <div style={{ fontFamily: "sans-serif", maxWidth: 520, margin: "3rem auto", padding: "0 1rem 4rem" }}>
+    <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 20px 80px" }}>
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "2rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 0 20px" }}>
         <button onClick={() => router.push("/judge")} style={ghostBtn}>← Back</button>
-        <h1 style={{ fontSize: 20, fontWeight: 500, margin: 0 }}>Judge Round</h1>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "#fff", margin: 0 }}>
+          Judge Round
+        </h1>
       </div>
 
       {/* Round info */}
       <div style={card}>
-        <p style={{ fontWeight: 500, fontSize: 16, margin: "0 0 6px" }}>{round.topic}</p>
-        <p style={{ fontSize: 13, color: "#6b6760", margin: 0 }}>
+        <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, rgba(122,160,212,0.08), transparent 70%)", pointerEvents: "none" }} />
+        <p style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 6px", position: "relative", zIndex: 1 }}>topic</p>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", margin: "0 0 8px", position: "relative", zIndex: 1 }}>{round.topic}</h2>
+        <p style={{ fontSize: 13, color: "#4a5580", margin: 0, position: "relative", zIndex: 1 }}>
           @{round.pro?.username} (Pro) vs @{round.con?.username} (Con)
         </p>
       </div>
 
       {/* Speeches */}
       <p style={sectionLabel}>Speeches</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
         {SPEECH_ORDER.map((s, i) => {
           const position = s.label.toLowerCase().replace(/ /g, "_");
           const url = audioUrls[position];
+          const speaker = s.role === "pro" ? round.pro?.username : round.con?.username;
           return (
-            <div key={i} style={{ ...card, opacity: url ? 1 : 0.4 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div key={i} style={{ ...card, opacity: url ? 1 : 0.4, marginBottom: 0 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: url ? 10 : 0, position: "relative", zIndex: 1 }}>
                 <div>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>{s.label}</p>
-                  <p style={{ margin: 0, fontSize: 12, color: "#6b6760" }}>
-                    {s.role === "pro" ? `@${round.pro?.username}` : `@${round.con?.username}`}
-                  </p>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#fff" }}>{s.label}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: "#4a5580" }}>@{speaker}</p>
                 </div>
-                {url && <audio controls src={url} style={{ height: 32, width: 200 }} />}
-                {!url && <span style={{ fontSize: 12, color: "#6b6760" }}>Not submitted</span>}
+                {!url && <span style={{ fontSize: 11, color: "#4a5580" }}>Not submitted</span>}
               </div>
+              {url && <AudioPlayer src={url} />}
             </div>
           );
         })}
@@ -181,78 +182,84 @@ export default function JudgeRoundPage() {
           <p style={sectionLabel}>Submit ballot</p>
 
           {error && (
-            <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#b91c1c", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 14 }}>
+            <div style={{ background: "rgba(255,107,107,0.1)", border: "0.5px solid rgba(255,107,107,0.3)", color: "#ff6b6b", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
               {error}
             </div>
           )}
 
-          <div style={{ ...card, marginBottom: "1rem" }}>
-            <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 12px" }}>Winner</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-              <div
-                onClick={() => setWinner("pro")}
-                style={{
-                  ...sideBox,
-                  border: winner === "pro" ? "2px solid #1a1814" : "1px solid #e5e2dc",
-                  background: winner === "pro" ? "#1a1814" : "#f9f7f4",
-                  color: winner === "pro" ? "#fff" : "#1a1814",
-                }}
-              >
-                <p style={{ fontWeight: 500, margin: "0 0 2px" }}>Pro</p>
-                <p style={{ fontSize: 12, margin: 0, opacity: 0.7 }}>@{round.pro?.username}</p>
-              </div>
-              <div
-                onClick={() => setWinner("con")}
-                style={{
-                  ...sideBox,
-                  border: winner === "con" ? "2px solid #1a1814" : "1px solid #e5e2dc",
-                  background: winner === "con" ? "#1a1814" : "#f9f7f4",
-                  color: winner === "con" ? "#fff" : "#1a1814",
-                }}
-              >
-                <p style={{ fontWeight: 500, margin: "0 0 2px" }}>Con</p>
-                <p style={{ fontSize: 12, margin: 0, opacity: 0.7 }}>@{round.con?.username}</p>
-              </div>
+          {/* Winner */}
+          <div style={{ ...card, marginBottom: 10 }}>
+            <p style={sectionLabel}>Winner</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, position: "relative", zIndex: 1 }}>
+              {(["pro", "con"] as const).map(side => (
+                <div
+                  key={side}
+                  onClick={() => setWinner(side)}
+                  style={{
+                    padding: "14px 16px", borderRadius: 8,
+                    cursor: "pointer", textAlign: "center",
+                    background: winner === side ? "rgba(122,160,212,0.15)" : "rgba(255,255,255,0.03)",
+                    border: `0.5px solid ${winner === side ? "#7aa0d4" : "rgba(255,255,255,0.08)"}`,
+                  }}
+                >
+                  <p style={{ fontWeight: 600, margin: "0 0 2px", fontSize: 14, color: winner === side ? "#7aa0d4" : "#fff" }}>
+                    {side === "pro" ? "Pro" : "Con"}
+                  </p>
+                  <p style={{ fontSize: 12, margin: 0, color: "#4a5580" }}>
+                    @{side === "pro" ? round.pro?.username : round.con?.username}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
 
-          <div style={{ ...card, marginBottom: "1rem" }}>
-            <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 12px" }}>Speaker points</p>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-              <div>
-                <label style={inputLabel}>Pro (@{round.pro?.username})</label>
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min="20"
-                  max="30"
-                  step="0.5"
-                  value={proSpeaks}
-                  onChange={e => setProSpeaks(e.target.value)}
-                />
-              </div>
-              <div>
-                <label style={inputLabel}>Con (@{round.con?.username})</label>
-                <input
-                  style={inputStyle}
-                  type="number"
-                  min="20"
-                  max="30"
-                  step="0.5"
-                  value={conSpeaks}
-                  onChange={e => setConSpeaks(e.target.value)}
-                />
-              </div>
+          {/* Speaker points */}
+          <div style={{ ...card, marginBottom: 10 }}>
+            <p style={sectionLabel}>Speaker points</p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, position: "relative", zIndex: 1 }}>
+              {[
+                { label: `Pro — @${round.pro?.username}`, val: proSpeaks, set: setProSpeaks },
+                { label: `Con — @${round.con?.username}`, val: conSpeaks, set: setConSpeaks },
+              ].map(f => (
+                <div key={f.label}>
+                  <label style={{ fontSize: 11, color: "#4a5580", display: "block", marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    {f.label}
+                  </label>
+                  <input
+                    type="number" min="20" max="30" step="0.5"
+                    value={f.val}
+                    onChange={e => f.set(e.target.value)}
+                    style={{
+                      width: "100%", boxSizing: "border-box" as const,
+                      height: 40, padding: "0 12px",
+                      background: "rgba(255,255,255,0.04)",
+                      border: "0.5px solid rgba(255,255,255,0.1)",
+                      borderRadius: 8, fontSize: 15,
+                      color: "#fff", outline: "none",
+                    }}
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
-          <div style={{ ...card, marginBottom: "1.5rem" }}>
-            <p style={{ fontSize: 13, fontWeight: 500, margin: "0 0 12px" }}>Reasoning</p>
+          {/* Reasoning */}
+          <div style={{ ...card, marginBottom: 16 }}>
+            <p style={sectionLabel}>Reasoning</p>
             <textarea
-              style={{ ...inputStyle, height: 120, padding: "10px 12px", resize: "vertical" }}
               placeholder="Explain your decision..."
               value={reasoning}
               onChange={e => setReasoning(e.target.value)}
+              style={{
+                width: "100%", boxSizing: "border-box" as const,
+                height: 120, padding: "10px 12px",
+                background: "rgba(255,255,255,0.04)",
+                border: "0.5px solid rgba(255,255,255,0.1)",
+                borderRadius: 8, fontSize: 14, color: "#fff",
+                outline: "none", resize: "vertical",
+                fontFamily: "inherit", lineHeight: 1.6,
+                position: "relative", zIndex: 1,
+              }}
             />
           </div>
 
@@ -263,10 +270,17 @@ export default function JudgeRoundPage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ ...card, textAlign: "center" }}>
-            <p style={{ fontWeight: 500, margin: "0 0 4px" }}>Ballot submitted!</p>
-            <p style={{ fontSize: 14, color: "#6b6760", margin: 0 }}>You can now delete the speeches or go back.</p>
+            <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "#4ddfc4", margin: "0 0 6px", position: "relative", zIndex: 1 }}>
+              Ballot submitted!
+            </p>
+            <p style={{ fontSize: 13, color: "#4a5580", margin: 0, position: "relative", zIndex: 1 }}>
+              You can now delete the speeches or go back.
+            </p>
           </div>
-          <button onClick={handleDeleteSpeeches} style={{ ...primaryBtn, background: "#b91c1c" }}>
+          <button
+            onClick={handleDeleteSpeeches}
+            style={{ ...primaryBtn, background: "rgba(255,107,107,0.15)", color: "#ff6b6b", border: "0.5px solid rgba(255,107,107,0.3)" }}
+          >
             Delete all speeches
           </button>
           <button onClick={() => router.push("/judge")} style={ghostBtn}>
@@ -279,69 +293,26 @@ export default function JudgeRoundPage() {
   );
 }
 
-const card = {
-  background: "#ffffff",
-  border: "1px solid #e5e2dc",
-  borderRadius: 12,
-  padding: "1.25rem",
-  marginBottom: "1rem",
-} as const;
-
-const sectionLabel = {
-  fontSize: 11,
-  fontWeight: 500 as const,
-  color: "#6b6760",
-  textTransform: "uppercase" as const,
-  letterSpacing: "0.5px",
-  margin: "0 0 10px",
+const card: React.CSSProperties = {
+  background: "rgba(255,255,255,0.03)",
+  border: "0.5px solid rgba(255,255,255,0.07)",
+  borderRadius: 14, padding: "18px 20px",
+  marginBottom: 10, position: "relative", overflow: "hidden",
 };
 
-const sideBox = {
-  padding: "14px 16px",
-  borderRadius: 8,
-  cursor: "pointer",
-  textAlign: "center" as const,
+const sectionLabel: React.CSSProperties = {
+  fontSize: 10, fontWeight: 500, color: "#4a5580",
+  textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 12px",
 };
 
-const inputStyle = {
-  width: "100%",
-  boxSizing: "border-box" as const,
-  height: 42,
-  padding: "0 12px",
-  border: "1px solid #e5e2dc",
-  borderRadius: 8,
-  fontSize: 15,
-  outline: "none",
-  background: "transparent",
-  fontFamily: "sans-serif",
+const ghostBtn: React.CSSProperties = {
+  width: "100%", height: 44, background: "transparent",
+  border: "0.5px solid rgba(255,255,255,0.1)",
+  borderRadius: 8, fontSize: 14, color: "#4a5580", cursor: "pointer",
 };
 
-const inputLabel = {
-  fontSize: 12,
-  fontWeight: 500 as const,
-  color: "#6b6760",
-  display: "block" as const,
-  marginBottom: 6,
+const primaryBtn: React.CSSProperties = {
+  width: "100%", height: 44, background: "#7aa0d4",
+  color: "#fff", border: "none", borderRadius: 8,
+  fontSize: 15, fontWeight: 600, cursor: "pointer",
 };
-
-const primaryBtn = {
-  width: "100%",
-  height: 44,
-  background: "#1a1814",
-  color: "#fff",
-  border: "none",
-  borderRadius: 8,
-  fontSize: 15,
-  fontWeight: 500,
-  cursor: "pointer",
-} as const;
-
-const ghostBtn = {
-  width: "100%",
-  height: 44,
-  background: "transparent",
-  border: "1px solid #e5e2dc",
-  borderRadius: 8,
-  fontSize: 14,
-  cursor: "pointer",
-} as const;

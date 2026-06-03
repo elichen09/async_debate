@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import AudioPlayer from "@/app/components/AudioPlayer";
 
 const SPEECH_ORDER = [
   { label: "Pro Constructive", role: "pro" },
@@ -309,7 +310,7 @@ export default function RoundPage() {
                   </div>
                 </div>
                 {audioUrls[position] && (
-                  <audio controls src={audioUrls[position]} style={{ height: 28, width: 150 }} />
+                  <AudioPlayer src={audioUrls[position]} />
                 )}
               </div>
             );
