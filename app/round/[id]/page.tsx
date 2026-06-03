@@ -29,6 +29,7 @@ interface Round {
   pro_id: string;
   con_id: string;
   current_speech: number;
+  is_ranked: boolean;
   pro: { username: string; display_name: string };
   con: { username: string; display_name: string };
 }
@@ -56,6 +57,7 @@ export default function RoundPage() {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioPreview, setAudioPreview] = useState<string | null>(null);
+  const [speechesDeleted, setSpeechesDeleted] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const chunksRef = useRef<BlobPart[]>([]);
 
@@ -70,7 +72,7 @@ export default function RoundPage() {
       const { data: roundData } = await supabase
         .from("rounds")
         .select(`
-          id, topic, status, pro_id, con_id, current_speech,
+          id, topic, status, pro_id, con_id, current_speech, is_ranked,
           pro:profiles!pro_id(username, display_name),
           con:profiles!con_id(username, display_name)
         `)
@@ -96,7 +98,6 @@ export default function RoundPage() {
           .createSignedUrl(s.storage_path, 3600);
         if (data) urls[s.position] = data.signedUrl;
         else {
-          // fallback to public URL
           const { data: pubData } = supabase.storage
             .from("speeches")
             .getPublicUrl(s.storage_path);
@@ -141,38 +142,85 @@ export default function RoundPage() {
     setRecording(false);
   }
 
+  async function deleteSpeeches(currentPath: string) {
+    const paths = [...speeches.map(s => s.storage_path), currentPath];
+    await supabase.storage.from("speeches").remove(paths);
+    await supabase.from("speeches").delete().eq("round_id", id);
+    setSpeechesDeleted(true);
+  }
+
   async function handleUploadBlob(blob: Blob) {
     if (!round) return;
     setError("");
     setUploading(true);
+
     const currentIndex = round.current_speech - 1;
     const position = SPEECH_ORDER[currentIndex].label.toLowerCase().replace(/ /g, "_");
     const path = `${round.id}/${position}_${Date.now()}.webm`;
-    const { error: uploadError } = await supabase.storage.from("speeches").upload(path, blob, { contentType: "audio/webm" });
+
+    const { error: uploadError } = await supabase.storage
+      .from("speeches")
+      .upload(path, blob, { contentType: "audio/webm" });
     if (uploadError) { setError(uploadError.message); setUploading(false); return; }
-    const { error: insertError } = await supabase.from("speeches").insert({ round_id: round.id, speaker_id: userId, position, speech_number: round.current_speech, storage_path: path });
+
+    const { error: insertError } = await supabase.from("speeches").insert({
+      round_id: round.id, speaker_id: userId,
+      position, speech_number: round.current_speech, storage_path: path,
+    });
     if (insertError) { setError(insertError.message); setUploading(false); return; }
+
     const nextSpeech = round.current_speech + 1;
-    await supabase.from("rounds").update({ current_speech: nextSpeech, status: nextSpeech > 8 ? "judging" : "active" }).eq("id", round.id);
+    const newStatus = nextSpeech > 8
+      ? (round.is_ranked ? "judging" : "complete")
+      : "active";
+
+    await supabase.from("rounds").update({
+      current_speech: nextSpeech, status: newStatus,
+    }).eq("id", round.id);
+
+    if (!round.is_ranked && newStatus === "complete") {
+      await deleteSpeeches(path);
+    }
+
     setUploading(false);
-    window.location.reload();
+    if (round.is_ranked || newStatus !== "complete") window.location.reload();
   }
 
   async function handleUpload(file: File) {
     if (!round) return;
     setError("");
     setUploading(true);
+
     const currentIndex = round.current_speech - 1;
     const position = SPEECH_ORDER[currentIndex].label.toLowerCase().replace(/ /g, "_");
     const path = `${round.id}/${position}_${Date.now()}.mp3`;
-    const { error: uploadError } = await supabase.storage.from("speeches").upload(path, file, { contentType: "audio/mpeg" });
+
+    const { error: uploadError } = await supabase.storage
+      .from("speeches")
+      .upload(path, file, { contentType: "audio/mpeg" });
     if (uploadError) { setError(uploadError.message); setUploading(false); return; }
-    const { error: insertError } = await supabase.from("speeches").insert({ round_id: round.id, speaker_id: userId, position, speech_number: round.current_speech, storage_path: path });
+
+    const { error: insertError } = await supabase.from("speeches").insert({
+      round_id: round.id, speaker_id: userId,
+      position, speech_number: round.current_speech, storage_path: path,
+    });
     if (insertError) { setError(insertError.message); setUploading(false); return; }
+
     const nextSpeech = round.current_speech + 1;
-    await supabase.from("rounds").update({ current_speech: nextSpeech, status: nextSpeech > 2 ? "judging" : "active" }).eq("id", round.id);
+    const newStatus = nextSpeech > 8
+      ? (round.is_ranked ? "judging" : "complete")
+      : "active";
+
+    await supabase.from("rounds").update({
+      current_speech: nextSpeech, status: newStatus,
+    }).eq("id", round.id);
+
+    if (!round.is_ranked && newStatus === "complete") {
+      await deleteSpeeches(path);
+    }
+
     setUploading(false);
-    window.location.reload();
+    if (round.is_ranked || newStatus !== "complete") window.location.reload();
   }
 
   if (!round) return <p style={{ textAlign: "center", marginTop: "4rem", color: "#4a5580" }}>Loading...</p>;
@@ -189,16 +237,20 @@ export default function RoundPage() {
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 0 20px" }}>
         <button onClick={() => router.push("/dashboard")} style={ghostBtn}>← Back</button>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "#fff", margin: 0 }}>Round</h1>
+        {!round.is_ranked && (
+          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", color: "#4a5580", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            Unranked
+          </span>
+        )}
       </div>
 
       {/* Round info card */}
       <div style={card}>
-        {/* inner glow */}
         <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, rgba(240,208,112,0.08), transparent 70%)", pointerEvents: "none" }} />
         <p style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 6px", position: "relative", zIndex: 1 }}>topic</p>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", margin: "0 0 6px", position: "relative", zIndex: 1 }}>{round.topic}</h2>
         <p style={{ fontSize: 13, color: "#4a5580", margin: "0 0 14px", position: "relative", zIndex: 1 }}>
-          vs @{opponent?.username} &nbsp;·&nbsp; You are {myRole === "pro" ? "Pro" : "Con"}
+          vs @{opponent?.username} · You are {myRole === "pro" ? "Pro" : "Con"}
         </p>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
           <span style={{
@@ -232,11 +284,8 @@ export default function RoundPage() {
               <div key={i} style={{
                 background: "rgba(255,255,255,0.03)",
                 border: `0.5px solid ${isCurrent ? "rgba(240,208,112,0.4)" : "rgba(255,255,255,0.07)"}`,
-                borderRadius: 10,
-                padding: "11px 14px",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                borderRadius: 10, padding: "11px 14px",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
                 opacity: isFuture ? 0.35 : 1,
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -331,8 +380,20 @@ export default function RoundPage() {
         </div>
       )}
 
+      {/* Unranked complete — speeches deleted */}
+      {(speechesDeleted || (round.status === "complete" && !round.is_ranked)) && (
+        <div style={{ ...card, textAlign: "center" }}>
+          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "#4ddfc4", margin: "0 0 6px" }}>
+            Unranked round complete
+          </p>
+          <p style={{ fontSize: 13, color: "#4a5580", margin: 0 }}>
+            All speeches have been automatically deleted since this was an unranked round.
+          </p>
+        </div>
+      )}
+
       {/* Ballot */}
-      {ballot && round.status === "complete" && (
+      {ballot && round.status === "complete" && round.is_ranked && (
         <div style={{ ...card, borderColor: ballot.winner_id === userId ? "rgba(77,223,196,0.3)" : "rgba(255,107,107,0.3)" }}>
           <p style={sectionLabel}>Judge's decision</p>
           <p style={{ fontFamily: "var(--font-display)", fontSize: 22, margin: "0 0 16px", color: ballot.winner_id === userId ? "#4ddfc4" : "#ff6b6b" }}>
@@ -362,52 +423,27 @@ export default function RoundPage() {
 const card: React.CSSProperties = {
   background: "rgba(255,255,255,0.03)",
   border: "0.5px solid rgba(255,255,255,0.07)",
-  borderRadius: 14,
-  padding: "18px 20px",
-  marginBottom: 12,
-  position: "relative",
-  overflow: "hidden",
+  borderRadius: 14, padding: "18px 20px",
+  marginBottom: 12, position: "relative", overflow: "hidden",
 };
 
 const sectionLabel: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 500,
-  color: "#4a5580",
-  textTransform: "uppercase",
-  letterSpacing: "0.12em",
-  margin: "0 0 12px",
+  fontSize: 10, fontWeight: 500, color: "#4a5580",
+  textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 12px",
 };
 
 const ghostBtn: React.CSSProperties = {
-  background: "transparent",
-  border: "0.5px solid rgba(255,255,255,0.1)",
-  borderRadius: 8,
-  padding: "8px 14px",
-  fontSize: 14,
-  color: "#4a5580",
-  cursor: "pointer",
+  background: "transparent", border: "0.5px solid rgba(255,255,255,0.1)",
+  borderRadius: 8, padding: "8px 14px", fontSize: 14, color: "#4a5580", cursor: "pointer",
 };
 
 const primaryBtn: React.CSSProperties = {
-  width: "100%",
-  height: 44,
-  background: "#f0d070",
-  color: "#0a0f1e",
-  border: "none",
-  borderRadius: 8,
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
+  width: "100%", height: 44, background: "#f0d070", color: "#0a0f1e",
+  border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
 };
 
 const secondaryBtn: React.CSSProperties = {
-  width: "100%",
-  height: 42,
-  background: "transparent",
-  color: "#8a9abf",
-  border: "0.5px solid rgba(255,255,255,0.1)",
-  borderRadius: 8,
-  fontSize: 14,
-  fontWeight: 500,
-  cursor: "pointer",
+  width: "100%", height: 42, background: "transparent", color: "#8a9abf",
+  border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 8,
+  fontSize: 14, fontWeight: 500, cursor: "pointer",
 };

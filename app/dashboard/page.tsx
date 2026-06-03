@@ -207,7 +207,7 @@ export default function DashboardPage() {
       {/* Hero card */}
       <div style={{
         position: "relative",
-        background: "rgba(255,255,255,0.03)",
+        background: "rgba(59, 24, 24, 0.03)",
         border: "0.5px solid rgba(255,255,255,0.07)",
         borderRadius: 14,
         padding: "22px 24px 20px",
