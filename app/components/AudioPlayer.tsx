@@ -71,14 +71,14 @@ export default function AudioPlayer({ src, label }: AudioPlayerProps) {
 
   return (
     <div style={{
-      background: "rgba(255,255,255,0.03)",
-      border: "0.5px solid rgba(255,255,255,0.08)",
+      background: "var(--card)",
+      border: "0.5px solid var(--line)",
       borderRadius: 10, padding: "12px 14px",
     }}>
       <audio ref={audioRef} src={src} preload="metadata" />
 
       {label && (
-        <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 10px" }}>
+        <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", margin: "0 0 10px" }}>
           {label}
         </p>
       )}
@@ -88,14 +88,14 @@ export default function AudioPlayer({ src, label }: AudioPlayerProps) {
         ref={barRef}
         onClick={seek}
         style={{
-          height: 6, background: "rgba(255,255,255,0.08)",
+          height: 6, background: "var(--line)",
           borderRadius: 3, cursor: "pointer", marginBottom: 10,
           position: "relative", overflow: "visible",
         }}
       >
         <div style={{
           height: "100%", width: `${progress}%`,
-          background: "#7aa0d4", borderRadius: 3,
+          background: "var(--pro)", borderRadius: 3,
           transition: dragging ? "none" : "width 0.1s linear",
           position: "relative",
         }}>
@@ -104,8 +104,8 @@ export default function AudioPlayer({ src, label }: AudioPlayerProps) {
             position: "absolute", right: -5, top: "50%",
             transform: "translateY(-50%)",
             width: 12, height: 12, borderRadius: "50%",
-            background: "#7aa0d4",
-            boxShadow: "0 0 0 2px rgba(122,160,212,0.3)",
+            background: "var(--pro)",
+            boxShadow: "0 0 0 2px color-mix(in srgb, var(--pro) 30%, transparent)",
           }} />
         </div>
       </div>
@@ -118,7 +118,7 @@ export default function AudioPlayer({ src, label }: AudioPlayerProps) {
           onClick={togglePlay}
           style={{
             width: 34, height: 34, borderRadius: "50%",
-            background: "#7aa0d4", border: "none",
+            background: "var(--pro)", border: "none",
             display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", flexShrink: 0,
             fontSize: 12, color: "#fff",
@@ -128,7 +128,7 @@ export default function AudioPlayer({ src, label }: AudioPlayerProps) {
         </button>
 
         {/* Time */}
-        <span style={{ fontSize: 11, color: "#4a5580", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
+        <span style={{ fontSize: 11, color: "var(--muted)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
           {fmt(currentTime)} / {fmt(duration)}
         </span>
 
@@ -142,10 +142,10 @@ export default function AudioPlayer({ src, label }: AudioPlayerProps) {
               onClick={() => setSpeedValue(s)}
               style={{
                 height: 24, padding: "0 8px",
-                background: speed === s ? "#7aa0d4" : "rgba(255,255,255,0.04)",
-                border: `0.5px solid ${speed === s ? "#7aa0d4" : "rgba(255,255,255,0.1)"}`,
+                background: speed === s ? "var(--pro)" : "var(--card)",
+                border: `0.5px solid ${speed === s ? "var(--pro)" : "var(--line-strong)"}`,
                 borderRadius: 5, fontSize: 11,
-                color: speed === s ? "#fff" : "#4a5580",
+                color: speed === s ? "#fff" : "var(--muted)",
                 cursor: "pointer", fontWeight: speed === s ? 600 : 400,
               }}
             >

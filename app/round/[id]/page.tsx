@@ -228,7 +228,7 @@ export default function RoundPage() {
     if (round.is_ranked || newStatus !== "complete") window.location.reload();
   }
 
-  if (!round) return <p style={{ textAlign: "center", marginTop: "4rem", color: "#4a5580" }}>Loading...</p>;
+  if (!round) return <p style={{ textAlign: "center", marginTop: "4rem", color: "var(--muted)" }}>Loading...</p>;
 
   const currentIndex = round.current_speech - 1;
   const currentSpeech = SPEECH_ORDER[currentIndex];
@@ -241,14 +241,14 @@ export default function RoundPage() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 0 20px" }}>
         <button onClick={() => router.push("/dashboard")} style={ghostBtn}>← Back</button>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "#fff", margin: 0 }}>Round</h1>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "var(--ink)", margin: 0 }}>Round</h1>
         {!round.is_ranked && (
-          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "rgba(255,255,255,0.06)", color: "#4a5580", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "var(--paper-2)", color: "var(--muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
             Unranked
           </span>
         )}
         {!isParticipant && (
-          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "rgba(122,160,212,0.1)", color: "#7aa0d4", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "color-mix(in srgb, var(--pro) 10%, transparent)", color: "var(--pro)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
             Spectating
           </span>
         )}
@@ -256,10 +256,10 @@ export default function RoundPage() {
 
       {/* Round info */}
       <div style={card}>
-        <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, rgba(240,208,112,0.08), transparent 70%)", pointerEvents: "none" }} />
-        <p style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 6px", position: "relative", zIndex: 1 }}>topic</p>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", margin: "0 0 6px", position: "relative", zIndex: 1 }}>{round.topic}</h2>
-        <p style={{ fontSize: 13, color: "#4a5580", margin: "0 0 14px", position: "relative", zIndex: 1 }}>
+        <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%)", pointerEvents: "none" }} />
+        <p style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)", margin: "0 0 6px", position: "relative", zIndex: 1 }}>topic</p>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ink)", margin: "0 0 6px", position: "relative", zIndex: 1 }}>{round.topic}</h2>
+        <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 14px", position: "relative", zIndex: 1 }}>
           {isParticipant
             ? `vs @${opponent?.username} · You are ${myRole === "pro" ? "Pro" : "Con"}`
             : `@${round.pro?.username} (Pro) vs @${round.con?.username} (Con)`
@@ -268,13 +268,13 @@ export default function RoundPage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
           <span style={{
             fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20,
-            background: round.status === "judging" ? "rgba(240,208,112,0.1)" : round.status === "complete" ? "rgba(77,223,196,0.1)" : "rgba(255,255,255,0.06)",
-            color: round.status === "judging" ? "#f0d070" : round.status === "complete" ? "#4ddfc4" : "#8a9abf",
+            background: round.status === "judging" ? "color-mix(in srgb, var(--accent) 10%, transparent)" : round.status === "complete" ? "color-mix(in srgb, var(--win) 10%, transparent)" : "var(--paper-2)",
+            color: round.status === "judging" ? "var(--accent)" : round.status === "complete" ? "var(--win)" : "var(--ink-soft)",
           }}>
             {round.status === "judging" ? "⏳ Awaiting judge" : round.status === "complete" ? "✓ Complete" : `Speech ${round.current_speech} of 8`}
           </span>
           {isMyTurn && (
-            <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: "#f0d070", color: "#0a0f1e" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: "var(--accent)", color: "var(--accent-ink)" }}>
               Your turn
             </span>
           )}
@@ -295,8 +295,8 @@ export default function RoundPage() {
 
             return (
               <div key={i} style={{
-                background: "rgba(255,255,255,0.03)",
-                border: `0.5px solid ${isCurrent ? "rgba(240,208,112,0.4)" : "rgba(255,255,255,0.07)"}`,
+                background: "var(--card)",
+                border: `0.5px solid ${isCurrent ? "color-mix(in srgb, var(--accent) 40%, transparent)" : "var(--line)"}`,
                 borderRadius: 10, padding: "11px 14px",
                 opacity: isFuture ? 0.35 : 1,
               }}>
@@ -304,18 +304,18 @@ export default function RoundPage() {
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{
                       width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
-                      background: isPast ? "#f0d070" : isCurrent ? "rgba(240,208,112,0.1)" : "rgba(255,255,255,0.04)",
-                      border: `1px solid ${isPast ? "#f0d070" : isCurrent ? "rgba(240,208,112,0.4)" : "rgba(255,255,255,0.1)"}`,
+                      background: isPast ? "var(--accent)" : isCurrent ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "var(--card)",
+                      border: `1px solid ${isPast ? "var(--accent)" : isCurrent ? "color-mix(in srgb, var(--accent) 40%, transparent)" : "var(--line-strong)"}`,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: 11, fontWeight: 600,
-                      color: isPast ? "#0a0f1e" : isCurrent ? "#f0d070" : "#4a5580",
+                      color: isPast ? "var(--accent-ink)" : isCurrent ? "var(--accent)" : "var(--muted)",
                     }}>
                       {isPast ? "✓" : speechNum}
                     </div>
                     <div>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: isCurrent ? 500 : 400, color: isCurrent ? "#fff" : "#8a9abf" }}>{s.label}</p>
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: isCurrent ? 500 : 400, color: isCurrent ? "var(--ink)" : "var(--ink-soft)" }}>{s.label}</p>
                       {submitted && (
-                        <p style={{ margin: 0, fontSize: 11, color: "#4a5580" }}>
+                        <p style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>
                           {new Date(submitted.submitted_at).toLocaleDateString()}
                         </p>
                       )}
@@ -331,27 +331,27 @@ export default function RoundPage() {
 
       {/* Upload section — participants only */}
       {isMyTurn && isParticipant && (
-        <div style={{ ...card, borderColor: "rgba(240,208,112,0.35)" }}>
+        <div style={{ ...card, borderColor: "color-mix(in srgb, var(--accent) 35%, transparent)" }}>
           <p style={sectionLabel}>Submit — {currentSpeech?.label}</p>
 
           {error && (
-            <div style={{ background: "rgba(255,107,107,0.1)", border: "0.5px solid rgba(255,107,107,0.3)", color: "#ff6b6b", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
+            <div style={{ background: "color-mix(in srgb, var(--loss) 10%, transparent)", border: "0.5px solid color-mix(in srgb, var(--loss) 30%, transparent)", color: "var(--loss)", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
               {error}
             </div>
           )}
 
-          <p style={{ fontSize: 12, fontWeight: 500, color: "#8a9abf", margin: "0 0 10px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Record directly</p>
+          <p style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-soft)", margin: "0 0 10px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Record directly</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             {!recording ? (
               <button onClick={startRecording} style={{ ...secondaryBtn, flex: 1 }}>🎙 Start recording</button>
             ) : (
-              <button onClick={stopRecording} style={{ ...secondaryBtn, flex: 1, borderColor: "rgba(255,107,107,0.4)", color: "#ff6b6b" }}>⏹ Stop recording</button>
+              <button onClick={stopRecording} style={{ ...secondaryBtn, flex: 1, borderColor: "color-mix(in srgb, var(--loss) 40%, transparent)", color: "var(--loss)" }}>⏹ Stop recording</button>
             )}
           </div>
 
           {recording && (
-            <div style={{ fontSize: 13, color: "#ff6b6b", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#ff6b6b", display: "inline-block" }} />
+            <div style={{ fontSize: 13, color: "var(--loss)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--loss)", display: "inline-block" }} />
               Recording…
             </div>
           )}
@@ -366,9 +366,9 @@ export default function RoundPage() {
           )}
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
-            <div style={{ flex: 1, height: "0.5px", background: "rgba(255,255,255,0.08)" }} />
-            <span style={{ fontSize: 11, color: "#4a5580" }}>or upload a file</span>
-            <div style={{ flex: 1, height: "0.5px", background: "rgba(255,255,255,0.08)" }} />
+            <div style={{ flex: 1, height: "0.5px", background: "var(--line)" }} />
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>or upload a file</span>
+            <div style={{ flex: 1, height: "0.5px", background: "var(--line)" }} />
           </div>
 
           <input ref={fileRef} type="file" accept="audio/mp3,audio/mpeg,audio/*" style={{ display: "none" }}
@@ -382,31 +382,31 @@ export default function RoundPage() {
       {/* Waiting message — participants only */}
       {!isMyTurn && round.status === "active" && isParticipant && (
         <div style={{ ...card, textAlign: "center" }}>
-          <p style={{ margin: 0, fontSize: 14, color: "#4a5580" }}>Waiting for opponent to submit their speech…</p>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--muted)" }}>Waiting for opponent to submit their speech…</p>
         </div>
       )}
 
       {/* Spectator message */}
       {!isParticipant && round.status === "active" && (
         <div style={{ ...card, textAlign: "center" }}>
-          <p style={{ margin: 0, fontSize: 14, color: "#4a5580" }}>You are watching this round as a spectator.</p>
+          <p style={{ margin: 0, fontSize: 14, color: "var(--muted)" }}>You are watching this round as a spectator.</p>
         </div>
       )}
 
       {round.status === "judging" && (
         <div style={{ ...card, textAlign: "center" }}>
-          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "#f0d070", margin: "0 0 6px" }}>All speeches submitted!</p>
-          <p style={{ fontSize: 13, color: "#4a5580", margin: 0 }}>This round is now awaiting a judge.</p>
+          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "var(--accent)", margin: "0 0 6px" }}>All speeches submitted!</p>
+          <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>This round is now awaiting a judge.</p>
         </div>
       )}
 
       {/* Unranked complete */}
       {(speechesDeleted || (round.status === "complete" && !round.is_ranked)) && (
         <div style={{ ...card, textAlign: "center" }}>
-          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "#4ddfc4", margin: "0 0 6px" }}>
+          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "var(--win)", margin: "0 0 6px" }}>
             Unranked round complete
           </p>
-          <p style={{ fontSize: 13, color: "#4a5580", margin: 0 }}>
+          <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
             All speeches have been automatically deleted since this was an unranked round.
           </p>
         </div>
@@ -414,23 +414,23 @@ export default function RoundPage() {
 
       {/* Ballot */}
       {ballot && round.status === "complete" && round.is_ranked && (
-        <div style={{ ...card, borderColor: ballot.winner_id === userId ? "rgba(77,223,196,0.3)" : "rgba(255,107,107,0.3)" }}>
+        <div style={{ ...card, borderColor: ballot.winner_id === userId ? "color-mix(in srgb, var(--win) 30%, transparent)" : "color-mix(in srgb, var(--loss) 30%, transparent)" }}>
           <p style={sectionLabel}>Judge's decision</p>
-          <p style={{ fontFamily: "var(--font-display)", fontSize: 22, margin: "0 0 16px", color: ballot.winner_id === userId ? "#4ddfc4" : "#ff6b6b" }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 22, margin: "0 0 16px", color: ballot.winner_id === userId ? "var(--win)" : "var(--loss)" }}>
             {ballot.winner_id === userId ? "✓ You won!" : "✗ You lost"}
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
             {[{ label: "Pro speaks", value: ballot.pro_speaks }, { label: "Con speaks", value: ballot.con_speaks }].map(s => (
-              <div key={s.label} style={{ background: "rgba(255,255,255,0.04)", border: "0.5px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "10px 12px" }}>
-                <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 4px" }}>{s.label}</p>
-                <p style={{ fontSize: 20, fontWeight: 500, color: "#fff", margin: 0 }}>{s.value}</p>
+              <div key={s.label} style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "10px 12px" }}>
+                <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", margin: "0 0 4px" }}>{s.label}</p>
+                <p style={{ fontSize: 20, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{s.value}</p>
               </div>
             ))}
           </div>
           {ballot.reasoning && (
             <div>
-              <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 8px" }}>Reasoning</p>
-              <p style={{ fontSize: 14, margin: 0, lineHeight: 1.6, color: "#8a9abf" }}>{ballot.reasoning}</p>
+              <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", margin: "0 0 8px" }}>Reasoning</p>
+              <p style={{ fontSize: 14, margin: 0, lineHeight: 1.6, color: "var(--ink-soft)" }}>{ballot.reasoning}</p>
             </div>
           )}
         </div>
@@ -441,29 +441,29 @@ export default function RoundPage() {
 }
 
 const card: React.CSSProperties = {
-  background: "rgba(255,255,255,0.03)",
-  border: "0.5px solid rgba(255,255,255,0.07)",
+  background: "var(--card)",
+  border: "0.5px solid var(--line)",
   borderRadius: 14, padding: "18px 20px",
   marginBottom: 12, position: "relative", overflow: "hidden",
 };
 
 const sectionLabel: React.CSSProperties = {
-  fontSize: 10, fontWeight: 500, color: "#4a5580",
+  fontSize: 10, fontWeight: 500, color: "var(--muted)",
   textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 12px",
 };
 
 const ghostBtn: React.CSSProperties = {
-  background: "transparent", border: "0.5px solid rgba(255,255,255,0.1)",
-  borderRadius: 8, padding: "8px 14px", fontSize: 14, color: "#4a5580", cursor: "pointer",
+  background: "transparent", border: "0.5px solid var(--line-strong)",
+  borderRadius: 8, padding: "8px 14px", fontSize: 14, color: "var(--muted)", cursor: "pointer",
 };
 
 const primaryBtn: React.CSSProperties = {
-  width: "100%", height: 44, background: "#f0d070", color: "#0a0f1e",
+  width: "100%", height: 44, background: "var(--accent)", color: "var(--accent-ink)",
   border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer",
 };
 
 const secondaryBtn: React.CSSProperties = {
-  width: "100%", height: 42, background: "transparent", color: "#8a9abf",
-  border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 8,
+  width: "100%", height: 42, background: "transparent", color: "var(--ink-soft)",
+  border: "0.5px solid var(--line-strong)", borderRadius: 8,
   fontSize: 14, fontWeight: 500, cursor: "pointer",
 };

@@ -129,7 +129,7 @@ export default function DashboardPage() {
   }
 
   if (loading) return (
-    <p style={{ textAlign: "center", marginTop: "4rem", color: "#4a5580", fontFamily: "var(--font-body)" }}>
+    <p style={{ textAlign: "center", marginTop: "4rem", color: "var(--muted)", fontFamily: "var(--font-body)" }}>
       Loading...
     </p>
   );
@@ -172,26 +172,26 @@ export default function DashboardPage() {
             const hoursLeft = Math.max(0, 48 - Math.floor((Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60)));
             return (
               <div key={r.id} style={{
-                background: "rgba(240,100,50,0.08)",
-                border: "0.5px solid rgba(240,100,50,0.35)",
+                background: "color-mix(in srgb, var(--warn) 8%, transparent)",
+                border: "0.5px solid color-mix(in srgb, var(--warn) 35%, transparent)",
                 borderRadius: 12, padding: "12px 16px",
                 marginBottom: 8,
                 display: "flex", alignItems: "center",
                 justifyContent: "space-between", gap: 12,
               }}>
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 500, color: "#ff8c5a", margin: "0 0 2px" }}>
+                  <p style={{ fontSize: 13, fontWeight: 500, color: "var(--warn)", margin: "0 0 2px" }}>
                     ⚠ Round expiring soon — {r.topic}
                   </p>
-                  <p style={{ fontSize: 11, color: "#4a5580", margin: 0 }}>
+                  <p style={{ fontSize: 11, color: "var(--muted)", margin: 0 }}>
                     vs @{opponent?.username} · {hoursLeft}h left before deletion
                   </p>
                 </div>
                 <button
                   onClick={() => router.push(`/round/${r.id}`)}
                   style={{
-                    padding: "7px 14px", background: "#ff8c5a",
-                    color: "#fff", border: "none", borderRadius: 8,
+                    padding: "7px 14px", background: "var(--warn)",
+                    color: "var(--accent-ink)", border: "none", borderRadius: 8,
                     fontSize: 12, fontWeight: 600, cursor: "pointer",
                     whiteSpace: "nowrap", flexShrink: 0,
                   }}
@@ -207,23 +207,23 @@ export default function DashboardPage() {
       {/* Hero card */}
       <div style={{
         position: "relative",
-        background: "rgba(59, 24, 24, 0.03)",
-        border: "0.5px solid rgba(255,255,255,0.07)",
+        background: "color-mix(in srgb, var(--ink) 4%, transparent)",
+        border: "0.5px solid var(--line)",
         borderRadius: 14,
         padding: "22px 24px 20px",
         marginBottom: 14,
         overflow: "hidden",
       }}>
-        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, rgba(240,208,112,0.12), transparent 70%)", pointerEvents: "none" }} />
-        <div style={{ position: "absolute", bottom: -80, left: -40, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, rgba(30,60,180,0.2), transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: -80, left: -40, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in srgb, var(--pro) 20%, transparent), transparent 70%)", pointerEvents: "none" }} />
 
-        <p style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "#4a5580", marginBottom: 8, position: "relative", zIndex: 1 }}>
+        <p style={{ fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--muted)", marginBottom: 8, position: "relative", zIndex: 1 }}>
           debater profile
         </p>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(26px, 5vw, 34px)", color: "#fff", letterSpacing: "-0.02em", lineHeight: 1, marginBottom: 4, position: "relative", zIndex: 1 }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(26px, 5vw, 34px)", color: "var(--ink)", letterSpacing: "-0.02em", lineHeight: 1, marginBottom: 4, position: "relative", zIndex: 1 }}>
           {displayName}
         </h1>
-        <p style={{ fontSize: 13, color: "#4a5580", marginBottom: 18, position: "relative", zIndex: 1 }}>
+        <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 18, position: "relative", zIndex: 1 }}>
           @{profile.username}
         </p>
 
@@ -235,12 +235,12 @@ export default function DashboardPage() {
           ].map((s, i, arr) => (
             <div key={s.label} style={{
               padding: "10px 18px",
-              background: "rgba(255,255,255,0.04)",
-              border: "0.5px solid rgba(255,255,255,0.07)",
+              background: "var(--card)",
+              border: "0.5px solid var(--line)",
               borderRadius: i === 0 ? "8px 0 0 8px" : i === arr.length - 1 ? "0 8px 8px 0" : "0",
             }}>
-              <p style={{ fontSize: 20, fontWeight: 500, color: s.gold ? "#f0d070" : "#fff", lineHeight: 1, margin: 0 }}>{s.value}</p>
-              <p style={{ fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "#4a5580", marginTop: 3 }}>{s.label}</p>
+              <p style={{ fontSize: 20, fontWeight: 500, color: s.gold ? "var(--accent)" : "var(--ink)", lineHeight: 1, margin: 0 }}>{s.value}</p>
+              <p style={{ fontSize: 9, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", marginTop: 3 }}>{s.label}</p>
             </div>
           ))}
         </div>
@@ -250,22 +250,22 @@ export default function DashboardPage() {
       {incoming.length > 0 && (
         <section style={{ marginBottom: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "18px 0 10px" }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "#c8b86a" }}>Incoming challenges</h2>
-            <span style={{ fontSize: 11, color: "#4a5580", letterSpacing: "0.04em" }}>{incoming.length} pending</span>
+            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "var(--accent)" }}>Incoming challenges</h2>
+            <span style={{ fontSize: 11, color: "var(--muted)", letterSpacing: "0.04em" }}>{incoming.length} pending</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {incoming.map(r => {
               const opponent = r.challenger_id === r.pro_id ? r.pro : r.con;
               const myRole = r.pro_id === userId ? "Pro" : "Con";
               return (
-                <div key={r.id} style={{ background: "rgba(255,255,255,0.03)", border: "0.5px solid rgba(240,208,112,0.25)", borderRadius: 12, overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 72px" }}>
+                <div key={r.id} style={{ background: "var(--card)", border: "0.5px solid color-mix(in srgb, var(--accent) 25%, transparent)", borderRadius: 12, overflow: "hidden", display: "grid", gridTemplateColumns: "1fr 72px" }}>
                   <div style={{ padding: "16px 18px" }}>
-                    <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "#f0d070", margin: "0 0 8px", display: "flex", alignItems: "center", gap: 5 }}>
-                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#f0d070", display: "inline-block", flexShrink: 0 }} />
+                    <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 8px", display: "flex", alignItems: "center", gap: 5 }}>
+                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: "var(--accent)", display: "inline-block", flexShrink: 0 }} />
                       {r.is_ranked ? "ranked challenge" : "unranked challenge"}
                     </p>
-                    <h3 style={{ fontFamily: "var(--font-display)", fontSize: 19, color: "#fff", marginBottom: 5 }}>{r.topic}</h3>
-                    <p style={{ fontSize: 12, color: "#4a5580", margin: "0 0 11px" }}>
+                    <h3 style={{ fontFamily: "var(--font-display)", fontSize: 19, color: "var(--ink)", marginBottom: 5 }}>{r.topic}</h3>
+                    <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 11px" }}>
                       from @{opponent?.username} · you are {myRole} · ELO {opponent?.elo}
                     </p>
                     <div style={{ display: "flex", gap: 7 }}>
@@ -273,7 +273,7 @@ export default function DashboardPage() {
                       <button onClick={() => handleDecline(r.id)} style={declineBtn}>Decline</button>
                     </div>
                   </div>
-                  <div style={{ background: "rgba(255,255,255,0.02)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <div style={{ background: "var(--card)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                     <svg width="48" viewBox="0 0 60 80" fill="none" style={{ opacity: 0.12 }}>
                       <rect x="5" y="5" width="50" height="70" rx="3" stroke="white" strokeWidth="1.5"/>
                       <line x1="14" y1="22" x2="46" y2="22" stroke="white" strokeWidth="1.2"/>
@@ -292,17 +292,17 @@ export default function DashboardPage() {
       {outgoing.length > 0 && (
         <section style={{ marginBottom: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "18px 0 10px" }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "#c8b86a" }}>Sent challenges</h2>
+            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "var(--accent)" }}>Sent challenges</h2>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {outgoing.map(r => {
               const opponent = r.pro_id === userId ? r.con : r.pro;
               return (
-                <div key={r.id} style={{ background: "rgba(255,255,255,0.02)", border: "0.5px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "13px 16px", opacity: 0.6, display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", border: "0.5px solid rgba(255,255,255,0.2)", display: "inline-block", flexShrink: 0 }} />
+                <div key={r.id} style={{ background: "var(--card)", border: "0.5px solid var(--paper-2)", borderRadius: 12, padding: "13px 16px", opacity: 0.6, display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", border: "0.5px solid var(--line-strong)", display: "inline-block", flexShrink: 0 }} />
                   <div>
-                    <p style={{ fontWeight: 500, fontSize: 14, margin: "0 0 2px", color: "#fff" }}>{r.topic}</p>
-                    <p style={{ fontSize: 12, color: "#4a5580", margin: 0 }}>waiting for @{opponent?.username} to respond</p>
+                    <p style={{ fontWeight: 500, fontSize: 14, margin: "0 0 2px", color: "var(--ink)" }}>{r.topic}</p>
+                    <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>waiting for @{opponent?.username} to respond</p>
                   </div>
                 </div>
               );
@@ -315,8 +315,8 @@ export default function DashboardPage() {
       {active.length > 0 && (
         <section style={{ marginBottom: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "18px 0 10px" }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "#c8b86a" }}>Active rounds</h2>
-            <span style={{ fontSize: 11, color: "#4a5580", letterSpacing: "0.04em" }}>{active.length} in play</span>
+            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "var(--accent)" }}>Active rounds</h2>
+            <span style={{ fontSize: 11, color: "var(--muted)", letterSpacing: "0.04em" }}>{active.length} in play</span>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {active.map(r => {
@@ -326,30 +326,30 @@ export default function DashboardPage() {
               const isMyTurn = (currentSpeech % 2 === 1 && myRole === "pro") || (currentSpeech % 2 === 0 && myRole === "con");
               const isStale = staleRounds.some(s => s.id === r.id);
               return (
-                <div key={r.id} onClick={() => router.push(`/round/${r.id}`)} style={{ background: "rgba(255,255,255,0.03)", border: `0.5px solid ${isStale ? "rgba(240,100,50,0.35)" : isMyTurn ? "rgba(240,208,112,0.35)" : "rgba(255,255,255,0.07)"}`, borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
-                  <div style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "#4a5580", width: 28, flexShrink: 0, textAlign: "center", lineHeight: 1 }}>
+                <div key={r.id} onClick={() => router.push(`/round/${r.id}`)} style={{ background: "var(--card)", border: `0.5px solid ${isStale ? "color-mix(in srgb, var(--warn) 35%, transparent)" : isMyTurn ? "color-mix(in srgb, var(--accent) 35%, transparent)" : "var(--line)"}`, borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "var(--muted)", width: 28, flexShrink: 0, textAlign: "center", lineHeight: 1 }}>
                     {currentSpeech}
                   </div>
-                  <div style={{ width: "0.5px", height: 36, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+                  <div style={{ width: "0.5px", height: 36, background: "var(--line)", flexShrink: 0 }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
-                      <p style={{ fontSize: 14, fontWeight: 500, color: "#fff", margin: 0 }}>{r.topic}</p>
-                      {r.is_ranked && <span style={{ fontSize: 9, fontWeight: 600, color: "#f0d070", background: "rgba(240,208,112,0.1)", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0 }}>ranked</span>}
+                      <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{r.topic}</p>
+                      {r.is_ranked && <span style={{ fontSize: 9, fontWeight: 600, color: "var(--accent)", background: "color-mix(in srgb, var(--accent) 10%, transparent)", padding: "2px 6px", borderRadius: 4, letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0 }}>ranked</span>}
                     </div>
-                    <p style={{ fontSize: 11, color: "#4a5580", margin: "0 0 7px" }}>
+                    <p style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 7px" }}>
                       vs @{opponent?.username} · {myRole === "pro" ? "Pro" : "Con"} · {speechLabels[currentSpeech - 1]}
                     </p>
                     <div style={{ display: "flex", gap: 3 }}>
                       {Array.from({ length: 8 }).map((_, i) => (
-                        <span key={i} style={{ width: 6, height: 6, borderRadius: "50%", display: "inline-block", background: i < currentSpeech ? "#f0d070" : "rgba(255,255,255,0.1)" }} />
+                        <span key={i} style={{ width: 6, height: 6, borderRadius: "50%", display: "inline-block", background: i < currentSpeech ? "var(--accent)" : "var(--line-strong)" }} />
                       ))}
                     </div>
                   </div>
                   <div style={{ flexShrink: 0, textAlign: "right" }}>
                     {isMyTurn ? (
-                      <span style={{ fontSize: 10, padding: "4px 10px", background: "#f0d070", color: "#0a0f1e", borderRadius: 20, fontWeight: 600, whiteSpace: "nowrap" }}>your turn →</span>
+                      <span style={{ fontSize: 10, padding: "4px 10px", background: "var(--accent)", color: "var(--accent-ink)", borderRadius: 20, fontWeight: 600, whiteSpace: "nowrap" }}>your turn →</span>
                     ) : (
-                      <span style={{ fontSize: 10, padding: "4px 10px", background: "rgba(255,255,255,0.06)", color: "#4a5580", borderRadius: 20, whiteSpace: "nowrap" }}>waiting…</span>
+                      <span style={{ fontSize: 10, padding: "4px 10px", background: "var(--paper-2)", color: "var(--muted)", borderRadius: 20, whiteSpace: "nowrap" }}>waiting…</span>
                     )}
                   </div>
                 </div>
@@ -363,10 +363,10 @@ export default function DashboardPage() {
       {otherPublicRounds.length > 0 && (
         <section style={{ marginBottom: 4 }}>
           <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "18px 0 10px" }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "#c8b86a" }}>Top ranked round</h2>
+            <h2 style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 17, color: "var(--accent)" }}>Top ranked round</h2>
             <span
               onClick={() => router.push("/watch")}
-              style={{ fontSize: 11, color: "#f0d070", letterSpacing: "0.04em", cursor: "pointer" }}
+              style={{ fontSize: 11, color: "var(--accent)", letterSpacing: "0.04em", cursor: "pointer" }}
             >
               See all →
             </span>
@@ -381,19 +381,19 @@ export default function DashboardPage() {
             const progress = ((currentSpeech - 1) / 8) * 100;
             const speechLabels = ["Pro Constructive","Con Constructive","Pro Rebuttal","Con Rebuttal","Pro Summary","Con Summary","Pro Final Focus","Con Final Focus"];
             return (
-              <div onClick={() => router.push(`/round/${r.id}`)} style={{ background: "rgba(255,255,255,0.03)", border: "0.5px solid rgba(240,208,112,0.2)", borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
+              <div onClick={() => router.push(`/round/${r.id}`)} style={{ background: "var(--card)", border: "0.5px solid color-mix(in srgb, var(--accent) 20%, transparent)", borderRadius: 12, padding: "13px 16px", display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: "#fff", margin: "0 0 4px" }}>{r.topic}</p>
-                  <p style={{ fontSize: 11, color: "#4a5580", margin: "0 0 8px" }}>
-                    @{r.pro?.username} <span style={{ color: "#f0d070" }}>{r.pro?.elo}</span> (Pro) vs @{r.con?.username} <span style={{ color: "#f0d070" }}>{r.con?.elo}</span> (Con)
+                  <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: "0 0 4px" }}>{r.topic}</p>
+                  <p style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 8px" }}>
+                    @{r.pro?.username} <span style={{ color: "var(--accent)" }}>{r.pro?.elo}</span> (Pro) vs @{r.con?.username} <span style={{ color: "var(--accent)" }}>{r.con?.elo}</span> (Con)
                   </p>
-                  <div style={{ height: 3, background: "rgba(255,255,255,0.08)", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${progress}%`, background: "#f0d070", borderRadius: 2 }} />
+                  <div style={{ height: 3, background: "var(--line)", borderRadius: 2, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${progress}%`, background: "var(--accent)", borderRadius: 2 }} />
                   </div>
                 </div>
                 <div style={{ flexShrink: 0, textAlign: "right" }}>
-                  <p style={{ fontSize: 11, color: "#4a5580", margin: "0 0 3px" }}>{speechLabels[currentSpeech - 1]}</p>
-                  <p style={{ fontSize: 10, color: "rgba(240,208,112,0.6)", margin: 0 }}>⚡ {(r.pro?.elo || 0) + (r.con?.elo || 0)} ELO</p>
+                  <p style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 3px" }}>{speechLabels[currentSpeech - 1]}</p>
+                  <p style={{ fontSize: 10, color: "color-mix(in srgb, var(--accent) 60%, transparent)", margin: 0 }}>⚡ {(r.pro?.elo || 0) + (r.con?.elo || 0)} ELO</p>
                 </div>
               </div>
             );
@@ -402,11 +402,11 @@ export default function DashboardPage() {
       )}
 
       {/* CTA */}
-      <div style={{ marginTop: 12, background: "rgba(255,255,255,0.03)", border: "0.5px solid rgba(240,208,112,0.2)", borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", right: -30, top: -30, width: 120, height: 120, borderRadius: "50%", background: "radial-gradient(circle, rgba(240,208,112,0.1), transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ marginTop: 12, background: "var(--card)", border: "0.5px solid color-mix(in srgb, var(--accent) 20%, transparent)", borderRadius: 12, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", right: -30, top: -30, width: 120, height: 120, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%)", pointerEvents: "none" }} />
         <div style={{ position: "relative", zIndex: 1 }}>
-          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 15, color: "#fff", margin: "0 0 3px" }}>Ready for a new challenge?</p>
-          <p style={{ fontSize: 11, color: "#4a5580" }}>debate new ideas · climb the ranks</p>
+          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 15, color: "var(--ink)", margin: "0 0 3px" }}>Ready for a new challenge?</p>
+          <p style={{ fontSize: 11, color: "var(--muted)" }}>debate new ideas · climb the ranks</p>
         </div>
         <button onClick={() => router.push("/challenge")} style={ctaBtn}>Challenge a debater</button>
       </div>
@@ -415,7 +415,7 @@ export default function DashboardPage() {
   );
 }
 
-const ghostBtn: React.CSSProperties = { background: "transparent", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "8px 14px", fontSize: 14, color: "#4a5580", cursor: "pointer" };
-const acceptBtn: React.CSSProperties = { flex: 1, padding: "8px 0", background: "#f0d070", color: "#0a0f1e", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" };
-const declineBtn: React.CSSProperties = { flex: 1, padding: "8px 0", background: "transparent", color: "#4a5580", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 7, fontSize: 12, cursor: "pointer" };
-const ctaBtn: React.CSSProperties = { padding: "10px 18px", background: "#f0d070", color: "#0a0f1e", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, position: "relative", zIndex: 1 };
+const ghostBtn: React.CSSProperties = { background: "transparent", border: "0.5px solid var(--line-strong)", borderRadius: 8, padding: "8px 14px", fontSize: 14, color: "var(--muted)", cursor: "pointer" };
+const acceptBtn: React.CSSProperties = { flex: 1, padding: "8px 0", background: "var(--accent)", color: "var(--accent-ink)", border: "none", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer" };
+const declineBtn: React.CSSProperties = { flex: 1, padding: "8px 0", background: "transparent", color: "var(--muted)", border: "0.5px solid var(--line-strong)", borderRadius: 7, fontSize: 12, cursor: "pointer" };
+const ctaBtn: React.CSSProperties = { padding: "10px 18px", background: "var(--accent)", color: "var(--accent-ink)", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0, position: "relative", zIndex: 1 };

@@ -95,7 +95,7 @@ export default function JudgeDashboard() {
             {claimedRounds.map(r => (
               <div key={r.id} style={card}>
                 <p style={{ fontWeight: 500, fontSize: 15, margin: "0 0 6px" }}>{r.topic}</p>
-                <p style={{ fontSize: 13, color: "#6b6760", margin: "0 0 14px" }}>
+                <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 14px" }}>
                   @{r.pro?.username} (Pro) vs @{r.con?.username} (Con) · ELO {r.pro?.elo} vs {r.con?.elo}
                 </p>
                 <button onClick={() => router.push(`/judge/${r.id}`)} style={primaryBtn}>
@@ -116,7 +116,7 @@ export default function JudgeDashboard() {
           {rounds.map(r => (
             <div key={r.id} style={card}>
               <p style={{ fontWeight: 500, fontSize: 15, margin: "0 0 6px" }}>{r.topic}</p>
-              <p style={{ fontSize: 13, color: "#6b6760", margin: "0 0 14px" }}>
+              <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: "0 0 14px" }}>
                 @{r.pro?.username} (Pro) vs @{r.con?.username} (Con) · ELO {r.pro?.elo} vs {r.con?.elo}
               </p>
               <button
@@ -135,8 +135,8 @@ export default function JudgeDashboard() {
 }
 
 const card = {
-  background: "#ffffff",
-  border: "1px solid #e5e2dc",
+  background: "var(--card)",
+  border: "1px solid var(--line)",
   borderRadius: 12,
   padding: "1.25rem",
 } as const;
@@ -144,7 +144,7 @@ const card = {
 const sectionLabel = {
   fontSize: 11,
   fontWeight: 500 as const,
-  color: "#6b6760",
+  color: "var(--ink-soft)",
   textTransform: "uppercase" as const,
   letterSpacing: "0.5px",
   margin: "0 0 10px",
@@ -153,8 +153,8 @@ const sectionLabel = {
 const primaryBtn = {
   width: "100%",
   height: 40,
-  background: "#1a1814",
-  color: "#fff",
+  background: "var(--ink)",
+  color: "var(--ink)",
   border: "none",
   borderRadius: 8,
   fontSize: 14,
@@ -164,7 +164,7 @@ const primaryBtn = {
 
 const ghostBtn = {
   background: "transparent",
-  border: "1px solid #e5e2dc",
+  border: "1px solid var(--line)",
   borderRadius: 8,
   padding: "8px 14px",
   fontSize: 14,

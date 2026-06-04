@@ -131,7 +131,7 @@ export default function JudgeRoundPage() {
     router.push("/judge");
   }
 
-  if (!round) return <p style={{ textAlign: "center", marginTop: "4rem", color: "#4a5580" }}>Loading...</p>;
+  if (!round) return <p style={{ textAlign: "center", marginTop: "4rem", color: "var(--muted)" }}>Loading...</p>;
 
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 20px 80px" }}>
@@ -139,17 +139,17 @@ export default function JudgeRoundPage() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 0 20px" }}>
         <button onClick={() => router.push("/judge")} style={ghostBtn}>← Back</button>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "#fff", margin: 0 }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "var(--ink)", margin: 0 }}>
           Judge Round
         </h1>
       </div>
 
       {/* Round info */}
       <div style={card}>
-        <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, rgba(122,160,212,0.08), transparent 70%)", pointerEvents: "none" }} />
-        <p style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "#4a5580", margin: "0 0 6px", position: "relative", zIndex: 1 }}>topic</p>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "#fff", margin: "0 0 8px", position: "relative", zIndex: 1 }}>{round.topic}</h2>
-        <p style={{ fontSize: 13, color: "#4a5580", margin: 0, position: "relative", zIndex: 1 }}>
+        <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in srgb, var(--pro) 8%, transparent), transparent 70%)", pointerEvents: "none" }} />
+        <p style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)", margin: "0 0 6px", position: "relative", zIndex: 1 }}>topic</p>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ink)", margin: "0 0 8px", position: "relative", zIndex: 1 }}>{round.topic}</h2>
+        <p style={{ fontSize: 13, color: "var(--muted)", margin: 0, position: "relative", zIndex: 1 }}>
           @{round.pro?.username} (Pro) vs @{round.con?.username} (Con)
         </p>
       </div>
@@ -165,10 +165,10 @@ export default function JudgeRoundPage() {
             <div key={i} style={{ ...card, opacity: url ? 1 : 0.4, marginBottom: 0 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: url ? 10 : 0, position: "relative", zIndex: 1 }}>
                 <div>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "#fff" }}>{s.label}</p>
-                  <p style={{ margin: 0, fontSize: 11, color: "#4a5580" }}>@{speaker}</p>
+                  <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{s.label}</p>
+                  <p style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>@{speaker}</p>
                 </div>
-                {!url && <span style={{ fontSize: 11, color: "#4a5580" }}>Not submitted</span>}
+                {!url && <span style={{ fontSize: 11, color: "var(--muted)" }}>Not submitted</span>}
               </div>
               {url && <AudioPlayer src={url} />}
             </div>
@@ -182,7 +182,7 @@ export default function JudgeRoundPage() {
           <p style={sectionLabel}>Submit ballot</p>
 
           {error && (
-            <div style={{ background: "rgba(255,107,107,0.1)", border: "0.5px solid rgba(255,107,107,0.3)", color: "#ff6b6b", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
+            <div style={{ background: "color-mix(in srgb, var(--loss) 10%, transparent)", border: "0.5px solid color-mix(in srgb, var(--loss) 30%, transparent)", color: "var(--loss)", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
               {error}
             </div>
           )}
@@ -198,14 +198,14 @@ export default function JudgeRoundPage() {
                   style={{
                     padding: "14px 16px", borderRadius: 8,
                     cursor: "pointer", textAlign: "center",
-                    background: winner === side ? "rgba(122,160,212,0.15)" : "rgba(255,255,255,0.03)",
-                    border: `0.5px solid ${winner === side ? "#7aa0d4" : "rgba(255,255,255,0.08)"}`,
+                    background: winner === side ? "color-mix(in srgb, var(--pro) 15%, transparent)" : "var(--card)",
+                    border: `0.5px solid ${winner === side ? "var(--pro)" : "var(--line)"}`,
                   }}
                 >
-                  <p style={{ fontWeight: 600, margin: "0 0 2px", fontSize: 14, color: winner === side ? "#7aa0d4" : "#fff" }}>
+                  <p style={{ fontWeight: 600, margin: "0 0 2px", fontSize: 14, color: winner === side ? "var(--pro)" : "var(--ink)" }}>
                     {side === "pro" ? "Pro" : "Con"}
                   </p>
-                  <p style={{ fontSize: 12, margin: 0, color: "#4a5580" }}>
+                  <p style={{ fontSize: 12, margin: 0, color: "var(--muted)" }}>
                     @{side === "pro" ? round.pro?.username : round.con?.username}
                   </p>
                 </div>
@@ -222,7 +222,7 @@ export default function JudgeRoundPage() {
                 { label: `Con — @${round.con?.username}`, val: conSpeaks, set: setConSpeaks },
               ].map(f => (
                 <div key={f.label}>
-                  <label style={{ fontSize: 11, color: "#4a5580", display: "block", marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                  <label style={{ fontSize: 11, color: "var(--muted)", display: "block", marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>
                     {f.label}
                   </label>
                   <input
@@ -232,10 +232,10 @@ export default function JudgeRoundPage() {
                     style={{
                       width: "100%", boxSizing: "border-box" as const,
                       height: 40, padding: "0 12px",
-                      background: "rgba(255,255,255,0.04)",
-                      border: "0.5px solid rgba(255,255,255,0.1)",
+                      background: "var(--card)",
+                      border: "0.5px solid var(--line-strong)",
                       borderRadius: 8, fontSize: 15,
-                      color: "#fff", outline: "none",
+                      color: "var(--ink)", outline: "none",
                     }}
                   />
                 </div>
@@ -253,9 +253,9 @@ export default function JudgeRoundPage() {
               style={{
                 width: "100%", boxSizing: "border-box" as const,
                 height: 120, padding: "10px 12px",
-                background: "rgba(255,255,255,0.04)",
-                border: "0.5px solid rgba(255,255,255,0.1)",
-                borderRadius: 8, fontSize: 14, color: "#fff",
+                background: "var(--card)",
+                border: "0.5px solid var(--line-strong)",
+                borderRadius: 8, fontSize: 14, color: "var(--ink)",
                 outline: "none", resize: "vertical",
                 fontFamily: "inherit", lineHeight: 1.6,
                 position: "relative", zIndex: 1,
@@ -270,16 +270,16 @@ export default function JudgeRoundPage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <div style={{ ...card, textAlign: "center" }}>
-            <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "#4ddfc4", margin: "0 0 6px", position: "relative", zIndex: 1 }}>
+            <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "var(--win)", margin: "0 0 6px", position: "relative", zIndex: 1 }}>
               Ballot submitted!
             </p>
-            <p style={{ fontSize: 13, color: "#4a5580", margin: 0, position: "relative", zIndex: 1 }}>
+            <p style={{ fontSize: 13, color: "var(--muted)", margin: 0, position: "relative", zIndex: 1 }}>
               You can now delete the speeches or go back.
             </p>
           </div>
           <button
             onClick={handleDeleteSpeeches}
-            style={{ ...primaryBtn, background: "rgba(255,107,107,0.15)", color: "#ff6b6b", border: "0.5px solid rgba(255,107,107,0.3)" }}
+            style={{ ...primaryBtn, background: "color-mix(in srgb, var(--loss) 15%, transparent)", color: "var(--loss)", border: "0.5px solid color-mix(in srgb, var(--loss) 30%, transparent)" }}
           >
             Delete all speeches
           </button>
@@ -294,25 +294,25 @@ export default function JudgeRoundPage() {
 }
 
 const card: React.CSSProperties = {
-  background: "rgba(255,255,255,0.03)",
-  border: "0.5px solid rgba(255,255,255,0.07)",
+  background: "var(--card)",
+  border: "0.5px solid var(--line)",
   borderRadius: 14, padding: "18px 20px",
   marginBottom: 10, position: "relative", overflow: "hidden",
 };
 
 const sectionLabel: React.CSSProperties = {
-  fontSize: 10, fontWeight: 500, color: "#4a5580",
+  fontSize: 10, fontWeight: 500, color: "var(--muted)",
   textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 12px",
 };
 
 const ghostBtn: React.CSSProperties = {
   width: "100%", height: 44, background: "transparent",
-  border: "0.5px solid rgba(255,255,255,0.1)",
-  borderRadius: 8, fontSize: 14, color: "#4a5580", cursor: "pointer",
+  border: "0.5px solid var(--line-strong)",
+  borderRadius: 8, fontSize: 14, color: "var(--muted)", cursor: "pointer",
 };
 
 const primaryBtn: React.CSSProperties = {
-  width: "100%", height: 44, background: "#7aa0d4",
-  color: "#fff", border: "none", borderRadius: 8,
+  width: "100%", height: 44, background: "var(--pro)",
+  color: "var(--ink)", border: "none", borderRadius: 8,
   fontSize: 15, fontWeight: 600, cursor: "pointer",
 };

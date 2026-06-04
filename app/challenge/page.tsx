@@ -58,11 +58,11 @@ export default function ChallengePage() {
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 0 20px" }}>
         <button onClick={() => router.push("/dashboard")} style={ghostBtn}>← Back</button>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "#fff", margin: 0 }}>New challenge</h1>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "var(--ink)", margin: 0 }}>New challenge</h1>
       </div>
 
       {error && (
-        <div style={{ background: "rgba(255,107,107,0.1)", border: "0.5px solid rgba(255,107,107,0.3)", color: "#ff6b6b", padding: "10px 14px", borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
+        <div style={{ background: "color-mix(in srgb, var(--loss) 10%, transparent)", border: "0.5px solid color-mix(in srgb, var(--loss) 30%, transparent)", color: "var(--loss)", padding: "10px 14px", borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
           {error}
         </div>
       )}
@@ -77,20 +77,20 @@ export default function ChallengePage() {
         {results.length > 0 && (
           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
             {results.map(p => (
-              <div key={p.id} onClick={() => { setSelected(p); setResults([]); setSearch(p.username); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 8, cursor: "pointer", background: selected?.id === p.id ? "rgba(240,208,112,0.08)" : "rgba(255,255,255,0.03)", border: `0.5px solid ${selected?.id === p.id ? "rgba(240,208,112,0.35)" : "rgba(255,255,255,0.07)"}` }}>
+              <div key={p.id} onClick={() => { setSelected(p); setResults([]); setSearch(p.username); }} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderRadius: 8, cursor: "pointer", background: selected?.id === p.id ? "color-mix(in srgb, var(--accent) 8%, transparent)" : "var(--card)", border: `0.5px solid ${selected?.id === p.id ? "color-mix(in srgb, var(--accent) 35%, transparent)" : "var(--line)"}` }}>
                 <div>
-                  <p style={{ margin: 0, fontWeight: 500, fontSize: 14, color: "#fff" }}>{p.display_name || p.username}</p>
-                  <p style={{ margin: 0, fontSize: 12, color: "#4a5580" }}>@{p.username}</p>
+                  <p style={{ margin: 0, fontWeight: 500, fontSize: 14, color: "var(--ink)" }}>{p.display_name || p.username}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: "var(--muted)" }}>@{p.username}</p>
                 </div>
-                <span style={{ fontSize: 12, color: "#4a5580", fontFamily: "var(--font-mono)" }}>ELO {p.elo}</span>
+                <span style={{ fontSize: 12, color: "var(--muted)", fontFamily: "var(--font-mono)" }}>ELO {p.elo}</span>
               </div>
             ))}
           </div>
         )}
         {selected && (
-          <div style={{ marginTop: 10, background: "rgba(240,208,112,0.06)", border: "0.5px solid rgba(240,208,112,0.25)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "#f0d070" }}>
+          <div style={{ marginTop: 10, background: "color-mix(in srgb, var(--accent) 6%, transparent)", border: "0.5px solid color-mix(in srgb, var(--accent) 25%, transparent)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "var(--accent)" }}>
             Selected: <strong>{selected.display_name || selected.username}</strong>
-            <span style={{ color: "#4a5580", marginLeft: 8, fontFamily: "var(--font-mono)" }}>ELO {selected.elo}</span>
+            <span style={{ color: "var(--muted)", marginLeft: 8, fontFamily: "var(--font-mono)" }}>ELO {selected.elo}</span>
           </div>
         )}
       </div>
@@ -106,9 +106,9 @@ export default function ChallengePage() {
         <p style={sectionLabel}>3. Choose your side</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {(["pro", "con"] as const).map(s => (
-            <div key={s} onClick={() => setSide(s)} style={{ padding: "14px 16px", borderRadius: 8, cursor: "pointer", textAlign: "center", background: side === s ? "#f0d070" : "rgba(255,255,255,0.03)", border: `0.5px solid ${side === s ? "#f0d070" : "rgba(255,255,255,0.1)"}` }}>
-              <p style={{ fontWeight: 600, margin: "0 0 4px", fontSize: 14, color: side === s ? "#0a0f1e" : "#fff" }}>{s === "pro" ? "Pro" : "Con"}</p>
-              <p style={{ fontSize: 12, margin: 0, color: side === s ? "rgba(10,15,30,0.6)" : "#4a5580" }}>{s === "pro" ? "You speak first" : "Opponent speaks first"}</p>
+            <div key={s} onClick={() => setSide(s)} style={{ padding: "14px 16px", borderRadius: 8, cursor: "pointer", textAlign: "center", background: side === s ? "var(--accent)" : "var(--card)", border: `0.5px solid ${side === s ? "var(--accent)" : "var(--line-strong)"}` }}>
+              <p style={{ fontWeight: 600, margin: "0 0 4px", fontSize: 14, color: side === s ? "var(--accent-ink)" : "var(--ink)" }}>{s === "pro" ? "Pro" : "Con"}</p>
+              <p style={{ fontSize: 12, margin: 0, color: side === s ? "color-mix(in srgb, var(--paper) 88%, transparent)" : "var(--muted)" }}>{s === "pro" ? "You speak first" : "Opponent speaks first"}</p>
             </div>
           ))}
         </div>
@@ -119,9 +119,9 @@ export default function ChallengePage() {
         <p style={sectionLabel}>4. Round type</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {([true, false] as const).map(ranked => (
-            <div key={String(ranked)} onClick={() => setIsRanked(ranked)} style={{ padding: "14px 16px", borderRadius: 8, cursor: "pointer", textAlign: "center", background: isRanked === ranked ? "#f0d070" : "rgba(255,255,255,0.03)", border: `0.5px solid ${isRanked === ranked ? "#f0d070" : "rgba(255,255,255,0.1)"}` }}>
-              <p style={{ fontWeight: 600, margin: "0 0 4px", fontSize: 14, color: isRanked === ranked ? "#0a0f1e" : "#fff" }}>{ranked ? "Ranked" : "Unranked"}</p>
-              <p style={{ fontSize: 12, margin: 0, color: isRanked === ranked ? "rgba(10,15,30,0.6)" : "#4a5580" }}>{ranked ? "Affects ELO · Visible publicly" : "No ELO change · Private"}</p>
+            <div key={String(ranked)} onClick={() => setIsRanked(ranked)} style={{ padding: "14px 16px", borderRadius: 8, cursor: "pointer", textAlign: "center", background: isRanked === ranked ? "var(--accent)" : "var(--card)", border: `0.5px solid ${isRanked === ranked ? "var(--accent)" : "var(--line-strong)"}` }}>
+              <p style={{ fontWeight: 600, margin: "0 0 4px", fontSize: 14, color: isRanked === ranked ? "var(--accent-ink)" : "var(--ink)" }}>{ranked ? "Ranked" : "Unranked"}</p>
+              <p style={{ fontSize: 12, margin: 0, color: isRanked === ranked ? "color-mix(in srgb, var(--paper) 88%, transparent)" : "var(--muted)" }}>{ranked ? "Affects ELO · Visible publicly" : "No ELO change · Private"}</p>
             </div>
           ))}
         </div>
@@ -135,9 +135,9 @@ export default function ChallengePage() {
   );
 }
 
-const card: React.CSSProperties = { background: "rgba(255,255,255,0.03)", border: "0.5px solid rgba(255,255,255,0.07)", borderRadius: 14, padding: "18px 20px", marginBottom: 12 };
-const sectionLabel: React.CSSProperties = { fontSize: 10, fontWeight: 500, color: "#4a5580", textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 12px" };
-const inputStyle: React.CSSProperties = { width: "100%", boxSizing: "border-box", height: 42, padding: "0 13px", background: "rgba(255,255,255,0.04)", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 14, color: "#fff", outline: "none" };
-const ghostBtn: React.CSSProperties = { background: "transparent", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 8, padding: "8px 14px", fontSize: 14, color: "#4a5580", cursor: "pointer" };
-const searchBtn: React.CSSProperties = { height: 42, padding: "0 16px", background: "transparent", border: "0.5px solid rgba(255,255,255,0.1)", borderRadius: 8, fontSize: 13, fontWeight: 500, color: "#8a9abf", cursor: "pointer", whiteSpace: "nowrap" };
-const primaryBtn: React.CSSProperties = { width: "100%", height: 46, background: "#f0d070", color: "#0a0f1e", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", marginTop: 4 };
+const card: React.CSSProperties = { background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 14, padding: "18px 20px", marginBottom: 12 };
+const sectionLabel: React.CSSProperties = { fontSize: 10, fontWeight: 500, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 12px" };
+const inputStyle: React.CSSProperties = { width: "100%", boxSizing: "border-box", height: 42, padding: "0 13px", background: "var(--card)", border: "0.5px solid var(--line-strong)", borderRadius: 8, fontSize: 14, color: "var(--ink)", outline: "none" };
+const ghostBtn: React.CSSProperties = { background: "transparent", border: "0.5px solid var(--line-strong)", borderRadius: 8, padding: "8px 14px", fontSize: 14, color: "var(--muted)", cursor: "pointer" };
+const searchBtn: React.CSSProperties = { height: 42, padding: "0 16px", background: "transparent", border: "0.5px solid var(--line-strong)", borderRadius: 8, fontSize: 13, fontWeight: 500, color: "var(--ink-soft)", cursor: "pointer", whiteSpace: "nowrap" };
+const primaryBtn: React.CSSProperties = { width: "100%", height: 46, background: "var(--accent)", color: "var(--accent-ink)", border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", marginTop: 4 };

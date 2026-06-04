@@ -28,20 +28,31 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ fontFamily: "sans-serif", maxWidth: 420, margin: "3rem auto", padding: "0 1rem" }}>
-      <h1 style={{ fontSize: 26, marginBottom: 4 }}>Welcome back</h1>
-      <p style={{ color: "#666", marginBottom: 24 }}>Sign in to your account.</p>
+    <div className="db-container db-page db-rise" style={{ maxWidth: 420 }}>
+      <p className="db-eyebrow">Async Debate</p>
+      <h1 style={{ fontSize: 30, marginBottom: 6 }}>Welcome back</h1>
+      <p style={{ color: "var(--ink-soft)", marginBottom: 24 }}>Sign in to your account.</p>
 
       {error && (
-        <div style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#b91c1c", padding: "10px 14px", borderRadius: 8, marginBottom: 16 }}>
+        <div
+          style={{
+            background: "color-mix(in srgb, var(--loss) 10%, var(--card))",
+            border: "1px solid color-mix(in srgb, var(--loss) 35%, transparent)",
+            color: "var(--loss)",
+            padding: "10px 14px",
+            borderRadius: "var(--radius-sm)",
+            marginBottom: 16,
+            fontSize: 14,
+          }}
+        >
           {error}
         </div>
       )}
 
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ fontSize: 12, fontWeight: 500, display: "block", marginBottom: 4 }}>EMAIL</label>
+      <div style={{ marginBottom: 14 }}>
+        <label className="db-label">EMAIL</label>
         <input
-          style={inputStyle}
+          className="db-input"
           type="email"
           placeholder="you@example.com"
           value={email}
@@ -50,13 +61,13 @@ export default function LoginPage() {
         />
       </div>
 
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-          <label style={{ fontSize: 12, fontWeight: 500 }}>PASSWORD</label>
-          <a href="/forgot-password" style={{ fontSize: 12, color: "#666" }}>Forgot password?</a>
+      <div style={{ marginBottom: 22 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <label className="db-label">PASSWORD</label>
+          <a href="/forgot-password" style={{ fontSize: 12 }}>Forgot password?</a>
         </div>
         <input
-          style={inputStyle}
+          className="db-input"
           type="password"
           placeholder="Your password"
           value={password}
@@ -65,25 +76,13 @@ export default function LoginPage() {
         />
       </div>
 
-      <button onClick={handleLogin} disabled={loading} style={btnStyle}>
+      <button onClick={handleLogin} disabled={loading} className="db-btn db-btn--primary db-btn--block">
         {loading ? "Signing in…" : "Sign in"}
       </button>
 
-      <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "#666" }}>
-        Don't have an account? <a href="/signup">Sign up</a>
+      <p style={{ textAlign: "center", marginTop: 20, fontSize: 14, color: "var(--ink-soft)" }}>
+        Don&apos;t have an account? <a href="/signup">Sign up</a>
       </p>
     </div>
   );
 }
-
-const inputStyle = {
-  width: "100%", boxSizing: "border-box" as const, height: 42,
-  padding: "0 12px", border: "1px solid #e5e2dc", borderRadius: 8,
-  fontSize: 15, outline: "none", background: "transparent",
-};
-
-const btnStyle = {
-  width: "100%", height: 44, background: "#1a1814", color: "#fff",
-  border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500,
-  cursor: "pointer",
-};
