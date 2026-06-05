@@ -111,9 +111,8 @@ export default function SideNav() {
         <Link href="/challenge" className={linkClass("/challenge")}><Icon name="plus" />Challenge</Link>
         <Link href="/watch" className={linkClass("/watch")}><Icon name="play" />Watch</Link>
         <Link href="/history" className={linkClass("/history")}><Icon name="clock" />History</Link>
-        {profile?.is_judge && (
-          <Link href="/judge" className={linkClass("/judge")}><Icon name="gavel" />Judge</Link>
-        )}
+        <Link href="/judge" className={linkClass("/judge")}><Icon name="gavel" />Judge</Link>
+     
 
         <div className="db-side__spacer" />
 

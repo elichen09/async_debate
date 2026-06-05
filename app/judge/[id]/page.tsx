@@ -54,12 +54,7 @@ export default function JudgeRoundPage() {
       if (!session) { router.push("/login"); return; }
       setUserId(session.user.id);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_judge")
-        .eq("id", session.user.id)
-        .single();
-      if (!profile?.is_judge) { router.push("/dashboard"); return; }
+      
 
       const { data: roundData } = await supabase
         .from("rounds")
@@ -72,6 +67,10 @@ export default function JudgeRoundPage() {
         .single();
 
       if (!roundData) { router.push("/judge"); return; }
+      if (roundData.pro_id === session.user.id || roundData.con_id === session.user.id) {
+        router.push("/judge");
+        return;
+      }
       setRound(roundData as unknown as Round);
 
       const { data: speechData } = await supabase

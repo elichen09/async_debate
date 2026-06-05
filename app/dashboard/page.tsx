@@ -153,14 +153,11 @@ export default function DashboardPage() {
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 20px 80px" }}>
 
-      {/* Judge link */}
-      {isJudge && (
-        <div style={{ marginBottom: 16 }}>
-          <button onClick={() => router.push("/judge")} style={ghostBtn}>
-            Judge dashboard →
-          </button>
-        </div>
-      )}
+      <div style={{ marginBottom: 16 }}>
+        <button onClick={() => router.push("/judge")} style={ghostBtn}>
+          Judge dashboard →
+        </button>
+      </div>
 
       {/* Stale round warnings */}
       {staleRounds.length > 0 && (
