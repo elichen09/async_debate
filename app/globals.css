@@ -776,6 +776,7 @@ input, button, textarea, select { font-family: inherit; }
   display: flex;
   justify-content: center;
   align-items: center;
+  min-height: 480px;
 }
 
 /* =========================================================================
@@ -947,7 +948,7 @@ input, button, textarea, select { font-family: inherit; }
 
 @keyframes db-fill-in {
   from { width: 0; }
-  to   { width: 37.5%; }
+  to   { width: var(--fill, 37.5%); }
 }
 
 .db-round-card__fill {
@@ -957,10 +958,98 @@ input, button, textarea, select { font-family: inherit; }
   animation: db-fill-in 1.4s cubic-bezier(.16,.84,.2,1) 0.9s both;
 }
 
+.db-round-card-slot--b .db-round-card__fill { animation-delay: 1.2s; }
+.db-round-card-slot--c .db-round-card__fill { animation-delay: 1.5s; }
+
 @media (prefers-reduced-motion: reduce) {
   .db-round-card__fill {
     animation: none;
-    width: 37.5%;
+    width: var(--fill, 37.5%);
+  }
+}
+
+.db-round-card__status {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: oklch(0.94 0.016 80 / 0.38);
+}
+
+/* =========================================================================
+   MULTI-CARD FLOAT — hero visual
+   ========================================================================= */
+.db-round-cards {
+  position: relative;
+  width: 380px;
+  height: 480px;
+  flex: none;
+}
+
+/* Slot A — primary, centered, front */
+.db-round-card-slot--a {
+  position: absolute;
+  width: 315px;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  animation: db-float-a 6s ease-in-out infinite;
+}
+
+/* Slot B — upper right, tilted clockwise */
+.db-round-card-slot--b {
+  position: absolute;
+  width: 268px;
+  right: -12px;
+  top: 18px;
+  z-index: 2;
+  opacity: 0.70;
+  transform: rotate(5deg);
+  animation: db-float-b 8.5s ease-in-out infinite;
+  animation-delay: -3.1s;
+}
+
+/* Slot C — lower left, tilted counter-clockwise */
+.db-round-card-slot--c {
+  position: absolute;
+  width: 252px;
+  left: -12px;
+  bottom: 18px;
+  z-index: 1;
+  opacity: 0.52;
+  transform: rotate(-4deg);
+  animation: db-float-c 7.2s ease-in-out infinite;
+  animation-delay: -5.4s;
+}
+
+@keyframes db-float-a {
+  0%, 100% { transform: translate(-50%, -50%); }
+  50%       { transform: translate(-50%, calc(-50% - 14px)); }
+}
+
+@keyframes db-float-b {
+  0%, 100% { transform: rotate(5deg) translateY(0px); }
+  50%       { transform: rotate(5deg) translateY(-11px); }
+}
+
+@keyframes db-float-c {
+  0%, 100% { transform: rotate(-4deg) translateY(0px); }
+  50%       { transform: rotate(-4deg) translateY(-9px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .db-round-card-slot--a {
+    animation: none;
+    transform: translate(-50%, -50%);
+  }
+  .db-round-card-slot--b {
+    animation: none;
+    transform: rotate(5deg);
+  }
+  .db-round-card-slot--c {
+    animation: none;
+    transform: rotate(-4deg);
   }
 }
 

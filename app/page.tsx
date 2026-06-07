@@ -1,4 +1,5 @@
 import Link from "next/link";
+import React from "react";
 
 const STEPS = [
   {
@@ -18,6 +19,97 @@ const STEPS = [
     d: "A real judge writes a full ballot. Win your round and your ELO climbs.",
   },
 ];
+
+const ROUNDS_VISUAL = [
+  {
+    slot: "a",
+    num: "Round #247",
+    live: true,
+    resolution:
+      "Developed nations have an obligation to fund green energy transitions in the Global South.",
+    pro: { name: "Sarah Chen", elo: "1,842" },
+    con: { name: "Marcus Webb", elo: "1,791" },
+    speech: "3 of 8",
+    time: "4:32",
+    fillPct: 37.5,
+  },
+  {
+    slot: "b",
+    num: "Round #251",
+    live: false,
+    status: "Awaiting",
+    resolution:
+      "The US federal government should adopt ranked-choice voting.",
+    pro: { name: "Priya Nair", elo: "1,756" },
+    con: { name: "Jordan Lee", elo: "1,803" },
+    speech: "6 of 8",
+    time: "1:48",
+    fillPct: 75,
+  },
+  {
+    slot: "c",
+    num: "Round #238",
+    live: false,
+    status: "Judged",
+    resolution:
+      "Economic sanctions are an effective tool of foreign policy.",
+    pro: { name: "Alex Kim", elo: "1,680" },
+    con: { name: "Chris Rivera", elo: "1,722" },
+    speech: "8 of 8",
+    time: "0:00",
+    fillPct: 100,
+  },
+] as const;
+
+function RoundCard({ r }: { r: (typeof ROUNDS_VISUAL)[number] }) {
+  return (
+    <div className="db-round-card">
+      <div className="db-round-card__header">
+        <span className="db-round-card__num">{r.num}</span>
+        <span className="db-round-card__live">
+          {r.live ? (
+            <>
+              <span className="db-round-card__dot" />
+              Live
+            </>
+          ) : (
+            <span className="db-round-card__status">{r.status}</span>
+          )}
+        </span>
+      </div>
+      <div className="db-round-card__resolution">
+        <p className="db-round-card__res-label">Resolution</p>
+        <p className="db-round-card__res-text">{r.resolution}</p>
+      </div>
+      <div className="db-round-card__sides">
+        <div className="db-round-card__side db-round-card__side--pro">
+          <span className="db-round-card__side-label">Pro</span>
+          <span className="db-round-card__side-name">{r.pro.name}</span>
+          <span className="db-round-card__side-elo">{r.pro.elo}</span>
+        </div>
+        <div className="db-round-card__side db-round-card__side--con">
+          <span className="db-round-card__side-label">Con</span>
+          <span className="db-round-card__side-name">{r.con.name}</span>
+          <span className="db-round-card__side-elo">{r.con.elo}</span>
+        </div>
+      </div>
+      <div className="db-round-card__footer">
+        <div className="db-round-card__progress-meta">
+          <span className="db-round-card__progress-label">
+            Speech {r.speech}
+          </span>
+          <span className="db-round-card__progress-time">{r.time}</span>
+        </div>
+        <div className="db-round-card__track">
+          <div
+            className="db-round-card__fill"
+            style={{ "--fill": `${r.fillPct}%` } as React.CSSProperties}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
@@ -54,42 +146,12 @@ export default function Home() {
           style={{ animationDelay: "0.28s" }}
           aria-hidden="true"
         >
-          <div className="db-round-card">
-            <div className="db-round-card__header">
-              <span className="db-round-card__num">Round #247</span>
-              <span className="db-round-card__live">
-                <span className="db-round-card__dot" />
-                Live
-              </span>
-            </div>
-            <div className="db-round-card__resolution">
-              <p className="db-round-card__res-label">Resolution</p>
-              <p className="db-round-card__res-text">
-                Developed nations have an obligation to fund green energy
-                transitions in the Global South.
-              </p>
-            </div>
-            <div className="db-round-card__sides">
-              <div className="db-round-card__side db-round-card__side--pro">
-                <span className="db-round-card__side-label">Pro</span>
-                <span className="db-round-card__side-name">Sarah Chen</span>
-                <span className="db-round-card__side-elo">1,842</span>
+          <div className="db-round-cards">
+            {ROUNDS_VISUAL.map((r) => (
+              <div key={r.slot} className={`db-round-card-slot db-round-card-slot--${r.slot}`}>
+                <RoundCard r={r} />
               </div>
-              <div className="db-round-card__side db-round-card__side--con">
-                <span className="db-round-card__side-label">Con</span>
-                <span className="db-round-card__side-name">Marcus Webb</span>
-                <span className="db-round-card__side-elo">1,791</span>
-              </div>
-            </div>
-            <div className="db-round-card__footer">
-              <div className="db-round-card__progress-meta">
-                <span className="db-round-card__progress-label">Speech 3 of 8</span>
-                <span className="db-round-card__progress-time">4:32</span>
-              </div>
-              <div className="db-round-card__track">
-                <div className="db-round-card__fill" />
-              </div>
-            </div>
+            ))}
           </div>
         </div>
 
