@@ -2,17 +2,18 @@ import Link from "next/link";
 
 const STEPS = [
   {
-    n: "01",
+    n: "1",
     t: "Challenge anyone",
     d: "Search for a debater, pick your side, send the resolution. Skip the calendar entirely.",
+    accent: true,
   },
   {
-    n: "02",
+    n: "2",
     t: "Speak on your clock",
     d: "Record and upload each speech whenever it suits you. The round moves at your pace.",
   },
   {
-    n: "03",
+    n: "3",
     t: "Get judged, climb",
     d: "A real judge writes a full ballot. Win your round and your ELO climbs.",
   },
@@ -20,41 +21,110 @@ const STEPS = [
 
 export default function Home() {
   return (
-    <div className="db-container db-page db-home">
-      <section className="db-home__hero db-rise">
-        <p className="db-eyebrow">Public Forum · Asynchronous</p>
-        <h1 className="db-home__title">
-          Debate anyone,
-          <br />
-          <span className="db-home__title-em">anywhere</span>, anytime.
-        </h1>
-        <p className="db-home__lede">
-          Real rounds without the scheduling headache. Send a challenge, record your
-          speeches whenever you have a free minute, and let the ladder show who is sharpest.
-        </p>
-        <div className="db-home__cta">
-          <Link href="/signup" className="db-btn db-btn--accent">
-            Start debating
-          </Link>
-          <Link href="/login" className="db-btn db-btn--ghost">
-            Sign in
-          </Link>
+    <div className="db-home">
+
+      {/* Attention — hero */}
+      <section className="db-home__hero">
+
+        <div className="db-home__hero-text db-rise">
+          <p className="db-home__eyebrow">Public Forum · Async</p>
+          <h1 className="db-home__title">
+            Debate<br />
+            <span className="db-home__title-em">anyone</span>,<br />
+            anytime.
+          </h1>
+          <p className="db-home__lede">
+            Real rounds without the scheduling headache. Send a challenge,
+            record your speeches whenever you have a free minute, and let the
+            ladder show who is sharpest.
+          </p>
+          <div className="db-home__cta">
+            <Link href="/signup" className="db-btn db-btn--accent db-btn--lg">
+              Start debating
+              <span className="db-btn__arrow" aria-hidden="true">→</span>
+            </Link>
+            <Link href="/login" className="db-btn db-btn--ghost">
+              Sign in
+            </Link>
+          </div>
+        </div>
+
+        <div
+          className="db-home__hero-visual db-rise"
+          style={{ animationDelay: "0.28s" }}
+          aria-hidden="true"
+        >
+          <div className="db-round-card">
+            <div className="db-round-card__header">
+              <span className="db-round-card__num">Round #247</span>
+              <span className="db-round-card__live">
+                <span className="db-round-card__dot" />
+                Live
+              </span>
+            </div>
+            <div className="db-round-card__resolution">
+              <p className="db-round-card__res-label">Resolution</p>
+              <p className="db-round-card__res-text">
+                Developed nations have an obligation to fund green energy
+                transitions in the Global South.
+              </p>
+            </div>
+            <div className="db-round-card__sides">
+              <div className="db-round-card__side db-round-card__side--pro">
+                <span className="db-round-card__side-label">Pro</span>
+                <span className="db-round-card__side-name">Sarah Chen</span>
+                <span className="db-round-card__side-elo">1,842</span>
+              </div>
+              <div className="db-round-card__side db-round-card__side--con">
+                <span className="db-round-card__side-label">Con</span>
+                <span className="db-round-card__side-name">Marcus Webb</span>
+                <span className="db-round-card__side-elo">1,791</span>
+              </div>
+            </div>
+            <div className="db-round-card__footer">
+              <div className="db-round-card__progress-meta">
+                <span className="db-round-card__progress-label">Speech 3 of 8</span>
+                <span className="db-round-card__progress-time">4:32</span>
+              </div>
+              <div className="db-round-card__track">
+                <div className="db-round-card__fill" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      {/* Interest — how it works */}
+      <section className="db-home__steps-wrap" aria-label="How it works">
+        <div className="db-home__steps-header db-scroll-reveal">
+          <h2 className="db-home__steps-title">How it works</h2>
+          <p className="db-home__steps-sub">Three steps, zero scheduling</p>
+        </div>
+        <div className="db-home__steps">
+          {STEPS.map((s) => (
+            <div
+              key={s.t}
+              className={`db-home__step db-scroll-reveal${s.accent ? " db-home__step--accent" : ""}`}
+            >
+              <span className="db-home__step-num" aria-hidden="true">{s.n}</span>
+              <h3 className="db-home__step-t">{s.t}</h3>
+              <p className="db-home__step-d">{s.d}</p>
+            </div>
+          ))}
         </div>
       </section>
 
-      <section className="db-home__steps">
-        {STEPS.map((s, i) => (
-          <div
-            key={s.n}
-            className="db-card db-home__step db-rise"
-            style={{ animationDelay: `${0.08 * (i + 1)}s` }}
-          >
-            <span className="db-home__step-n">{s.n}</span>
-            <h3 className="db-home__step-t">{s.t}</h3>
-            <p className="db-home__step-d">{s.d}</p>
-          </div>
-        ))}
+      {/* Action — CTA banner */}
+      <section className="db-home__action db-scroll-reveal" aria-label="Get started">
+        <p className="db-home__action-eyebrow">Ready to argue?</p>
+        <h2 className="db-home__action-heading">Your first round is waiting.</h2>
+        <Link href="/signup" className="db-btn db-btn--accent db-btn--lg">
+          Start debating
+          <span className="db-btn__arrow" aria-hidden="true">→</span>
+        </Link>
       </section>
+
     </div>
   );
 }

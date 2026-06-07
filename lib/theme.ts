@@ -12,11 +12,11 @@ export const DEFAULT_SCHEME: Scheme = "ember";
 
 // `swatch` is the resting accent color, shown in the picker dots.
 export const SCHEMES: { id: Scheme; label: string; swatch: string }[] = [
-  { id: "ember", label: "Ember", swatch: "#d11f2d" },
-  { id: "gold", label: "Gold", swatch: "#e7b84b" },
-  { id: "azure", label: "Azure", swatch: "#2f7bff" },
-  { id: "violet", label: "Violet", swatch: "#7c5cff" },
-  { id: "emerald", label: "Emerald", swatch: "#0fa968" },
+  { id: "ember",   label: "Ember",   swatch: "#c49020" },
+  { id: "gold",    label: "Gold",    swatch: "#c8b030" },
+  { id: "azure",   label: "Azure",   swatch: "#3a6ab8" },
+  { id: "violet",  label: "Violet",  swatch: "#7040a8" },
+  { id: "emerald", label: "Emerald", swatch: "#2a8050" },
 ];
 
 const SCHEME_IDS = SCHEMES.map((s) => s.id);

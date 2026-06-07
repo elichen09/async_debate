@@ -1,24 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Fraunces } from "next/font/google";
+import { Geist_Mono, Barlow_Condensed, Chivo } from "next/font/google";
 import "./globals.css";
 import NavBar from "./components/NavBar";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
 
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+const barlowCondensed = Barlow_Condensed({
+  variable: "--font-barlow",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "600", "700", "800"],
   style: ["normal", "italic"],
+});
+
+const chivo = Chivo({
+  variable: "--font-chivo",
+  subsets: ["latin"],
+  weight: ["300", "400", "700"],
 });
 
 export const metadata: Metadata = {
@@ -38,7 +39,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased`}
+      className={`${geistMono.variable} ${barlowCondensed.variable} ${chivo.variable} antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
