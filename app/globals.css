@@ -379,7 +379,7 @@ input, button, textarea, select { font-family: inherit; }
    ========================================================================= */
 .db-shell {
   min-height: 100dvh;
-  background: url("/bg-app.jpg") center center / cover no-repeat fixed,
+  background: url("/bg-app.png") center center / cover no-repeat fixed,
               url("/hero-bg.png") center center / cover no-repeat fixed;
   background-color: oklch(0.68 0.08 145);
   position: relative;
