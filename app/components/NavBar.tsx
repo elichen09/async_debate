@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const HIDE_ON = ["/", "/login", "/signup", "/about"];
+const HIDE_ON = ["/", "/login", "/signup", "/about", "/founders"];
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Rounds" },
