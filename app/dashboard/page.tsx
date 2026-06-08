@@ -68,6 +68,11 @@ export default function DashboardPage() {
   const [profileDragging, setProfileDragging] = useState(false);
 
   useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  useEffect(() => {
     try {
       const saved = localStorage.getItem("gh-card-positions");
       if (saved) { const p = JSON.parse(saved); setPositions(p); posRef.current = p; }
@@ -214,8 +219,15 @@ export default function DashboardPage() {
   }
 
   if (loading) return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 20px" }}>
-      <p className="db-card" style={{ padding: "24px 32px", color: "var(--ink-soft)" }}>Loading…</p>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100dvh - 44px)" }}>
+      <div className="db-card" style={{ padding: "28px 40px", textAlign: "center" }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: "0 0 14px", textTransform: "uppercase" }}>
+          Grasshopper
+        </p>
+        <div className="gh-loading-dots">
+          <span /><span /><span />
+        </div>
+      </div>
     </div>
   );
   if (!profile) return null;
@@ -287,7 +299,7 @@ export default function DashboardPage() {
 
       {/* Freeform canvas */}
       <div className="gh-dash__canvas">
-        {SECTION_KEYS.map(key => {
+        {SECTION_KEYS.map((key, keyIndex) => {
           if (key === "incoming" && incoming.length === 0) return null;
           if (key === "active" && active.length === 0) return null;
           if (key === "outgoing" && outgoing.length === 0) return null;
@@ -463,7 +475,7 @@ export default function DashboardPage() {
             <div
               key={key}
               className={`db-drag-card${isDragging ? " is-active" : ""}`}
-              style={{ left: pos.x, top: pos.y }}
+              style={{ left: pos.x, top: pos.y, '--i': String(keyIndex) } as React.CSSProperties}
             >
               {content}
             </div>

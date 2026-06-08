@@ -66,6 +66,7 @@ export default function RoundPage() {
   const [reported, setReported] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [showReportForm, setShowReportForm] = useState(false);
+  const [loading, setLoading] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
   const chunksRef = useRef<BlobPart[]>([]);
 
@@ -125,7 +126,6 @@ export default function RoundPage() {
 
       if (ballotData) setBallot(ballotData as Ballot);
 
-      // check if already reported
       if (ballotData) {
         const { data: reportData } = await supabase
           .from("reports")
@@ -135,6 +135,8 @@ export default function RoundPage() {
           .single();
         if (reportData) setReported(true);
       }
+
+      setLoading(false);
     }
     load();
   }, [id]);
@@ -247,7 +249,20 @@ export default function RoundPage() {
     setShowReportForm(false);
   }
 
-  if (!round) return <p style={{ textAlign: "center", marginTop: "4rem", color: "var(--muted)" }}>Loading...</p>;
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100dvh - 44px)" }}>
+      <div className="db-card" style={{ padding: "28px 40px", textAlign: "center" }}>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: "0 0 14px", textTransform: "uppercase" }}>
+          Grasshopper
+        </p>
+        <div className="gh-loading-dots">
+          <span /><span /><span />
+        </div>
+      </div>
+    </div>
+  );
+
+  if (!round) return null;
 
   const currentIndex = round.current_speech - 1;
   const currentSpeech = SPEECH_ORDER[currentIndex];
@@ -258,13 +273,18 @@ export default function RoundPage() {
     <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 20px 80px" }}>
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 0 20px" }}>
-        <button onClick={() => router.push("/dashboard")} style={ghostBtn}>← Back</button>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "var(--ink)", margin: 0 }}>Round</h1>
+      <div
+        className="db-card db-rise"
+        style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 12px" }}
+      >
+        <button onClick={() => router.push("/dashboard")} className="db-btn db-btn--ghost db-btn--sm">
+          ← Back
+        </button>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "var(--ink)", margin: 0 }}>
+          Round
+        </h1>
         {!round.is_ranked && (
-          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "var(--paper-2)", color: "var(--muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            Unranked
-          </span>
+          <span className="db-badge db-badge--wait">Unranked</span>
         )}
         {!isParticipant && (
           <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "color-mix(in srgb, var(--pro) 10%, transparent)", color: "var(--pro)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
@@ -274,10 +294,15 @@ export default function RoundPage() {
       </div>
 
       {/* Round info */}
-      <div style={card}>
+      <div
+        className="db-card db-rise"
+        style={{ marginBottom: 12, '--i': '1' } as React.CSSProperties}
+      >
         <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%)", pointerEvents: "none" }} />
-        <p style={{ fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)", margin: "0 0 6px", position: "relative", zIndex: 1 }}>topic</p>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ink)", margin: "0 0 6px", position: "relative", zIndex: 1 }}>{round.topic}</h2>
+        <p style={{ ...eyebrow, position: "relative", zIndex: 1 }}>topic</p>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ink)", margin: "0 0 6px", position: "relative", zIndex: 1 }}>
+          {round.topic}
+        </h2>
         <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 14px", position: "relative", zIndex: 1 }}>
           {isParticipant
             ? `vs @${opponent?.username} · You are ${myRole === "pro" ? "Pro" : "Con"}`
@@ -286,21 +311,34 @@ export default function RoundPage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
           <span style={{
             fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20,
-            background: round.status === "judging" ? "color-mix(in srgb, var(--accent) 10%, transparent)" : round.status === "complete" ? "color-mix(in srgb, var(--win) 10%, transparent)" : "var(--paper-2)",
-            color: round.status === "judging" ? "var(--accent)" : round.status === "complete" ? "var(--win)" : "var(--ink-soft)",
+            background: round.status === "judging"
+              ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+              : round.status === "complete"
+              ? "color-mix(in srgb, var(--win) 10%, transparent)"
+              : "var(--paper-2)",
+            color: round.status === "judging"
+              ? "var(--accent)"
+              : round.status === "complete"
+              ? "var(--win)"
+              : "var(--ink-soft)",
           }}>
-            {round.status === "judging" ? "⏳ Awaiting judge" : round.status === "complete" ? "✓ Complete" : `Speech ${round.current_speech} of 8`}
+            {round.status === "judging"
+              ? "⏳ Awaiting judge"
+              : round.status === "complete"
+              ? "✓ Complete"
+              : `Speech ${round.current_speech} of 8`}
           </span>
           {isMyTurn && (
-            <span style={{ fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20, background: "var(--accent)", color: "var(--accent-ink)" }}>
-              Your turn
-            </span>
+            <span className="db-badge db-badge--turn">Your turn</span>
           )}
         </div>
       </div>
 
       {/* Speech list */}
-      <div style={{ marginBottom: 20 }}>
+      <div
+        className="db-rise"
+        style={{ marginBottom: 20, '--i': '2' } as React.CSSProperties}
+      >
         <p style={sectionLabel}>Speeches</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {SPEECH_ORDER.map((s, i) => {
@@ -316,12 +354,18 @@ export default function RoundPage() {
                 border: `0.5px solid ${isCurrent ? "color-mix(in srgb, var(--accent) 40%, transparent)" : "var(--line)"}`,
                 borderRadius: 10, padding: "11px 14px",
                 opacity: isFuture ? 0.35 : 1,
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: audioUrls[position] ? 10 : 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{
                       width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
-                      background: isPast ? "var(--accent)" : isCurrent ? "color-mix(in srgb, var(--accent) 10%, transparent)" : "var(--card)",
+                      background: isPast
+                        ? "var(--accent)"
+                        : isCurrent
+                        ? "color-mix(in srgb, var(--accent) 10%, transparent)"
+                        : "var(--card)",
                       border: `1px solid ${isPast ? "var(--accent)" : isCurrent ? "color-mix(in srgb, var(--accent) 40%, transparent)" : "var(--line-strong)"}`,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: 11, fontWeight: 600,
@@ -330,8 +374,14 @@ export default function RoundPage() {
                       {isPast ? "✓" : speechNum}
                     </div>
                     <div>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: isCurrent ? 500 : 400, color: isCurrent ? "var(--ink)" : "var(--ink-soft)" }}>{s.label}</p>
-                      {submitted && <p style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>{new Date(submitted.submitted_at).toLocaleDateString()}</p>}
+                      <p style={{ margin: 0, fontSize: 13, fontWeight: isCurrent ? 500 : 400, color: isCurrent ? "var(--ink)" : "var(--ink-soft)" }}>
+                        {s.label}
+                      </p>
+                      {submitted && (
+                        <p style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>
+                          {new Date(submitted.submitted_at).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -342,32 +392,35 @@ export default function RoundPage() {
         </div>
       </div>
 
-      {/* Upload section */}
+      {/* Submit speech */}
       {isMyTurn && isParticipant && (
-        <div style={{ ...card, borderColor: "color-mix(in srgb, var(--accent) 35%, transparent)" }}>
+        <div
+          className="db-card db-card--accent db-rise"
+          style={{ marginBottom: 12, '--i': '3' } as React.CSSProperties}
+        >
           <p style={sectionLabel}>Submit — {currentSpeech?.label}</p>
           {error && (
             <div style={{ background: "color-mix(in srgb, var(--loss) 10%, transparent)", border: "0.5px solid color-mix(in srgb, var(--loss) 30%, transparent)", color: "var(--loss)", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
               {error}
             </div>
           )}
-          <p style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-soft)", margin: "0 0 10px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Record directly</p>
+          <p style={{ ...eyebrow, marginBottom: 10 }}>Record directly</p>
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
             {!recording
-              ? <button onClick={startRecording} style={{ ...secondaryBtn, flex: 1 }}>🎙 Start recording</button>
-              : <button onClick={stopRecording} style={{ ...secondaryBtn, flex: 1, borderColor: "color-mix(in srgb, var(--loss) 40%, transparent)", color: "var(--loss)" }}>⏹ Stop recording</button>
+              ? <button onClick={startRecording} className="db-btn db-btn--ghost db-btn--block">🎙 Start recording</button>
+              : <button onClick={stopRecording} className="db-btn db-btn--block" style={{ borderColor: "color-mix(in srgb, var(--loss) 40%, transparent)", color: "var(--loss)", background: "color-mix(in srgb, var(--loss) 8%, transparent)" }}>⏹ Stop recording</button>
             }
           </div>
           {recording && (
             <div style={{ fontSize: 13, color: "var(--loss)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--loss)", display: "inline-block" }} />
+              <span className="gh-rec-dot" />
               Recording…
             </div>
           )}
           {audioPreview && !recording && (
             <div style={{ marginBottom: 12 }}>
               <audio controls src={audioPreview} style={{ width: "100%", marginBottom: 8 }} />
-              <button onClick={() => handleUploadBlob(audioBlob!)} disabled={uploading} style={primaryBtn}>
+              <button onClick={() => handleUploadBlob(audioBlob!)} disabled={uploading} className="db-btn db-btn--accent db-btn--block">
                 {uploading ? "Uploading…" : "Submit recording"}
               </button>
             </div>
@@ -379,61 +432,87 @@ export default function RoundPage() {
           </div>
           <input ref={fileRef} type="file" accept="audio/mp3,audio/mpeg,audio/*" style={{ display: "none" }}
             onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }} />
-          <button onClick={() => fileRef.current?.click()} disabled={uploading} style={secondaryBtn}>
+          <button onClick={() => fileRef.current?.click()} disabled={uploading} className="db-btn db-btn--ghost db-btn--block">
             {uploading ? "Uploading…" : "Upload MP3"}
           </button>
         </div>
       )}
 
       {!isMyTurn && round.status === "active" && isParticipant && (
-        <div style={{ ...card, textAlign: "center" }}>
+        <div
+          className="db-card db-rise"
+          style={{ marginBottom: 12, textAlign: "center", '--i': '3' } as React.CSSProperties}
+        >
           <p style={{ margin: 0, fontSize: 14, color: "var(--muted)" }}>Waiting for opponent to submit their speech…</p>
         </div>
       )}
 
       {!isParticipant && round.status === "active" && (
-        <div style={{ ...card, textAlign: "center" }}>
+        <div
+          className="db-card db-rise"
+          style={{ marginBottom: 12, textAlign: "center", '--i': '3' } as React.CSSProperties}
+        >
           <p style={{ margin: 0, fontSize: 14, color: "var(--muted)" }}>You are watching this round as a spectator.</p>
         </div>
       )}
 
       {round.status === "judging" && (
-        <div style={{ ...card, textAlign: "center" }}>
-          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "var(--accent)", margin: "0 0 6px" }}>All speeches submitted!</p>
+        <div
+          className="db-card db-rise"
+          style={{ marginBottom: 12, textAlign: "center", '--i': '3' } as React.CSSProperties}
+        >
+          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "var(--accent)", margin: "0 0 6px" }}>
+            All speeches submitted!
+          </p>
           <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>This round is now awaiting a judge.</p>
         </div>
       )}
 
       {(speechesDeleted || (round.status === "complete" && !round.is_ranked)) && (
-        <div style={{ ...card, textAlign: "center" }}>
-          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "var(--win)", margin: "0 0 6px" }}>Unranked round complete</p>
-          <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>All speeches have been automatically deleted since this was an unranked round.</p>
+        <div
+          className="db-card db-rise"
+          style={{ marginBottom: 12, textAlign: "center", '--i': '3' } as React.CSSProperties}
+        >
+          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "var(--win)", margin: "0 0 6px" }}>
+            Unranked round complete
+          </p>
+          <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
+            All speeches have been automatically deleted since this was an unranked round.
+          </p>
         </div>
       )}
 
       {/* Ballot */}
       {ballot && round.status === "complete" && round.is_ranked && (
-        <div style={{ ...card, borderColor: ballot.winner_id === userId ? "color-mix(in srgb, var(--win) 30%, transparent)" : "color-mix(in srgb, var(--loss) 30%, transparent)" }}>
+        <div
+          className="db-card db-rise"
+          style={{
+            marginBottom: 12,
+            borderColor: ballot.winner_id === userId
+              ? "color-mix(in srgb, var(--win) 30%, transparent)"
+              : "color-mix(in srgb, var(--loss) 30%, transparent)",
+            '--i': '4',
+          } as React.CSSProperties}
+        >
           <p style={sectionLabel}>Judge's decision</p>
-          <p style={{ fontFamily: "var(--font-display)", fontSize: 22, margin: "0 0 16px", color: ballot.winner_id === userId ? "var(--win)" : "var(--loss)" }}>
+          <p style={{ fontFamily: "var(--font-display)", fontSize: 26, margin: "0 0 20px", color: ballot.winner_id === userId ? "var(--win)" : "var(--loss)" }}>
             {ballot.winner_id === userId ? "✓ You won!" : "✗ You lost"}
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
             {[{ label: "Pro speaks", value: ballot.pro_speaks }, { label: "Con speaks", value: ballot.con_speaks }].map(s => (
-              <div key={s.label} style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 8, padding: "10px 12px" }}>
-                <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", margin: "0 0 4px" }}>{s.label}</p>
-                <p style={{ fontSize: 20, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{s.value}</p>
+              <div key={s.label} style={{ background: "var(--paper-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
+                <p style={{ ...eyebrow, marginBottom: 4 }}>{s.label}</p>
+                <p style={{ fontSize: 22, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{s.value}</p>
               </div>
             ))}
           </div>
           {ballot.reasoning && (
             <div style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", margin: "0 0 8px" }}>Reasoning</p>
-              <p style={{ fontSize: 14, margin: 0, lineHeight: 1.6, color: "var(--ink-soft)" }}>{ballot.reasoning}</p>
+              <p style={{ ...eyebrow, marginBottom: 8 }}>Reasoning</p>
+              <p style={{ fontSize: 14, margin: 0, lineHeight: 1.7, color: "var(--ink-soft)" }}>{ballot.reasoning}</p>
             </div>
           )}
 
-          {/* Report button — participants only */}
           {isParticipant && (
             <div style={{ borderTop: "0.5px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
               {reported ? (
@@ -457,26 +536,16 @@ export default function RoundPage() {
                     }}
                   />
                   <div style={{ display: "flex", gap: 8 }}>
-                    <button
-                      onClick={handleReport}
-                      disabled={reporting}
-                      style={{ flex: 1, height: 36, background: "var(--loss)", color: "#fff", border: "none", borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: "pointer" }}
-                    >
+                    <button onClick={handleReport} disabled={reporting} className="db-btn db-btn--danger" style={{ flex: 1, height: 36, fontSize: 13 }}>
                       {reporting ? "Submitting…" : "Submit report"}
                     </button>
-                    <button
-                      onClick={() => setShowReportForm(false)}
-                      style={{ flex: 1, height: 36, background: "transparent", color: "var(--muted)", border: "0.5px solid var(--line-strong)", borderRadius: 7, fontSize: 13, cursor: "pointer" }}
-                    >
+                    <button onClick={() => setShowReportForm(false)} className="db-btn db-btn--ghost" style={{ flex: 1, height: 36, fontSize: 13 }}>
                       Cancel
                     </button>
                   </div>
                 </div>
               ) : (
-                <button
-                  onClick={() => setShowReportForm(true)}
-                  style={{ width: "100%", height: 36, background: "transparent", color: "var(--muted)", border: "0.5px solid var(--line-strong)", borderRadius: 7, fontSize: 12, cursor: "pointer" }}
-                >
+                <button onClick={() => setShowReportForm(true)} className="db-btn db-btn--ghost db-btn--block" style={{ fontSize: 12 }}>
                   ⚑ Report this ballot
                 </button>
               )}
@@ -489,8 +558,5 @@ export default function RoundPage() {
   );
 }
 
-const card: React.CSSProperties = { background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 14, padding: "18px 20px", marginBottom: 12, position: "relative", overflow: "hidden" };
+const eyebrow: React.CSSProperties = { fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)", margin: 0 };
 const sectionLabel: React.CSSProperties = { fontSize: 10, fontWeight: 500, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 12px" };
-const ghostBtn: React.CSSProperties = { background: "transparent", border: "0.5px solid var(--line-strong)", borderRadius: 8, padding: "8px 14px", fontSize: 14, color: "var(--muted)", cursor: "pointer" };
-const primaryBtn: React.CSSProperties = { width: "100%", height: 44, background: "var(--accent)", color: "var(--accent-ink)", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" };
-const secondaryBtn: React.CSSProperties = { width: "100%", height: 42, background: "transparent", color: "var(--ink-soft)", border: "0.5px solid var(--line-strong)", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" };
