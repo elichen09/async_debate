@@ -24,9 +24,9 @@
    ACCENT
    ========================================================================= */
 :root {
-  --accent:      oklch(0.56 0.14 198);   /* dragonfly teal */
-  --accent-deep: oklch(0.46 0.14 198);
-  --accent-ink:  oklch(0.97 0.006 80);
+  --accent:      oklch(0.54 0.16 142);   /* forest green — echoes the moss, bokeh, and grasshopper coloring */
+  --accent-deep: oklch(0.44 0.16 142);
+  --accent-ink:  oklch(0.97 0.008 142);
 }
 
 /* =========================================================================
@@ -36,7 +36,7 @@
 :root {
   --paper:       transparent;
   --paper-2:     oklch(0.14 0.042 145 / 0.05);
-  --card:        oklch(0.97 0.006 80 / 0.88);    /* near-white frosted glass */
+  --card:        oklch(0.97 0.006 80 / 0.65);    /* frosted glass — more transparent for stronger blur effect */
   --ink:         oklch(0.12 0.040 145);            /* dark forest text */
   --ink-soft:    oklch(0.32 0.025 145);            /* secondary text */
   --muted:       oklch(0.50 0.015 145);            /* tertiary / placeholder */
@@ -126,27 +126,36 @@ input, button, textarea, select { font-family: inherit; }
 .db-card {
   position: relative;
   background: var(--card);
-  backdrop-filter: blur(10px) saturate(1.4);
-  border: 1px solid var(--line-strong);
-  border-top: 3px solid oklch(0.12 0.040 145 / 0.12);
-  border-radius: var(--radius);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid oklch(1 0 0 / 0.50);
+  border-bottom-color: oklch(1 0 0 / 0.28);
+  border-radius: 16px;
   padding: 24px;
-  box-shadow: var(--shadow-sm);
+  box-shadow:
+    0 8px 40px oklch(0 0 0 / 0.20),
+    0 2px 8px oklch(0 0 0 / 0.10),
+    inset 0 1px 0 oklch(1 0 0 / 0.80);
 }
 
 .db-card--interactive {
   transition: transform .22s cubic-bezier(.2,.8,.2,1), box-shadow .22s ease,
-              border-top-color .22s ease;
+              border-color .22s ease;
   cursor: pointer;
 }
 .db-card--interactive:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  border-top-color: var(--accent);
+  border-color: oklch(1 0 0 / 0.70);
+  border-bottom-color: oklch(1 0 0 / 0.38);
+  box-shadow:
+    0 16px 56px oklch(0 0 0 / 0.26),
+    0 4px 16px oklch(0 0 0 / 0.14),
+    inset 0 1px 0 oklch(1 0 0 / 0.80);
 }
 .db-card--accent {
+  border-top-width: 3px;
   border-top-color: var(--accent);
-  background: oklch(0.97 0.006 80 / 0.92);
+  background: oklch(0.97 0.006 80 / 0.76);
 }
 
 /* =========================================================================
@@ -794,12 +803,17 @@ input, button, textarea, select { font-family: inherit; }
   cursor: default;
   width: 208px;
   background: var(--card);
-  backdrop-filter: blur(16px) saturate(1.4);
-  border: 1px solid var(--line-strong);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid oklch(1 0 0 / 0.50);
+  border-bottom-color: oklch(1 0 0 / 0.28);
   border-top: 3px solid var(--accent);
-  border-radius: var(--radius);
+  border-radius: 16px;
   padding: 18px 20px;
-  box-shadow: var(--shadow-md);
+  box-shadow:
+    0 8px 40px oklch(0 0 0 / 0.20),
+    0 2px 8px oklch(0 0 0 / 0.10),
+    inset 0 1px 0 oklch(1 0 0 / 0.80);
 }
 
 .gh-profile-card__eyebrow {
@@ -966,8 +980,9 @@ input, button, textarea, select { font-family: inherit; }
 
 /* Identity header strip */
 .db-dash__header {
-  background: oklch(0.97 0.006 80 / 0.92);
-  backdrop-filter: blur(18px) saturate(1.4);
+  background: oklch(0.97 0.006 80 / 0.72);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
   border-bottom: 2px solid var(--accent);
   padding: 28px clamp(20px, 4vw, 48px) 26px;
   position: relative;
@@ -1108,17 +1123,19 @@ input, button, textarea, select { font-family: inherit; }
   gap: 12px 16px;
   padding: 16px 20px;
   background: var(--card);
-  backdrop-filter: blur(8px) saturate(1.3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid oklch(1 0 0 / 0.45);
+  border-bottom-color: oklch(1 0 0 / 0.25);
+  border-radius: 12px;
   cursor: pointer;
   margin-bottom: 6px;
   transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
 
 .db-round-row:hover {
-  border-color: color-mix(in oklch, var(--accent) 45%, var(--line));
-  box-shadow: var(--shadow-sm);
+  border-color: oklch(1 0 0 / 0.65);
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.18), 0 2px 8px oklch(0 0 0 / 0.10);
   transform: translateY(-1px);
 }
 
@@ -1211,10 +1228,12 @@ input, button, textarea, select { font-family: inherit; }
 /* Challenge card — incoming */
 .db-challenge-card {
   background: var(--card);
-  backdrop-filter: blur(8px) saturate(1.3);
-  border: 1px solid color-mix(in oklch, var(--accent) 22%, var(--line));
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid oklch(1 0 0 / 0.45);
+  border-bottom-color: oklch(1 0 0 / 0.25);
   border-top: 3px solid var(--accent);
-  border-radius: var(--radius);
+  border-radius: 12px;
   padding: 18px 20px;
   margin-bottom: 6px;
 }
@@ -1265,9 +1284,11 @@ input, button, textarea, select { font-family: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  background: oklch(0.96 0.014 75 / 0.88);
-  backdrop-filter: blur(8px);
-  border: 1px solid color-mix(in oklch, var(--warn) 28%, transparent);
+  background: oklch(0.96 0.014 75 / 0.72);
+  backdrop-filter: blur(24px) saturate(1.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  border: 1px solid oklch(1 0 0 / 0.45);
+  border-bottom-color: oklch(1 0 0 / 0.25);
   border-top: 3px solid var(--warn);
   border-radius: var(--radius);
   padding: 12px 16px;
@@ -1304,17 +1325,19 @@ input, button, textarea, select { font-family: inherit; }
 /* Watch card */
 .db-watch-card {
   background: var(--card);
-  backdrop-filter: blur(8px) saturate(1.3);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid oklch(1 0 0 / 0.45);
+  border-bottom-color: oklch(1 0 0 / 0.25);
+  border-radius: 12px;
   padding: 16px 20px;
   cursor: pointer;
   transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
 }
 
 .db-watch-card:hover {
-  border-color: color-mix(in oklch, var(--accent) 40%, var(--line));
-  box-shadow: var(--shadow-sm);
+  border-color: oklch(1 0 0 / 0.65);
+  box-shadow: 0 8px 32px oklch(0 0 0 / 0.18), 0 2px 8px oklch(0 0 0 / 0.10);
   transform: translateY(-1px);
 }
 
@@ -1326,10 +1349,12 @@ input, button, textarea, select { font-family: inherit; }
   gap: 16px;
   padding: 20px 24px;
   background: var(--card);
-  backdrop-filter: blur(8px) saturate(1.3);
-  border: 1px solid var(--line);
+  backdrop-filter: blur(24px) saturate(1.6);
+  -webkit-backdrop-filter: blur(24px) saturate(1.6);
+  border: 1px solid oklch(1 0 0 / 0.45);
+  border-bottom-color: oklch(1 0 0 / 0.25);
   border-top: 3px solid var(--accent);
-  border-radius: var(--radius);
+  border-radius: 12px;
 }
 
 .db-dash__cta-heading {

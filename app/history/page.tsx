@@ -11,6 +11,8 @@ interface Round {
   winner_id: string;
   created_at: string;
   completed_at: string;
+  pro_id: string;
+  con_id: string;
   pro: { username: string };
   con: { username: string };
 }
@@ -30,7 +32,7 @@ export default function HistoryPage() {
       const { data } = await supabase
         .from("rounds")
         .select(`
-          id, topic, status, winner_id, created_at, completed_at,
+          id, topic, status, winner_id, created_at, completed_at, pro_id, con_id,
           pro:profiles!pro_id(username),
           con:profiles!con_id(username)
         `)
@@ -66,8 +68,7 @@ export default function HistoryPage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {rounds.map(r => {
-            const myRole = r.pro?.username === r.pro?.username ? "pro" : "con";
-            const opponent = (r as any).pro_id === userId ? r.con : r.pro;
+            const opponent = r.pro_id === userId ? r.con : r.pro;
             const isComplete = r.status === "complete";
             const won = r.winner_id === userId;
 
