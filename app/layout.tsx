@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono, Barlow_Condensed, Chivo } from "next/font/google";
 import "./globals.css";
 import NavBar from "./components/NavBar";
+import ParticleField from "./components/ParticleField";
 import { Analytics } from "@vercel/analytics/next"
 
 const geistMono = Geist_Mono({
@@ -41,6 +42,7 @@ export default function RootLayout({
       <head />
       <body>
         <div className="db-shell">
+          <ParticleField />
           <NavBar />
           <main className="db-main">{children}</main>
         </div>
