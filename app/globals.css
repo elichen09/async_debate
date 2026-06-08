@@ -471,6 +471,46 @@ input, button, textarea, select { font-family: inherit; }
 }
 @media (prefers-reduced-motion: reduce) { .gh-rec-dot { animation: none; } }
 
+/* =========================================================================
+   ABOUT PAGE — Typographic poster animations
+   ========================================================================= */
+
+/* Each title line slides up independently */
+@keyframes ab-hero-in {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ab-hero-line {
+  display: block;
+  animation: ab-hero-in 0.80s var(--ease-out-quint) both;
+  animation-delay: calc(var(--i, 0) * 115ms);
+}
+
+/* Steps enter from the left one by one */
+@keyframes ab-step-in {
+  from { opacity: 0; transform: translateX(-18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.ab-step-in {
+  animation: ab-step-in 0.65s var(--ease-out-quint) both;
+  animation-delay: calc(var(--i, 0) * 90ms);
+}
+
+/* Separator line draws itself left → right */
+@keyframes ab-rule-draw {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.ab-rule-draw {
+  transform-origin: left center;
+  animation: ab-rule-draw 1.0s var(--ease-out-expo) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ab-hero-line, .ab-step-in, .ab-rule-draw { animation: none; }
+}
+
 /* Page-load entrance — supports stagger via --i custom property */
 .db-rise {
   animation: gh-focus-in 0.65s var(--ease-out-quint) both;

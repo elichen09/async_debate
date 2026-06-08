@@ -10,8 +10,11 @@ export default function Home() {
   return (
     <div className="gh-overlay">
       <header className="gh-header">
-        <Link href="/login" className="gh-nav-link">Log in</Link>
-        <Link href="/signup" className="gh-nav-link">Sign up</Link>
+        <Link href="/about" className="gh-nav-link">About</Link>
+        <div style={{ display: "flex", gap: 24 }}>
+          <Link href="/login" className="gh-nav-link">Log in</Link>
+          <Link href="/signup" className="gh-nav-link">Sign up</Link>
+        </div>
       </header>
 
       <main className="gh-center" aria-label="Grasshopper">
