@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono, Barlow_Condensed, Chivo } from "next/font/google";
 import "./globals.css";
 import NavBar from "./components/NavBar";
+import { Analytics } from "@vercel/analytics/next"
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
