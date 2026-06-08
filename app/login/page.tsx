@@ -29,7 +29,7 @@ export default function LoginPage() {
 
   return (
     <div className="db-container db-page db-rise" style={{ maxWidth: 420 }}>
-      <p className="db-eyebrow">Async Debate</p>
+      <p className="db-eyebrow">Grasshopper</p>
       <h1 style={{ fontSize: 30, marginBottom: 6 }}>Welcome back</h1>
       <p style={{ color: "var(--ink-soft)", marginBottom: 24 }}>Sign in to your account.</p>
 

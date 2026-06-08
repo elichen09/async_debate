@@ -44,14 +44,20 @@ export default function HistoryPage() {
     load();
   }, []);
 
-  if (loading) return <p style={{ textAlign: "center", marginTop: "4rem" }}>Loading...</p>;
+  if (loading) return (
+    <div style={{ display: "flex", justifyContent: "center", padding: "80px 20px" }}>
+      <p className="db-card" style={{ padding: "24px 32px", color: "var(--ink-soft)" }}>Loading…</p>
+    </div>
+  );
 
   return (
     <div className="db-container db-page">
-      <h1 style={{ fontSize: 26, marginBottom: 6 }}>Round history</h1>
-      <p style={{ color: "var(--muted)", marginBottom: 28, fontSize: 15 }}>
-        {rounds.length} round{rounds.length !== 1 ? "s" : ""} total
-      </p>
+      <div className="db-card" style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 24, marginBottom: 4, color: "var(--ink)" }}>Round history</h1>
+        <p style={{ color: "var(--ink-soft)", margin: 0, fontSize: 13 }}>
+          {rounds.length} round{rounds.length !== 1 ? "s" : ""} total
+        </p>
+      </div>
 
       {rounds.length === 0 ? (
         <div className="db-card" style={{ textAlign: "center", color: "var(--muted)" }}>

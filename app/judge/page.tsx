@@ -81,12 +81,16 @@ export default function JudgeDashboard() {
     router.push(`/judge/${roundId}`);
   }
 
-  if (loading) return <p style={{ textAlign: "center", marginTop: "4rem", color: "var(--muted)" }}>Loading...</p>;
+  if (loading) return (
+    <div style={{ display: "flex", justifyContent: "center", padding: "80px 20px" }}>
+      <p className="db-card" style={{ padding: "24px 32px", color: "var(--ink-soft)" }}>Loading…</p>
+    </div>
+  );
 
   if (isBanned) return (
     <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 20px 80px" }}>
-      <div style={{ padding: "24px 0 20px" }}>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--ink)", margin: 0 }}>Judge Dashboard</h1>
+      <div className="db-card" style={{ margin: "24px 0 12px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: "var(--ink)", margin: 0 }}>Judge Dashboard</h1>
       </div>
       <div style={{ ...card, textAlign: "center", borderColor: "color-mix(in srgb, var(--loss) 30%, transparent)" }}>
         <p style={{ fontSize: 16, fontWeight: 600, color: "var(--loss)", margin: "0 0 8px" }}>Judging privileges removed</p>
@@ -100,9 +104,9 @@ export default function JudgeDashboard() {
   return (
     <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 20px 80px" }}>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 0 20px" }}>
+      <div className="db-card" style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 12px" }}>
         <button onClick={() => router.push("/dashboard")} style={ghostBtn}>← Back</button>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "var(--ink)", margin: 0 }}>Judge Dashboard</h1>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: "var(--ink)", margin: 0 }}>Judge Dashboard</h1>
       </div>
 
       <div style={{ ...card, marginBottom: 20 }}>

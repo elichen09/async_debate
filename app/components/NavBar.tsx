@@ -4,70 +4,40 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import ThemePicker from "./ThemePicker";
 
-// Pages where the nav should NOT appear (public / auth screens).
 const HIDE_ON = ["/", "/login", "/signup"];
 
-interface NavProfile {
-  username: string;
-  display_name: string;
-  elo: number;
-  is_judge: boolean;
-}
+const NAV_LINKS = [
+  { href: "/dashboard", label: "Rounds" },
+  { href: "/challenge", label: "Challenge" },
+  { href: "/watch", label: "Watch" },
+  { href: "/history", label: "History" },
+  { href: "/judge", label: "Judge" },
+];
 
-// Inline SVG icons (no icon-font dependency needed).
-const ICONS: Record<string, React.ReactNode> = {
-  menu: (<><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>),
-  home: (<><path d="M3 11.5 12 4l9 7.5" /><path d="M5 10v9h14v-9" /></>),
-  plus: (<><path d="M12 5v14" /><path d="M5 12h14" /></>),
-  play: (<path d="M8 5l11 7-11 7z" />),
-  clock: (<><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></>),
-  gavel: (<><path d="m9 11 4-4" /><path d="m7 13 4 4" /><path d="m11 7 6 6" /><path d="M4 20h9" /></>),
-};
-
-function Icon({ name }: { name: string }) {
-  return (
-    <svg
-      className="db-side__ic"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {ICONS[name]}
-    </svg>
-  );
-}
-
-export default function SideNav() {
+export default function TopNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [profile, setProfile] = useState<NavProfile | null>(null);
+  const [elo, setElo] = useState<number | null>(null);
+  const [username, setUsername] = useState<string>("");
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
-    async function loadProfile() {
+    async function load() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { if (active) setProfile(null); return; }
+      if (!session) { if (active) { setElo(null); setUsername(""); } return; }
       const { data } = await supabase
         .from("profiles")
-        .select("username, display_name, elo, is_judge")
+        .select("username, elo")
         .eq("id", session.user.id)
         .single();
-      if (active) setProfile(data as NavProfile | null);
+      if (active && data) { setElo(data.elo); setUsername(data.username); }
     }
-    loadProfile();
+    load();
     return () => { active = false; };
   }, [pathname]);
 
-  // Close the mobile drawer whenever the route changes.
   useEffect(() => { setOpen(false); }, [pathname]);
 
   if (HIDE_ON.includes(pathname)) return null;
@@ -79,53 +49,63 @@ export default function SideNav() {
 
   const isActive = (href: string) =>
     pathname === href || pathname.startsWith(href + "/");
-  const linkClass = (href: string) =>
-    `db-side__link ${isActive(href) ? "is-active" : ""}`;
 
   return (
     <>
-      <div className="db-topbar">
+      <nav className="gh-topnav">
         <button
-          className="db-topbar__burger"
+          className="gh-topnav__burger"
+          onClick={() => setOpen(o => !o)}
           aria-label="Open menu"
-          onClick={() => setOpen(true)}
         >
-          <Icon name="menu" />
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
         </button>
-        <Link href="/dashboard" className="db-topbar__brand">A<b>/</b>D</Link>
-        {profile && <span className="db-topbar__elo">{profile.elo}</span>}
-      </div>
+
+        <div className="gh-topnav__left">
+          {NAV_LINKS.map(link => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`gh-topnav__link ${isActive(link.href) ? "is-active" : ""}`}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+
+        <Link href="/dashboard" className="gh-topnav__brand">
+          GRASS<b>H</b>OPPER
+        </Link>
+
+        <div className="gh-topnav__right">
+          {elo !== null && <span className="gh-topnav__elo">{elo}</span>}
+          {username && <span className="gh-topnav__username">@{username}</span>}
+          <button onClick={handleSignOut} className="gh-topnav__out">Sign out</button>
+        </div>
+      </nav>
 
       <div
-        className={`db-backdrop ${open ? "is-open" : ""}`}
+        className={`gh-drawer-backdrop ${open ? "is-open" : ""}`}
         onClick={() => setOpen(false)}
       />
 
-      <aside className={`db-side ${open ? "is-open" : ""}`}>
-        <Link href="/dashboard" className="db-side__brand" aria-label="Async Debate home">
-          A<b>/</b>D
+      <aside className={`gh-drawer ${open ? "is-open" : ""}`}>
+        <Link href="/dashboard" className="gh-drawer__brand">
+          GRASS<b>H</b>OPPER
         </Link>
-
-        <div className="db-side__grp">Menu</div>
-        <Link href="/dashboard" className={linkClass("/dashboard")}><Icon name="home" />Rounds</Link>
-        <Link href="/challenge" className={linkClass("/challenge")}><Icon name="plus" />Challenge</Link>
-        <Link href="/watch" className={linkClass("/watch")}><Icon name="play" />Watch</Link>
-        <Link href="/history" className={linkClass("/history")}><Icon name="clock" />History</Link>
-        <Link href="/judge" className={linkClass("/judge")}><Icon name="gavel" />Judge</Link>
-     
-
-        <div className="db-side__spacer" />
-
-        <div className="db-side__grp">Appearance</div>
-        <ThemePicker />
-
-        {profile && (
-          <div className="db-side__elo" title="Your ELO">
-            <span className="db-side__elo-label">ELO</span>
-            <span className="db-side__elo-value">{profile.elo}</span>
-          </div>
-        )}
-        <button onClick={handleSignOut} className="db-side__out">Sign out</button>
+        {NAV_LINKS.map(link => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`gh-drawer__link ${isActive(link.href) ? "is-active" : ""}`}
+          >
+            {link.label}
+          </Link>
+        ))}
+        {username && <p className="gh-drawer__user">@{username} · ELO {elo}</p>}
+        <button onClick={handleSignOut} className="gh-drawer__out">Sign out</button>
       </aside>
     </>
   );

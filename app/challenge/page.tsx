@@ -56,9 +56,9 @@ export default function ChallengePage() {
   return (
     <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 20px 80px" }}>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "24px 0 20px" }}>
+      <div className="db-card" style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 12px" }}>
         <button onClick={() => router.push("/dashboard")} style={ghostBtn}>← Back</button>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "var(--ink)", margin: 0 }}>New challenge</h1>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: "var(--ink)", margin: 0 }}>New challenge</h1>
       </div>
 
       {error && (
@@ -108,7 +108,7 @@ export default function ChallengePage() {
           {(["pro", "con"] as const).map(s => (
             <div key={s} onClick={() => setSide(s)} style={{ padding: "14px 16px", borderRadius: 8, cursor: "pointer", textAlign: "center", background: side === s ? "var(--accent)" : "var(--card)", border: `0.5px solid ${side === s ? "var(--accent)" : "var(--line-strong)"}` }}>
               <p style={{ fontWeight: 600, margin: "0 0 4px", fontSize: 14, color: side === s ? "var(--accent-ink)" : "var(--ink)" }}>{s === "pro" ? "Pro" : "Con"}</p>
-              <p style={{ fontSize: 12, margin: 0, color: side === s ? "color-mix(in srgb, var(--paper) 88%, transparent)" : "var(--muted)" }}>{s === "pro" ? "You speak first" : "Opponent speaks first"}</p>
+              <p style={{ fontSize: 12, margin: 0, color: side === s ? "var(--accent-ink)" : "var(--muted)" }}>{s === "pro" ? "You speak first" : "Opponent speaks first"}</p>
             </div>
           ))}
         </div>
@@ -121,7 +121,7 @@ export default function ChallengePage() {
           {([true, false] as const).map(ranked => (
             <div key={String(ranked)} onClick={() => setIsRanked(ranked)} style={{ padding: "14px 16px", borderRadius: 8, cursor: "pointer", textAlign: "center", background: isRanked === ranked ? "var(--accent)" : "var(--card)", border: `0.5px solid ${isRanked === ranked ? "var(--accent)" : "var(--line-strong)"}` }}>
               <p style={{ fontWeight: 600, margin: "0 0 4px", fontSize: 14, color: isRanked === ranked ? "var(--accent-ink)" : "var(--ink)" }}>{ranked ? "Ranked" : "Unranked"}</p>
-              <p style={{ fontSize: 12, margin: 0, color: isRanked === ranked ? "color-mix(in srgb, var(--paper) 88%, transparent)" : "var(--muted)" }}>{ranked ? "Affects ELO · Visible publicly" : "No ELO change · Private"}</p>
+              <p style={{ fontSize: 12, margin: 0, color: isRanked === ranked ? "var(--accent-ink)" : "var(--muted)" }}>{ranked ? "Affects ELO · Visible publicly" : "No ELO change · Private"}</p>
             </div>
           ))}
         </div>

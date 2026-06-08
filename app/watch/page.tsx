@@ -53,17 +53,19 @@ export default function RoundsPage() {
   ];
 
   if (loading) return (
-    <p style={{ textAlign: "center", marginTop: "4rem", color: "var(--muted)" }}>Loading...</p>
+    <div style={{ display: "flex", justifyContent: "center", padding: "80px 20px" }}>
+      <p className="db-card" style={{ padding: "24px 32px", color: "var(--ink-soft)" }}>Loading…</p>
+    </div>
   );
 
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 20px 80px" }}>
 
-      <div style={{ margin: "24px 0 20px" }}>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(24px, 4vw, 30px)", color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 4px" }}>
+      <div className="db-card" style={{ margin: "24px 0 16px" }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(22px, 4vw, 28px)", color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 4px" }}>
           Live ranked rounds
         </h1>
-        <p style={{ fontSize: 12, color: "var(--muted)", margin: 0 }}>
+        <p style={{ fontSize: 12, color: "var(--ink-soft)", margin: 0 }}>
           Sorted by combined ELO · {rounds.length} active
         </p>
       </div>

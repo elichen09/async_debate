@@ -35,7 +35,7 @@ export default function SignupPage() {
 
   return (
     <div className="db-container db-page db-rise" style={{ maxWidth: 420 }}>
-      <p className="db-eyebrow">Async Debate</p>
+      <p className="db-eyebrow">Grasshopper</p>
       <h1 style={{ fontSize: 30, marginBottom: 6 }}>Create your account</h1>
       <p style={{ color: "var(--ink-soft)", marginBottom: 24 }}>Join the debate. Starting ELO: 1200.</p>
 
