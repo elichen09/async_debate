@@ -44,6 +44,7 @@ export default function RootLayout({
           <NavBar />
           <main className="db-main">{children}</main>
         </div>
+        <Analytics />
       </body>
     </html>
   );
