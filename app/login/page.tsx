@@ -28,8 +28,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="db-container db-page db-rise" style={{ maxWidth: 420 }}>
-      <div className="db-card" style={{ padding: "32px 28px" }}>
+    <div className="db-container db-page" style={{ maxWidth: 420 }}>
+      <div className="db-card db-rise" style={{ padding: "32px 28px" }}>
         <p className="db-eyebrow" style={{ marginBottom: 12 }}>Grasshopper</p>
         <h1 style={{ fontSize: 28, marginBottom: 6 }}>Welcome back</h1>
         <p style={{ color: "var(--ink-soft)", marginBottom: 24, fontSize: 14 }}>Sign in to your account.</p>

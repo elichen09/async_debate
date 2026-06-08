@@ -104,12 +104,12 @@ export default function JudgeDashboard() {
   return (
     <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 20px 80px" }}>
 
-      <div className="db-card" style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 12px" }}>
+      <div className="db-card db-rise" style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 12px" }}>
         <button onClick={() => router.push("/dashboard")} style={ghostBtn}>← Back</button>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: "var(--ink)", margin: 0 }}>Judge Dashboard</h1>
       </div>
 
-      <div style={{ ...card, marginBottom: 20 }}>
+      <div className="db-rise" style={{ ...card, marginBottom: 20, '--i': '1' } as React.CSSProperties}>
         <p style={{ fontSize: 13, color: "var(--ink-soft)", margin: 0, lineHeight: 1.6 }}>
           Anyone can judge rounds they are not a participant in. Faulty ballots can be reported by participants — repeated reports will remove your judging ability.
         </p>

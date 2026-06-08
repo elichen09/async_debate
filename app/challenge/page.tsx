@@ -56,7 +56,7 @@ export default function ChallengePage() {
   return (
     <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 20px 80px" }}>
 
-      <div className="db-card" style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 12px" }}>
+      <div className="db-card db-rise" style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 12px" }}>
         <button onClick={() => router.push("/dashboard")} style={ghostBtn}>← Back</button>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: "var(--ink)", margin: 0 }}>New challenge</h1>
       </div>
@@ -68,7 +68,7 @@ export default function ChallengePage() {
       )}
 
       {/* Step 1 */}
-      <div style={card}>
+      <div className="db-rise" style={{ ...card, '--i': '1' } as React.CSSProperties}>
         <p style={sectionLabel}>1. Find your opponent</p>
         <div style={{ display: "flex", gap: 8 }}>
           <input style={{ ...inputStyle, flex: 1 }} placeholder="Search by username" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === "Enter" && handleSearch()} />
@@ -96,13 +96,13 @@ export default function ChallengePage() {
       </div>
 
       {/* Step 2 */}
-      <div style={card}>
+      <div className="db-rise" style={{ ...card, '--i': '2' } as React.CSSProperties}>
         <p style={sectionLabel}>2. Enter the topic</p>
         <input style={inputStyle} placeholder="e.g. Resolved: The US should abolish the death penalty." value={topic} onChange={e => setTopic(e.target.value)} />
       </div>
 
       {/* Step 3 */}
-      <div style={card}>
+      <div className="db-rise" style={{ ...card, '--i': '3' } as React.CSSProperties}>
         <p style={sectionLabel}>3. Choose your side</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {(["pro", "con"] as const).map(s => (
@@ -115,7 +115,7 @@ export default function ChallengePage() {
       </div>
 
       {/* Step 4 */}
-      <div style={card}>
+      <div className="db-rise" style={{ ...card, '--i': '4' } as React.CSSProperties}>
         <p style={sectionLabel}>4. Round type</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           {([true, false] as const).map(ranked => (

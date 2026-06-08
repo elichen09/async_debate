@@ -61,7 +61,7 @@ export default function RoundsPage() {
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 20px 80px" }}>
 
-      <div className="db-card" style={{ margin: "24px 0 16px" }}>
+      <div className="db-card db-rise" style={{ margin: "24px 0 16px" }}>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(22px, 4vw, 28px)", color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 4px" }}>
           Live ranked rounds
         </h1>
@@ -71,7 +71,7 @@ export default function RoundsPage() {
       </div>
 
       {rounds.length === 0 ? (
-        <div style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 12, padding: "32px", textAlign: "center" }}>
+        <div className="db-rise" style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 12, padding: "32px", textAlign: "center", '--i': '1' } as React.CSSProperties}>
           <p style={{ color: "var(--muted)", margin: 0 }}>No live ranked rounds right now.</p>
         </div>
       ) : (
@@ -83,6 +83,7 @@ export default function RoundsPage() {
             return (
               <div
                 key={r.id}
+                className="db-rise"
                 onClick={() => router.push(`/round/${r.id}`)}
                 style={{
                   background: "var(--card)",
@@ -90,7 +91,8 @@ export default function RoundsPage() {
                   borderRadius: 12, padding: "14px 16px",
                   display: "flex", alignItems: "center",
                   gap: 14, cursor: "pointer",
-                }}
+                  '--i': String(Math.min(index + 1, 8)),
+                } as React.CSSProperties}
               >
                 {/* rank number */}
                 <div style={{ fontFamily: "var(--font-display)", fontSize: 20, color: index === 0 ? "var(--accent)" : "var(--muted)", width: 28, flexShrink: 0, textAlign: "center", lineHeight: 1 }}>

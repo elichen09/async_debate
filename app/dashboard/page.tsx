@@ -176,7 +176,7 @@ export default function DashboardPage() {
   function moveDrag(key: string, e: React.PointerEvent) {
     if (!dragRef.current || dragRef.current.key !== key) return;
     const x = Math.max(0, Math.min(window.innerWidth - 440, e.clientX - dragRef.current.offsetX));
-    const y = Math.max(44, Math.min(window.innerHeight - 80, e.clientY - dragRef.current.offsetY));
+    const y = Math.max(44, Math.min(window.innerHeight - 44 - 52, e.clientY - dragRef.current.offsetY));
     posRef.current = { ...posRef.current, [key]: { x, y } };
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => setPositions({ ...posRef.current }));
@@ -199,7 +199,7 @@ export default function DashboardPage() {
   function moveProfileDrag(e: React.PointerEvent) {
     if (!profileDragRef.current) return;
     const x = Math.max(0, Math.min(window.innerWidth - 208, e.clientX - profileDragRef.current.offsetX));
-    const y = Math.max(44, Math.min(window.innerHeight - 80, e.clientY - profileDragRef.current.offsetY));
+    const y = Math.max(44, Math.min(window.innerHeight - 44 - 52, e.clientY - profileDragRef.current.offsetY));
     profilePosRef.current = { x, y };
     cancelAnimationFrame(profileRafRef.current);
     profileRafRef.current = requestAnimationFrame(() => setProfilePos({ x, y }));
@@ -239,6 +239,7 @@ export default function DashboardPage() {
 
   return (
     <>
+      <style>{`.db-shell { background-image: url("/bg-app.png"), url("/hero-bg.png") !important; }`}</style>
       {/* Mobile-only profile strip */}
       <div className="gh-mobile-profile" style={{ padding: "16px 20px 0" }}>
         <div style={{ flex: 1, minWidth: 0 }}>

@@ -54,7 +54,7 @@ export default function HistoryPage() {
 
   return (
     <div className="db-container db-page">
-      <div className="db-card" style={{ marginBottom: 20 }}>
+      <div className="db-card db-rise" style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 24, marginBottom: 4, color: "var(--ink)" }}>Round history</h1>
         <p style={{ color: "var(--ink-soft)", margin: 0, fontSize: 13 }}>
           {rounds.length} round{rounds.length !== 1 ? "s" : ""} total
@@ -62,12 +62,12 @@ export default function HistoryPage() {
       </div>
 
       {rounds.length === 0 ? (
-        <div className="db-card" style={{ textAlign: "center", color: "var(--muted)" }}>
+        <div className="db-card db-rise" style={{ textAlign: "center", color: "var(--muted)", '--i': '1' } as React.CSSProperties}>
           <p style={{ margin: 0 }}>No completed rounds yet.</p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {rounds.map(r => {
+          {rounds.map((r, idx) => {
             const opponent = r.pro_id === userId ? r.con : r.pro;
             const isComplete = r.status === "complete";
             const won = r.winner_id === userId;
@@ -75,7 +75,8 @@ export default function HistoryPage() {
             return (
               <div
                 key={r.id}
-                className="db-card db-card--interactive"
+                className="db-card db-card--interactive db-rise"
+                style={{ '--i': String(Math.min(idx + 1, 8)) } as React.CSSProperties}
                 onClick={() => router.push(`/round/${r.id}`)}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>

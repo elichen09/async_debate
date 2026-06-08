@@ -34,8 +34,8 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="db-container db-page db-rise" style={{ maxWidth: 460 }}>
-      <div className="db-card" style={{ padding: "32px 28px" }}>
+    <div className="db-container db-page" style={{ maxWidth: 460 }}>
+      <div className="db-card db-rise" style={{ padding: "32px 28px" }}>
         <p className="db-eyebrow" style={{ marginBottom: 12 }}>Grasshopper</p>
         <h1 style={{ fontSize: 28, marginBottom: 6 }}>Create your account</h1>
         <p style={{ color: "var(--ink-soft)", marginBottom: 24, fontSize: 14 }}>Join the debate. Starting ELO: 1200.</p>
