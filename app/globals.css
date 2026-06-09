@@ -546,6 +546,7 @@ input, button, textarea, select { font-family: inherit; }
   background-color: oklch(0.68 0.08 145);
   position: relative;
 }
+
 .db-main {
   min-height: 100dvh;
   position: relative;

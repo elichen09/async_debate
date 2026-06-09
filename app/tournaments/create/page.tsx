@@ -45,6 +45,7 @@ export default function CreateTournamentPage() {
 
   return (
     <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 20px 80px" }}>
+      <style>{`.db-shell { background-image: url("/4.png") !important; }`}</style>
       <div className="db-card db-rise" style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 12px" }}>
         <button onClick={() => router.push("/tournaments")} style={ghostBtn}>← Back</button>
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: "var(--ink)", margin: 0 }}>

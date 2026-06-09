@@ -16,7 +16,7 @@ const STEPS = [
 
 const PRO = ["Constructive", "Rebuttal", "Summary", "Final Focus"];
 const CON = ["Constructive", "Rebuttal", "Summary", "Final Focus"];
-const TIMES = ["2 min", "1 min", "2 min", "1 min"];
+const TIMES = ["4 min", "4 min", "3 min", "2 min"];
 
 export default function AboutPage() {
   return (

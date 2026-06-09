@@ -59,6 +59,7 @@ export default function TournamentsPage() {
 
   return (
     <div className="db-container db-page">
+      <style>{`.db-shell { background-image: url("/4.png") !important; }`}</style>
       <div className="db-card db-rise" style={{ marginBottom: 20, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
           <h1 style={{ fontSize: 24, margin: "0 0 4px", color: "var(--ink)" }}>Tournaments</h1>
