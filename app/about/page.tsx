@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 const STEPS = [
-  { title: "Challenge", body: "Pick an opponent from the leaderboard, propose a topic, choose ranked or casual." },
+  { title: "Challenge", body: "Pick an opponent, propose a topic, choose ranked or casual." },
   { title: "Record",    body: "Submit speeches when you have a free window — record in the browser or upload an audio file." },
   { title: "Judge",     body: "An independent community member hears all eight speeches and issues a written ballot." },
   { title: "Rank",      body: "Wins and losses update both players' ELO. Every ranked round shifts the ladder." },
