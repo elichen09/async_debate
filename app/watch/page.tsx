@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import type { CSSProperties } from "react";
 
 interface Round {
   id: string;
@@ -14,7 +15,14 @@ interface Round {
   con: { username: string; elo: number };
 }
 
-export default function RoundsPage() {
+const SPEECH_LABELS = [
+  "Pro Constructive", "Con Constructive",
+  "Pro Rebuttal",     "Con Rebuttal",
+  "Pro Summary",      "Con Summary",
+  "Pro Final Focus",  "Con Final Focus",
+];
+
+export default function WatchPage() {
   const router = useRouter();
   const [rounds, setRounds] = useState<Round[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,12 +40,9 @@ export default function RoundsPage() {
         .eq("status", "active")
         .order("created_at", { ascending: false });
 
-      // sort by combined ELO of both players
-      const sorted = ((data || []) as unknown as Round[]).sort((a, b) => {
-        const eloA = (a.pro?.elo || 0) + (a.con?.elo || 0);
-        const eloB = (b.pro?.elo || 0) + (b.con?.elo || 0);
-        return eloB - eloA;
-      });
+      const sorted = ((data || []) as unknown as Round[]).sort((a, b) =>
+        ((b.pro?.elo || 0) + (b.con?.elo || 0)) - ((a.pro?.elo || 0) + (a.con?.elo || 0))
+      );
 
       setRounds(sorted);
       setLoading(false);
@@ -45,78 +50,94 @@ export default function RoundsPage() {
     load();
   }, []);
 
-  const speechLabels = [
-    "Pro Constructive", "Con Constructive",
-    "Pro Rebuttal", "Con Rebuttal",
-    "Pro Summary", "Con Summary",
-    "Pro Final Focus", "Con Final Focus",
-  ];
-
   if (loading) return (
-    <div style={{ display: "flex", justifyContent: "center", padding: "80px 20px" }}>
-      <p className="db-card" style={{ padding: "24px 32px", color: "var(--ink-soft)" }}>Loading…</p>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100dvh - 44px)" }}>
+      <div className="db-card" style={{ padding: "28px 40px", textAlign: "center" }}>
+        <div className="gh-loading-dots"><span /><span /><span /></div>
+      </div>
     </div>
   );
 
   return (
-    <div style={{ maxWidth: 600, margin: "0 auto", padding: "0 20px 80px" }}>
+    <>
+      <style>{`.db-shell { background-image: url("/6.png") !important; }`}</style>
+      <div style={{ maxWidth: 720, margin: "0 auto", padding: "0 clamp(24px, 5vw, 48px) 100px" }}>
 
-      <div className="db-card db-rise" style={{ margin: "24px 0 16px" }}>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(22px, 4vw, 28px)", color: "var(--ink)", letterSpacing: "-0.02em", margin: "0 0 4px" }}>
-          Live ranked rounds
-        </h1>
-        <p style={{ fontSize: 12, color: "var(--ink-soft)", margin: 0 }}>
-          Sorted by combined ELO · {rounds.length} active
-        </p>
+      <div style={{ paddingTop: "clamp(20px, 4vh, 36px)" }}>
+        <button onClick={() => router.push("/dashboard")} style={backBtn}>← Back</button>
       </div>
 
+      <section style={{ paddingTop: "clamp(20px, 4vh, 32px)" }}>
+        <h1 className="ab-hero-line" style={{ '--i': '0', ...heroTitle } as CSSProperties}>Watch</h1>
+        <p className="ab-hero-line" style={{ '--i': '1', fontSize: 14, color: "rgba(255,255,255,0.50)", margin: "10px 0 0", textShadow: "0 1px 5px rgba(0,0,0,0.35)" } as CSSProperties}>
+          Live ranked rounds · sorted by combined ELO
+          {rounds.length > 0 && (
+            <span style={{ fontFamily: "var(--font-mono)", marginLeft: 10, fontSize: 11, color: "rgba(255,255,255,0.32)", letterSpacing: "0.06em" }}>
+              {rounds.length} active
+            </span>
+          )}
+        </p>
+      </section>
+
+      <div style={rule}><div style={ruleDot} /><div style={ruleLine} /></div>
+
       {rounds.length === 0 ? (
-        <div className="db-rise" style={{ background: "var(--card)", border: "0.5px solid var(--line)", borderRadius: 12, padding: "32px", textAlign: "center", '--i': '1' } as React.CSSProperties}>
-          <p style={{ color: "var(--muted)", margin: 0 }}>No live ranked rounds right now.</p>
-        </div>
+        <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
+          No live ranked rounds right now — check back soon.
+        </p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {rounds.map((r, index) => {
-            const currentSpeech = r.current_speech || 1;
-            const progress = ((currentSpeech - 1) / 8) * 100;
+        <div>
+          {rounds.map((r, i) => {
+            const speech = r.current_speech || 1;
+            const progress = ((speech - 1) / 8) * 100;
             const combinedElo = (r.pro?.elo || 0) + (r.con?.elo || 0);
             return (
               <div
                 key={r.id}
-                className="db-rise"
+                className="ab-step-in"
                 onClick={() => router.push(`/round/${r.id}`)}
                 style={{
-                  background: "var(--card)",
-                  border: "0.5px solid var(--line)",
-                  borderRadius: 12, padding: "14px 16px",
-                  display: "flex", alignItems: "center",
-                  gap: 14, cursor: "pointer",
-                  '--i': String(Math.min(index + 1, 8)),
-                } as React.CSSProperties}
+                  '--i': String(Math.min(i, 6)),
+                  display: "grid",
+                  gridTemplateColumns: "32px 1fr auto",
+                  alignItems: "start",
+                  gap: "0 20px",
+                  padding: "22px 0",
+                  borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  cursor: "pointer",
+                } as CSSProperties}
               >
-                {/* rank number */}
-                <div style={{ fontFamily: "var(--font-display)", fontSize: 20, color: index === 0 ? "var(--accent)" : "var(--muted)", width: 28, flexShrink: 0, textAlign: "center", lineHeight: 1 }}>
-                  {index + 1}
-                </div>
+                {/* Rank */}
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: i === 0 ? 22 : 15, fontWeight: 700, color: i === 0 ? "var(--accent)" : "rgba(255,255,255,0.28)", lineHeight: "22px", letterSpacing: "-0.02em", paddingTop: 1 }}>
+                  {String(i + 1).padStart(2, "0")}
+                </span>
 
-                <div style={{ width: "0.5px", height: 36, background: "var(--line)", flexShrink: 0 }} />
-
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)", margin: "0 0 4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {/* Content */}
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ margin: "0 0 6px", fontSize: "clamp(14px, 1.8vw, 16px)", fontWeight: 500, color: "#fff", textShadow: "0 1px 8px rgba(0,0,0,0.38)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {r.topic}
                   </p>
-                  <p style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 8px" }}>
-                    @{r.pro?.username} <span style={{ color: "var(--accent)" }}>{r.pro?.elo}</span>
-                    {" "}(Pro) vs @{r.con?.username} <span style={{ color: "var(--accent)" }}>{r.con?.elo}</span> (Con)
+                  <p style={{ margin: "0 0 12px", fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.38)", letterSpacing: "0.03em" }}>
+                    @{r.pro?.username}{" "}
+                    <span style={{ color: "var(--accent)" }}>{r.pro?.elo}</span>
+                    {" "}Pro · @{r.con?.username}{" "}
+                    <span style={{ color: "var(--accent)" }}>{r.con?.elo}</span>
+                    {" "}Con
                   </p>
-                  <div style={{ height: 3, background: "var(--paper-2)", borderRadius: 2, overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${progress}%`, background: "var(--accent)", borderRadius: 2 }} />
+                  {/* Progress bar */}
+                  <div style={{ height: 2, background: "rgba(255,255,255,0.10)", borderRadius: 1, overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${progress}%`, background: "var(--accent)", borderRadius: 1, transition: "width 0.4s" }} />
                   </div>
                 </div>
 
-                <div style={{ flexShrink: 0, textAlign: "right" }}>
-                  <p style={{ fontSize: 11, color: "var(--muted)", margin: "0 0 3px" }}>{speechLabels[currentSpeech - 1]}</p>
-                  <p style={{ fontSize: 10, color: "color-mix(in srgb, var(--accent) 60%, transparent)", margin: 0 }}>⚡ {combinedElo} ELO</p>
+                {/* Right meta */}
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <p style={{ margin: "0 0 4px", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.08em", color: "rgba(255,255,255,0.35)", whiteSpace: "nowrap" }}>
+                    {SPEECH_LABELS[speech - 1]}
+                  </p>
+                  <p style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 11, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.06em" }}>
+                    {combinedElo}
+                  </p>
                 </div>
               </div>
             );
@@ -124,5 +145,12 @@ export default function RoundsPage() {
         </div>
       )}
     </div>
+    </>
   );
 }
+
+const backBtn: CSSProperties = { background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.65)", padding: "8px 0", textShadow: "0 1px 4px rgba(0,0,0,0.35)" };
+const heroTitle: CSSProperties = { fontFamily: "var(--font-display)", fontSize: "clamp(56px, 12vw, 110px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.02em", margin: 0, lineHeight: 0.92, textShadow: "0 2px 20px rgba(0,0,0,0.45), 0 8px 40px rgba(0,0,0,0.22)" };
+const rule: CSSProperties = { display: "flex", alignItems: "center", gap: 12, margin: "clamp(28px, 5vh, 44px) 0" };
+const ruleDot: CSSProperties = { width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 };
+const ruleLine: CSSProperties = { flex: 1, height: 1, background: "rgba(255,255,255,0.15)" };

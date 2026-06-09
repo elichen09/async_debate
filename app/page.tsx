@@ -13,6 +13,7 @@ export default function Home() {
         <div style={{ display: "flex", gap: 24 }}>
           <Link href="/about" className="gh-nav-link">About</Link>
           <Link href="/founders" className="gh-nav-link">Founders</Link>
+          <Link href="/future" className="gh-nav-link">Future</Link>
         </div>
         <div style={{ display: "flex", gap: 24 }}>
           <Link href="/login" className="gh-nav-link">Log in</Link>
@@ -21,11 +22,17 @@ export default function Home() {
       </header>
 
       <main className="gh-center" aria-label="Grasshopper">
-        <h1 className="gh-title">Grasshopper</h1>
+        <h1 className="gh-title">Grasshopper.</h1>
+        <p className="gh-credit">made by Eli and Gary</p>
       </main>
 
-      <footer className="gh-footer">
-        <p className="gh-credit">made by Eli and Gary</p>
+      <footer style={{ position: "absolute", bottom: 20, left: 0, right: 0, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
+        <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "oklch(0.97 0.006 80 / 0.35)", letterSpacing: "0.02em", pointerEvents: "auto" }}>
+          &copy; {new Date().getFullYear()} Grasshopper. By using this site, you agree to our{" "}
+          <Link href="/terms" style={{ color: "inherit", textDecoration: "underline" }}>Terms</Link>
+          {" "}and{" "}
+          <Link href="/privacy" style={{ color: "inherit", textDecoration: "underline" }}>Privacy Policy</Link>.
+        </span>
       </footer>
     </div>
   );

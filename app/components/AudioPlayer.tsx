@@ -2,10 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-
-
-
-
 interface AudioPlayerProps {
   src: string;
   label?: string;
@@ -23,11 +19,9 @@ export default function AudioPlayer({ src, label }: AudioPlayerProps) {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-
     const onTime = () => { if (!dragging) setCurrentTime(audio.currentTime); };
     const onLoad = () => setDuration(audio.duration);
-    const onEnd = () => setPlaying(false);
-
+    const onEnd  = () => setPlaying(false);
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("loadedmetadata", onLoad);
     audio.addEventListener("ended", onEnd);
@@ -42,7 +36,7 @@ export default function AudioPlayer({ src, label }: AudioPlayerProps) {
     const audio = audioRef.current;
     if (!audio) return;
     if (playing) { audio.pause(); setPlaying(false); }
-    else { audio.play(); setPlaying(true); }
+    else          { audio.play();  setPlaying(true);  }
   }
 
   function setSpeedValue(s: number) {
@@ -63,22 +57,23 @@ export default function AudioPlayer({ src, label }: AudioPlayerProps) {
   function fmt(s: number) {
     if (!s || isNaN(s)) return "0:00";
     const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, "0")}`;
+    return `${m}:${Math.floor(s % 60).toString().padStart(2, "0")}`;
   }
 
   const progress = duration ? (currentTime / duration) * 100 : 0;
 
   return (
     <div style={{
-      background: "var(--card)",
-      border: "0.5px solid var(--line)",
-      borderRadius: 10, padding: "12px 14px",
+      background: "rgba(255,255,255,0.06)",
+      border: "1px solid rgba(255,255,255,0.10)",
+      borderRadius: 10,
+      padding: "12px 14px",
+      backdropFilter: "blur(8px)",
     }}>
       <audio ref={audioRef} src={src} preload="metadata" />
 
       {label && (
-        <p style={{ fontSize: 10, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted)", margin: "0 0 10px" }}>
+        <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.38)", margin: "0 0 10px" }}>
           {label}
         </p>
       )}
@@ -88,65 +83,81 @@ export default function AudioPlayer({ src, label }: AudioPlayerProps) {
         ref={barRef}
         onClick={seek}
         style={{
-          height: 6, background: "var(--line)",
-          borderRadius: 3, cursor: "pointer", marginBottom: 10,
-          position: "relative", overflow: "visible",
+          height: 3,
+          background: "rgba(255,255,255,0.12)",
+          borderRadius: 2,
+          cursor: "pointer",
+          marginBottom: 12,
+          position: "relative",
+          overflow: "visible",
         }}
       >
         <div style={{
-          height: "100%", width: `${progress}%`,
-          background: "var(--pro)", borderRadius: 3,
+          height: "100%",
+          width: `${progress}%`,
+          background: "var(--accent)",
+          borderRadius: 2,
           transition: dragging ? "none" : "width 0.1s linear",
           position: "relative",
         }}>
-          {/* scrubber handle */}
           <div style={{
-            position: "absolute", right: -5, top: "50%",
+            position: "absolute",
+            right: -5,
+            top: "50%",
             transform: "translateY(-50%)",
-            width: 12, height: 12, borderRadius: "50%",
-            background: "var(--pro)",
-            boxShadow: "0 0 0 2px color-mix(in srgb, var(--pro) 30%, transparent)",
+            width: 11,
+            height: 11,
+            borderRadius: "50%",
+            background: "var(--accent)",
+            boxShadow: "0 0 0 2px rgba(255,255,255,0.20)",
           }} />
         </div>
       </div>
 
-      {/* Controls row */}
+      {/* Controls */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
 
-        {/* Play/pause */}
+        {/* Play / pause */}
         <button
           onClick={togglePlay}
           style={{
-            width: 34, height: 34, borderRadius: "50%",
-            background: "var(--pro)", border: "none",
+            width: 32, height: 32, borderRadius: "50%",
+            background: playing ? "rgba(255,255,255,0.15)" : "var(--accent)",
+            border: "none",
             display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", flexShrink: 0,
-            fontSize: 12, color: "#fff",
+            fontSize: 11, color: "#fff",
+            transition: "background 0.15s",
           }}
         >
           {playing ? "⏸" : "▶"}
         </button>
 
         {/* Time */}
-        <span style={{ fontSize: 11, color: "var(--muted)", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>
-          {fmt(currentTime)} / {fmt(duration)}
+        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.40)", fontVariantNumeric: "tabular-nums", flexShrink: 0, letterSpacing: "0.04em" }}>
+          {fmt(currentTime)}<span style={{ opacity: 0.5, margin: "0 3px" }}>/</span>{fmt(duration)}
         </span>
 
         <div style={{ flex: 1 }} />
 
-        {/* Speed buttons */}
+        {/* Speed */}
         <div style={{ display: "flex", gap: 4 }}>
           {[1, 1.5, 2].map(s => (
             <button
               key={s}
               onClick={() => setSpeedValue(s)}
               style={{
-                height: 24, padding: "0 8px",
-                background: speed === s ? "var(--pro)" : "var(--card)",
-                border: `0.5px solid ${speed === s ? "var(--pro)" : "var(--line-strong)"}`,
-                borderRadius: 5, fontSize: 11,
-                color: speed === s ? "#fff" : "var(--muted)",
-                cursor: "pointer", fontWeight: speed === s ? 600 : 400,
+                height: 22, padding: "0 7px",
+                background: speed === s ? "var(--accent)" : "transparent",
+                border: `1px solid ${speed === s ? "var(--accent)" : "rgba(255,255,255,0.16)"}`,
+                borderRadius: 4,
+                fontSize: 10,
+                color: speed === s ? "#fff" : "rgba(255,255,255,0.40)",
+                cursor: "pointer",
+                fontWeight: speed === s ? 600 : 400,
+                fontFamily: "var(--font-mono)",
+                letterSpacing: "0.04em",
+                transition: "background 0.14s, color 0.14s, border-color 0.14s",
               }}
             >
               {s}x

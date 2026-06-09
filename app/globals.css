@@ -15,8 +15,8 @@
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
 
-  --font-display: var(--font-barlow), "Arial Narrow", ui-sans-serif, sans-serif;
-  --font-body:    var(--font-chivo), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-barlow), "Fraunces", Georgia, serif;
+  --font-body:    var(--font-chivo), "Lora", Georgia, serif;
   --font-mono:    var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
 
   --accent-tint: color-mix(in oklch, var(--accent) 14%, transparent);
@@ -178,10 +178,9 @@ input, button, textarea, select { font-family: inherit; }
   padding: 0 24px;
   border-radius: var(--radius);
   font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   border: 1.5px solid transparent;
   cursor: pointer;
   text-decoration: none;
@@ -246,13 +245,25 @@ input, button, textarea, select { font-family: inherit; }
   border-color: oklch(0.12 0.040 145 / 0.24);
 }
 
+.db-btn--glass {
+  background: rgba(255, 255, 255, 0.10);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.db-btn--glass:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.38);
+  transform: translateY(-1px);
+}
+
 .db-btn--danger {
   background: oklch(0.48 0.20 28);
   color: #fdf4f4;
   border-color: oklch(0.42 0.20 28);
 }
 .db-btn--block { width: 100%; }
-.db-btn--sm    { height: 36px; padding: 0 16px; font-size: 12px; }
+.db-btn--sm    { height: 36px; padding: 0 16px; font-size: 13px; }
 .db-btn--lg    { height: 56px; padding: 0 36px; font-size: 16px; gap: 10px; }
 .db-btn--lg .db-btn__arrow { width: 26px; height: 26px; font-size: 15px; }
 
@@ -511,6 +522,43 @@ input, button, textarea, select { font-family: inherit; }
   .ab-hero-line, .ab-step-in, .ab-rule-draw { animation: none; }
 }
 
+/* =========================================================================
+   LIGHT-ON-DARK FORM ELEMENTS (challenge, judge, round, history)
+   ========================================================================= */
+.lp-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 46px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.lp-input:focus { border-color: rgba(255, 255, 255, 0.40); }
+.lp-input::placeholder { color: rgba(255, 255, 255, 0.28); }
+
+.lp-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: #fff;
+  outline: none;
+  resize: none;
+  transition: border-color 0.15s;
+}
+.lp-textarea:focus { border-color: rgba(255, 255, 255, 0.40); }
+.lp-textarea::placeholder { color: rgba(255, 255, 255, 0.28); }
+
 /* Page-load entrance — supports stagger via --i custom property */
 .db-rise {
   animation: gh-focus-in 0.65s var(--ease-out-quint) both;
@@ -545,6 +593,14 @@ input, button, textarea, select { font-family: inherit; }
   background: url("/1.png") center center / cover no-repeat fixed;
   background-color: oklch(0.68 0.08 145);
   position: relative;
+}
+.db-shell::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: oklch(0.06 0.025 145 / 0.45);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .db-main {
@@ -1101,19 +1157,19 @@ input, button, textarea, select { font-family: inherit; }
 .gh-center {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 0 24px;
 }
 
 .gh-title {
-  font-family: var(--font-barlow);
+  font-family: var(--font-display);
   font-size: clamp(56px, 13.5vw, 220px);
   font-weight: 800;
-  letter-spacing: -0.025em;
-  text-transform: uppercase;
+  letter-spacing: -0.01em;
   color: #fff;
-  line-height: 0.88;
+  line-height: 0.92;
   text-align: center;
   text-shadow:
     0 2px 12px rgba(0, 0, 0, 0.35),
@@ -1133,16 +1189,160 @@ input, button, textarea, select { font-family: inherit; }
 
 .gh-credit {
   font-family: var(--font-body);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.45);
-  letter-spacing: 0.03em;
-  margin: 0;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.06em;
+  margin: 10px 0 0;
+  pointer-events: none;
+  user-select: none;
 }
 
 @media (max-width: 600px) {
   .gh-header { padding: 20px 24px; }
   .gh-footer  { padding: 20px 24px; }
+}
+
+/* =========================================================================
+   SITE FOOTER BAR
+   ========================================================================= */
+.site-footer {
+  display: flex;
+  justify-content: center;
+  padding: 24px 24px 32px;
+  pointer-events: none;
+}
+
+.site-footer__text {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 400;
+  color: oklch(0.97 0.006 80 / 0.35);
+  letter-spacing: 0.02em;
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.site-footer__link {
+  color: oklch(0.97 0.006 80 / 0.35);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.18s;
+}
+.site-footer__link:hover {
+  color: oklch(0.97 0.006 80 / 0.70);
+}
+
+@media (max-width: 480px) {
+  .site-footer__text { white-space: normal; text-align: center; }
+}
+
+/* =========================================================================
+   LEGAL PAGES (Terms & Privacy)
+   ========================================================================= */
+.legal-page {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 60px 20px 100px;
+}
+
+.legal-card {
+  background: oklch(0.97 0.006 80 / 0.90);
+  backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid oklch(0.12 0.040 145 / 0.12);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 4px 24px oklch(0 0 0 / 0.10),
+    0 1px 4px oklch(0 0 0 / 0.06);
+  max-width: 720px;
+  width: 100%;
+  padding: 48px 52px;
+}
+
+.legal-back {
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  margin-bottom: 28px;
+  transition: color 0.14s;
+}
+.legal-back:hover { color: var(--ink); }
+
+.legal-title {
+  font-family: var(--font-display);
+  font-size: clamp(28px, 5vw, 40px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+
+.legal-date {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 40px;
+}
+
+.legal-section {
+  margin-bottom: 32px;
+}
+
+.legal-section h2 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin: 0 0 10px;
+}
+
+.legal-section p,
+.legal-section ul {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.7;
+  color: oklch(0.28 0.022 145);
+  margin: 0 0 10px;
+}
+
+.legal-section ul {
+  padding-left: 20px;
+}
+
+.legal-section ul li {
+  margin-bottom: 5px;
+}
+
+.legal-section a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.legal-section a:hover { opacity: 0.8; }
+
+.legal-related {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid oklch(0.12 0.040 145 / 0.10);
+}
+
+.legal-related a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .legal-card { padding: 32px 24px; }
 }
 
 /* =========================================================================
@@ -1546,12 +1746,11 @@ input, button, textarea, select { font-family: inherit; }
 
 .db-dash__cta-heading {
   font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 17px;
+  font-weight: 700;
   letter-spacing: -0.01em;
-  text-transform: uppercase;
   color: var(--ink);
-  margin: 0 0 2px;
+  margin: 0 0 4px;
 }
 
 .db-dash__cta-sub {

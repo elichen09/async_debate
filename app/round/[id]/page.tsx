@@ -4,26 +4,27 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AudioPlayer from "@/app/components/AudioPlayer";
+import type { CSSProperties } from "react";
 
 const PRO_FIRST_ORDER = [
   { label: "Pro Constructive", role: "pro" },
   { label: "Con Constructive", role: "con" },
-  { label: "Pro Rebuttal", role: "pro" },
-  { label: "Con Rebuttal", role: "con" },
-  { label: "Pro Summary", role: "pro" },
-  { label: "Con Summary", role: "con" },
-  { label: "Pro Final Focus", role: "pro" },
-  { label: "Con Final Focus", role: "con" },
+  { label: "Pro Rebuttal",     role: "pro" },
+  { label: "Con Rebuttal",     role: "con" },
+  { label: "Pro Summary",      role: "pro" },
+  { label: "Con Summary",      role: "con" },
+  { label: "Pro Final Focus",  role: "pro" },
+  { label: "Con Final Focus",  role: "con" },
 ];
 const CON_FIRST_ORDER = [
   { label: "Con Constructive", role: "con" },
   { label: "Pro Constructive", role: "pro" },
-  { label: "Con Rebuttal", role: "con" },
-  { label: "Pro Rebuttal", role: "pro" },
-  { label: "Con Summary", role: "con" },
-  { label: "Pro Summary", role: "pro" },
-  { label: "Con Final Focus", role: "con" },
-  { label: "Pro Final Focus", role: "pro" },
+  { label: "Con Rebuttal",     role: "con" },
+  { label: "Pro Rebuttal",     role: "pro" },
+  { label: "Con Summary",      role: "con" },
+  { label: "Pro Summary",      role: "pro" },
+  { label: "Con Final Focus",  role: "con" },
+  { label: "Pro Final Focus",  role: "pro" },
 ];
 
 interface Speech {
@@ -85,23 +86,19 @@ export default function RoundPage() {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push("/login"); return; }
-
       const uid = session.user.id;
       setUserId(uid);
 
       const { data: roundData } = await supabase
         .from("rounds")
-        .select(`
-          id, topic, status, pro_id, con_id, con_goes_first, current_speech, is_ranked,
+        .select(`id, topic, status, pro_id, con_id, con_goes_first, current_speech, is_ranked,
           pro:profiles!pro_id(username, display_name),
-          con:profiles!con_id(username, display_name)
-        `)
+          con:profiles!con_id(username, display_name)`)
         .eq("id", id)
         .single();
 
       if (!roundData) { router.push("/dashboard"); return; }
       setRound(roundData as unknown as Round);
-
       const participant = roundData.pro_id === uid || roundData.con_id === uid;
       setIsParticipant(participant);
       setMyRole(roundData.pro_id === uid ? "pro" : "con");
@@ -111,19 +108,14 @@ export default function RoundPage() {
         .select("position, speech_number, storage_path, submitted_at")
         .eq("round_id", id)
         .order("speech_number", { ascending: true });
-
       setSpeeches(speechData || []);
 
       const urls: Record<string, string> = {};
       for (const s of speechData || []) {
-        const { data } = await supabase.storage
-          .from("speeches")
-          .createSignedUrl(s.storage_path, 3600);
+        const { data } = await supabase.storage.from("speeches").createSignedUrl(s.storage_path, 3600);
         if (data) urls[s.position] = data.signedUrl;
         else {
-          const { data: pubData } = supabase.storage
-            .from("speeches")
-            .getPublicUrl(s.storage_path);
+          const { data: pubData } = supabase.storage.from("speeches").getPublicUrl(s.storage_path);
           if (pubData) urls[s.position] = pubData.publicUrl;
         }
       }
@@ -132,21 +124,15 @@ export default function RoundPage() {
       const { data: ballotData } = await supabase
         .from("ballots")
         .select("id, winner_id, pro_speaks, con_speaks, reasoning, submitted_at, judge_id")
-        .eq("round_id", id)
-        .single();
-
+        .eq("round_id", id).single();
       if (ballotData) setBallot(ballotData as Ballot);
 
       if (ballotData) {
         const { data: reportData } = await supabase
-          .from("reports")
-          .select("id")
-          .eq("ballot_id", ballotData.id)
-          .eq("reporter_id", uid)
-          .single();
+          .from("reports").select("id")
+          .eq("ballot_id", ballotData.id).eq("reporter_id", uid).single();
         if (reportData) setReported(true);
       }
-
       setLoading(false);
     }
     load();
@@ -172,10 +158,7 @@ export default function RoundPage() {
     }
   }
 
-  function stopRecording() {
-    mediaRecorder?.stop();
-    setRecording(false);
-  }
+  function stopRecording() { mediaRecorder?.stop(); setRecording(false); }
 
   async function deleteSpeeches(currentPath: string) {
     const paths = [...speeches.map(s => s.storage_path), currentPath];
@@ -186,62 +169,36 @@ export default function RoundPage() {
 
   async function handleUploadBlob(blob: Blob) {
     if (!round) return;
-    setError("");
-    setUploading(true);
-
+    setError(""); setUploading(true);
     const speechOrder = round.con_goes_first ? CON_FIRST_ORDER : PRO_FIRST_ORDER;
-    const currentIndex = round.current_speech - 1;
-    const position = speechOrder[currentIndex].label.toLowerCase().replace(/ /g, "_");
+    const position = speechOrder[round.current_speech - 1].label.toLowerCase().replace(/ /g, "_");
     const path = `${round.id}/${position}_${Date.now()}.webm`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("speeches").upload(path, blob, { contentType: "audio/webm" });
+    const { error: uploadError } = await supabase.storage.from("speeches").upload(path, blob, { contentType: "audio/webm" });
     if (uploadError) { setError(uploadError.message); setUploading(false); return; }
-
-    const { error: insertError } = await supabase.from("speeches").insert({
-      round_id: round.id, speaker_id: userId,
-      position, speech_number: round.current_speech, storage_path: path,
-    });
+    const { error: insertError } = await supabase.from("speeches").insert({ round_id: round.id, speaker_id: userId, position, speech_number: round.current_speech, storage_path: path });
     if (insertError) { setError(insertError.message); setUploading(false); return; }
-
     const nextSpeech = round.current_speech + 1;
     const newStatus = nextSpeech > 8 ? (round.is_ranked ? "judging" : "complete") : "active";
-
     await supabase.from("rounds").update({ current_speech: nextSpeech, status: newStatus }).eq("id", round.id);
-
     if (!round.is_ranked && newStatus === "complete") await deleteSpeeches(path);
-
     setUploading(false);
     if (round.is_ranked || newStatus !== "complete") window.location.reload();
   }
 
   async function handleUpload(file: File) {
     if (!round) return;
-    setError("");
-    setUploading(true);
-
+    setError(""); setUploading(true);
     const speechOrder = round.con_goes_first ? CON_FIRST_ORDER : PRO_FIRST_ORDER;
-    const currentIndex = round.current_speech - 1;
-    const position = speechOrder[currentIndex].label.toLowerCase().replace(/ /g, "_");
+    const position = speechOrder[round.current_speech - 1].label.toLowerCase().replace(/ /g, "_");
     const path = `${round.id}/${position}_${Date.now()}.mp3`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("speeches").upload(path, file, { contentType: "audio/mpeg" });
+    const { error: uploadError } = await supabase.storage.from("speeches").upload(path, file, { contentType: "audio/mpeg" });
     if (uploadError) { setError(uploadError.message); setUploading(false); return; }
-
-    const { error: insertError } = await supabase.from("speeches").insert({
-      round_id: round.id, speaker_id: userId,
-      position, speech_number: round.current_speech, storage_path: path,
-    });
+    const { error: insertError } = await supabase.from("speeches").insert({ round_id: round.id, speaker_id: userId, position, speech_number: round.current_speech, storage_path: path });
     if (insertError) { setError(insertError.message); setUploading(false); return; }
-
     const nextSpeech = round.current_speech + 1;
     const newStatus = nextSpeech > 8 ? (round.is_ranked ? "judging" : "complete") : "active";
-
     await supabase.from("rounds").update({ current_speech: nextSpeech, status: newStatus }).eq("id", round.id);
-
     if (!round.is_ranked && newStatus === "complete") await deleteSpeeches(path);
-
     setUploading(false);
     if (round.is_ranked || newStatus !== "complete") window.location.reload();
   }
@@ -249,28 +206,17 @@ export default function RoundPage() {
   async function handleReport() {
     if (!ballot || !round) return;
     setReporting(true);
-    const { error } = await supabase.from("reports").insert({
-      ballot_id: ballot.id,
-      round_id: round.id,
-      reporter_id: userId,
-      judge_id: ballot.judge_id,
-      reason: reportReason,
-    });
+    const { error } = await supabase.from("reports").insert({ ballot_id: ballot.id, round_id: round.id, reporter_id: userId, judge_id: ballot.judge_id, reason: reportReason });
     setReporting(false);
     if (error) { setError(error.message); return; }
-    setReported(true);
-    setShowReportForm(false);
+    setReported(true); setShowReportForm(false);
   }
 
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100dvh - 44px)" }}>
       <div className="db-card" style={{ padding: "28px 40px", textAlign: "center" }}>
-        <p style={{ fontFamily: "var(--font-display)", fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: "0 0 14px", textTransform: "uppercase" }}>
-          Grasshopper
-        </p>
-        <div className="gh-loading-dots">
-          <span /><span /><span />
-        </div>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: "0 0 14px", textTransform: "uppercase" }}>Grasshopper</p>
+        <div className="gh-loading-dots"><span /><span /><span /></div>
       </div>
     </div>
   );
@@ -278,299 +224,247 @@ export default function RoundPage() {
   if (!round) return null;
 
   const SPEECH_ORDER = round.con_goes_first ? CON_FIRST_ORDER : PRO_FIRST_ORDER;
-  const currentIndex = round.current_speech - 1;
-  const currentSpeech = SPEECH_ORDER[currentIndex];
+  const currentSpeech = SPEECH_ORDER[round.current_speech - 1];
   const isMyTurn = currentSpeech?.role === myRole && round.status === "active" && isParticipant;
   const opponent = myRole === "pro" ? round.con : round.pro;
 
   return (
-    <div style={{ maxWidth: 560, margin: "0 auto", padding: "0 20px 80px" }}>
+    <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 clamp(24px, 5vw, 48px) 100px" }}>
 
-      {/* Header */}
-      <div
-        className="db-card db-rise"
-        style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 12px" }}
-      >
-        <button onClick={() => router.push("/dashboard")} className="db-btn db-btn--ghost db-btn--sm">
-          ← Back
-        </button>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 580, color: "var(--ink)", margin: 0 }}>
-          Round
-        </h1>
+      {/* Back */}
+      <div style={{ paddingTop: "clamp(20px, 4vh, 36px)", display: "flex", alignItems: "center", gap: 14 }}>
+        <button onClick={() => router.push("/dashboard")} style={backBtn}>← Back</button>
         {!round.is_ranked && (
-          <span className="db-badge db-badge--wait">Unranked</span>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(255,255,255,0.40)" }}>
+            Unranked
+          </span>
         )}
         {!isParticipant && (
-          <span style={{ fontSize: 10, fontWeight: 600, padding: "3px 8px", borderRadius: 6, background: "color-mix(in srgb, var(--pro) 10%, transparent)", color: "var(--pro)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.10em", textTransform: "uppercase", color: "rgba(255,255,255,0.40)" }}>
             Spectating
           </span>
         )}
       </div>
 
-      {/* Round info */}
-      <div
-        className="db-card db-rise"
-        style={{ marginBottom: 12, '--i': '1' } as React.CSSProperties}
-      >
-        <div style={{ position: "absolute", top: -40, right: -40, width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 8%, transparent), transparent 70%)", pointerEvents: "none" }} />
-        <p style={{ ...eyebrow, position: "relative", zIndex: 1 }}>topic</p>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--ink)", margin: "0 0 6px", position: "relative", zIndex: 1 }}>
+      {/* Hero — topic as heading */}
+      <section style={{ paddingTop: "clamp(16px, 3vh, 28px)" }}>
+        <p style={eyebrow}>Topic</p>
+        <h1 className="ab-hero-line" style={{ '--i': '0', fontFamily: "var(--font-display)", fontSize: "clamp(28px, 5.5vw, 52px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.02em", margin: "0 0 14px", lineHeight: 1.05, textShadow: "0 2px 20px rgba(0,0,0,0.45), 0 8px 40px rgba(0,0,0,0.22)", textWrap: "balance" } as CSSProperties}>
           {round.topic}
-        </h2>
-        <p style={{ fontSize: 13, color: "var(--muted)", margin: "0 0 14px", position: "relative", zIndex: 1 }}>
+        </h1>
+        <p style={{ fontSize: 13, color: "rgba(255,255,255,0.50)", margin: "0 0 10px", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
           {isParticipant
             ? `vs @${opponent?.username} · You are ${myRole === "pro" ? "Pro" : "Con"}`
             : `@${round.pro?.username} (Pro) vs @${round.con?.username} (Con)`}
         </p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", position: "relative", zIndex: 1 }}>
-          <span style={{
-            fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20,
-            background: round.status === "judging"
-              ? "color-mix(in srgb, var(--accent) 10%, transparent)"
-              : round.status === "complete"
-              ? "color-mix(in srgb, var(--win) 10%, transparent)"
-              : "var(--paper-2)",
-            color: round.status === "judging"
-              ? "var(--accent)"
-              : round.status === "complete"
-              ? "var(--win)"
-              : "var(--ink-soft)",
-          }}>
-            {round.status === "judging"
-              ? "⏳ Awaiting judge"
-              : round.status === "complete"
-              ? "✓ Complete"
-              : `Speech ${round.current_speech} of 8`}
+        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.08em", color: round.status === "complete" ? "var(--accent)" : round.status === "judging" ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.55)" }}>
+            {round.status === "judging" ? "Awaiting judge" : round.status === "complete" ? "Complete" : `Speech ${round.current_speech} of 8`}
           </span>
           {isMyTurn && (
-            <span className="db-badge db-badge--turn">Your turn</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, letterSpacing: "0.08em", color: "var(--accent)", textShadow: "0 1px 4px rgba(0,0,0,0.30)" }}>
+              Your turn →
+            </span>
           )}
         </div>
-      </div>
+      </section>
+
+      <div style={rule}><div style={ruleDot} /><div style={ruleLine} /></div>
 
       {/* Speech list */}
-      <div
-        className="db-rise"
-        style={{ marginBottom: 20, '--i': '2' } as React.CSSProperties}
-      >
-        <p style={sectionLabel}>Speeches</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {SPEECH_ORDER.map((s, i) => {
-            const speechNum = i + 1;
-            const position = s.label.toLowerCase().replace(/ /g, "_");
-            const submitted = speeches.find(sp => sp.speech_number === speechNum);
-            const isCurrent = speechNum === round.current_speech;
-            const isPast = speechNum < round.current_speech;
-            const isFuture = speechNum > round.current_speech;
-            return (
-              <div key={i} style={{
-                background: "var(--card)",
-                border: `0.5px solid ${isCurrent ? "color-mix(in srgb, var(--accent) 40%, transparent)" : "var(--line)"}`,
-                borderRadius: 10, padding: "11px 14px",
-                opacity: isFuture ? 0.35 : 1,
-                backdropFilter: "blur(12px)",
-                WebkitBackdropFilter: "blur(12px)",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: audioUrls[position] ? 10 : 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{
-                      width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
-                      background: isPast
-                        ? "var(--accent)"
-                        : isCurrent
-                        ? "color-mix(in srgb, var(--accent) 10%, transparent)"
-                        : "var(--card)",
-                      border: `1px solid ${isPast ? "var(--accent)" : isCurrent ? "color-mix(in srgb, var(--accent) 40%, transparent)" : "var(--line-strong)"}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 11, fontWeight: 600,
-                      color: isPast ? "var(--accent-ink)" : isCurrent ? "var(--accent)" : "var(--muted)",
-                    }}>
-                      {isPast ? "✓" : speechNum}
+      <section>
+        <p style={eyebrow}>Speeches</p>
+        {SPEECH_ORDER.map((s, i) => {
+          const speechNum = i + 1;
+          const position = s.label.toLowerCase().replace(/ /g, "_");
+          const submitted = speeches.find(sp => sp.speech_number === speechNum);
+          const isCurrent = speechNum === round.current_speech && round.status === "active";
+          const isPast = submitted !== undefined;
+          const isFuture = speechNum > round.current_speech && !submitted;
+
+          return (
+            <div
+              key={i}
+              style={{
+                padding: "16px 0",
+                borderBottom: "1px solid rgba(255,255,255,0.07)",
+                opacity: isFuture ? 0.30 : 1,
+                transition: "opacity 0.2s",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                {/* Number / check */}
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: isPast ? "var(--accent)" : isCurrent ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.28)", lineHeight: "22px", minWidth: 20, letterSpacing: "0.06em", flexShrink: 0 }}>
+                  {isPast ? "✓" : String(speechNum).padStart(2, "0")}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: isCurrent ? 600 : 400, color: isCurrent ? "#fff" : isPast ? "rgba(255,255,255,0.70)" : "rgba(255,255,255,0.50)", textShadow: isCurrent ? "0 1px 8px rgba(0,0,0,0.38)" : "none" }}>
+                    {s.label}
+                  </p>
+                  {submitted && (
+                    <p style={{ margin: "2px 0 0", fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.30)", letterSpacing: "0.04em" }}>
+                      {new Date(submitted.submitted_at).toLocaleDateString()}
+                    </p>
+                  )}
+                  {audioUrls[position] && (
+                    <div style={{ marginTop: 10 }}>
+                      <AudioPlayer src={audioUrls[position]} />
                     </div>
-                    <div>
-                      <p style={{ margin: 0, fontSize: 13, fontWeight: isCurrent ? 500 : 400, color: isCurrent ? "var(--ink)" : "var(--ink-soft)" }}>
-                        {s.label}
-                      </p>
-                      {submitted && (
-                        <p style={{ margin: 0, fontSize: 11, color: "var(--muted)" }}>
-                          {new Date(submitted.submitted_at).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
-                {audioUrls[position] && <AudioPlayer src={audioUrls[position]} />}
               </div>
-            );
-          })}
-        </div>
-      </div>
+            </div>
+          );
+        })}
+      </section>
+
+      <div style={rule}><div style={{ ...ruleDot, background: "rgba(255,255,255,0.20)" }} /><div style={ruleLine} /></div>
 
       {/* Submit speech */}
       {isMyTurn && isParticipant && (
-        <div
-          className="db-card db-card--accent db-rise"
-          style={{ marginBottom: 12, '--i': '3' } as React.CSSProperties}
-        >
-          <p style={sectionLabel}>Submit — {currentSpeech?.label}</p>
+        <section style={{ marginBottom: 32 }}>
+          <p style={eyebrow}>Submit — {currentSpeech?.label}</p>
+
           {error && (
-            <div style={{ background: "color-mix(in srgb, var(--loss) 10%, transparent)", border: "0.5px solid color-mix(in srgb, var(--loss) 30%, transparent)", color: "var(--loss)", padding: "10px 14px", borderRadius: 8, marginBottom: 12, fontSize: 13 }}>
-              {error}
-            </div>
+            <p style={{ fontSize: 13, color: "oklch(0.70 0.20 28)", margin: "0 0 16px", textShadow: "0 1px 4px rgba(0,0,0,0.40)" }}>
+              ⚑ {error}
+            </p>
           )}
-          <p style={{ ...eyebrow, marginBottom: 10 }}>Record directly</p>
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", margin: "0 0 14px" }}>Record directly</p>
+
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
             {!recording
-              ? <button onClick={startRecording} className="db-btn db-btn--ghost db-btn--block">🎙 Start recording</button>
-              : <button onClick={stopRecording} className="db-btn db-btn--block" style={{ borderColor: "color-mix(in srgb, var(--loss) 40%, transparent)", color: "var(--loss)", background: "color-mix(in srgb, var(--loss) 8%, transparent)" }}>⏹ Stop recording</button>
+              ? <button onClick={startRecording} className="db-btn db-btn--glass db-btn--block">🎙 Start recording</button>
+              : <button onClick={stopRecording} className="db-btn db-btn--block" style={{ borderColor: "rgba(220,80,80,0.45)", color: "rgba(255,160,160,0.90)", background: "rgba(200,60,60,0.12)" }}>⏹ Stop recording</button>
             }
           </div>
+
           {recording && (
-            <div style={{ fontSize: 13, color: "var(--loss)", marginBottom: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <span className="gh-rec-dot" />
-              Recording…
+            <div style={{ fontSize: 13, color: "oklch(0.65 0.22 28)", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="gh-rec-dot" /> Recording…
             </div>
           )}
+
           {audioPreview && !recording && (
-            <div style={{ marginBottom: 12 }}>
-              <audio controls src={audioPreview} style={{ width: "100%", marginBottom: 8 }} />
+            <div style={{ marginBottom: 14 }}>
+              <audio controls src={audioPreview} style={{ width: "100%", marginBottom: 10, borderRadius: 8 }} />
               <button onClick={() => handleUploadBlob(audioBlob!)} disabled={uploading} className="db-btn db-btn--accent db-btn--block">
                 {uploading ? "Uploading…" : "Submit recording"}
               </button>
             </div>
           )}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0" }}>
-            <div style={{ flex: 1, height: "0.5px", background: "var(--line)" }} />
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>or upload a file</span>
-            <div style={{ flex: 1, height: "0.5px", background: "var(--line)" }} />
+
+          <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "18px 0" }}>
+            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.12)" }} />
+            <span style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontFamily: "var(--font-mono)" }}>or upload a file</span>
+            <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.12)" }} />
           </div>
+
           <input ref={fileRef} type="file" accept="audio/mp3,audio/mpeg,audio/*" style={{ display: "none" }}
             onChange={e => { if (e.target.files?.[0]) handleUpload(e.target.files[0]); }} />
-          <button onClick={() => fileRef.current?.click()} disabled={uploading} className="db-btn db-btn--ghost db-btn--block">
+          <button onClick={() => fileRef.current?.click()} disabled={uploading} className="db-btn db-btn--glass db-btn--block">
             {uploading ? "Uploading…" : "Upload MP3"}
           </button>
-        </div>
+        </section>
       )}
 
+      {/* Status messages */}
       {!isMyTurn && round.status === "active" && isParticipant && (
-        <div
-          className="db-card db-rise"
-          style={{ marginBottom: 12, textAlign: "center", '--i': '3' } as React.CSSProperties}
-        >
-          <p style={{ margin: 0, fontSize: 14, color: "var(--muted)" }}>Waiting for opponent to submit their speech…</p>
-        </div>
+        <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", textShadow: "0 1px 5px rgba(0,0,0,0.35)", marginBottom: 20 }}>
+          Waiting for opponent to submit their speech…
+        </p>
       )}
-
       {!isParticipant && round.status === "active" && (
-        <div
-          className="db-card db-rise"
-          style={{ marginBottom: 12, textAlign: "center", '--i': '3' } as React.CSSProperties}
-        >
-          <p style={{ margin: 0, fontSize: 14, color: "var(--muted)" }}>You are watching this round as a spectator.</p>
-        </div>
+        <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", textShadow: "0 1px 5px rgba(0,0,0,0.35)", marginBottom: 20 }}>
+          You are watching this round as a spectator.
+        </p>
       )}
-
       {round.status === "judging" && (
-        <div
-          className="db-card db-rise"
-          style={{ marginBottom: 12, textAlign: "center", '--i': '3' } as React.CSSProperties}
-        >
-          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "var(--accent)", margin: "0 0 6px" }}>
-            All speeches submitted!
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "clamp(20px, 3.5vw, 28px)", color: "var(--accent)", margin: "0 0 6px", textShadow: "0 2px 14px rgba(0,0,0,0.40)" }}>
+            All speeches submitted.
           </p>
-          <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>This round is now awaiting a judge.</p>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
+            This round is awaiting a judge.
+          </p>
         </div>
       )}
-
       {(speechesDeleted || (round.status === "complete" && !round.is_ranked)) && (
-        <div
-          className="db-card db-rise"
-          style={{ marginBottom: 12, textAlign: "center", '--i': '3' } as React.CSSProperties}
-        >
-          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: 16, color: "var(--win)", margin: "0 0 6px" }}>
-            Unranked round complete
+        <div style={{ marginBottom: 20 }}>
+          <p style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "clamp(20px, 3.5vw, 28px)", color: "var(--accent)", margin: "0 0 6px", textShadow: "0 2px 14px rgba(0,0,0,0.40)" }}>
+            Unranked round complete.
           </p>
-          <p style={{ fontSize: 13, color: "var(--muted)", margin: 0 }}>
-            All speeches have been automatically deleted since this was an unranked round.
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: 0, textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
+            All speeches were automatically deleted.
           </p>
         </div>
       )}
 
       {/* Ballot */}
       {ballot && round.status === "complete" && round.is_ranked && (
-        <div
-          className="db-card db-rise"
-          style={{
-            marginBottom: 12,
-            borderColor: ballot.winner_id === userId
-              ? "color-mix(in srgb, var(--win) 30%, transparent)"
-              : "color-mix(in srgb, var(--loss) 30%, transparent)",
-            '--i': '4',
-          } as React.CSSProperties}
-        >
-          <p style={sectionLabel}>Judge's decision</p>
-          <p style={{ fontFamily: "var(--font-display)", fontSize: 26, margin: "0 0 20px", color: ballot.winner_id === userId ? "var(--win)" : "var(--loss)" }}>
-            {ballot.winner_id === userId ? "✓ You won!" : "✗ You lost"}
+        <section>
+          <p style={eyebrow}>Judge's decision</p>
+
+          <p style={{ fontFamily: "var(--font-display)", fontSize: "clamp(36px, 8vw, 72px)", fontWeight: 800, letterSpacing: "-0.02em", color: ballot.winner_id === userId ? "var(--accent)" : "rgba(255,255,255,0.55)", margin: "0 0 24px", textShadow: "0 2px 20px rgba(0,0,0,0.45)", lineHeight: 0.95 }}>
+            {ballot.winner_id === userId ? "You won." : "You lost."}
           </p>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 clamp(24px, 5vw, 56px)", marginBottom: 28 }}>
             {[{ label: "Pro speaks", value: ballot.pro_speaks }, { label: "Con speaks", value: ballot.con_speaks }].map(s => (
-              <div key={s.label} style={{ background: "var(--paper-2)", border: "0.5px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
-                <p style={{ ...eyebrow, marginBottom: 4 }}>{s.label}</p>
-                <p style={{ fontSize: 22, fontWeight: 500, color: "var(--ink)", margin: 0 }}>{s.value}</p>
+              <div key={s.label}>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.40)", margin: "0 0 6px" }}>{s.label}</p>
+                <p style={{ fontFamily: "var(--font-mono)", fontSize: "clamp(28px, 6vw, 48px)", fontWeight: 700, color: "#fff", margin: 0, textShadow: "0 2px 14px rgba(0,0,0,0.40)" }}>{s.value}</p>
               </div>
             ))}
           </div>
+
           {ballot.reasoning && (
-            <div style={{ marginBottom: 16 }}>
-              <p style={{ ...eyebrow, marginBottom: 8 }}>Reasoning</p>
-              <p style={{ fontSize: 14, margin: 0, lineHeight: 1.7, color: "var(--ink-soft)" }}>{ballot.reasoning}</p>
+            <div style={{ marginBottom: 28 }}>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.40)", margin: "0 0 12px" }}>Reasoning</p>
+              <p style={{ fontSize: 14, lineHeight: 1.75, color: "rgba(255,255,255,0.65)", margin: 0, textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>{ballot.reasoning}</p>
             </div>
           )}
 
           {isParticipant && (
-            <div style={{ borderTop: "0.5px solid var(--line)", paddingTop: 14, marginTop: 4 }}>
+            <div style={{ borderTop: "1px solid rgba(255,255,255,0.10)", paddingTop: 20 }}>
               {reported ? (
-                <p style={{ fontSize: 12, color: "var(--muted)", margin: 0, textAlign: "center" }}>
-                  ✓ Ballot reported — under review
-                </p>
+                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.38)", margin: 0 }}>✓ Ballot reported — under review</p>
               ) : showReportForm ? (
                 <div>
-                  <p style={{ fontSize: 12, color: "var(--muted)", margin: "0 0 8px" }}>Why are you reporting this ballot?</p>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.50)", margin: "0 0 10px" }}>Why are you reporting this ballot?</p>
                   <textarea
+                    className="lp-textarea"
                     value={reportReason}
                     onChange={e => setReportReason(e.target.value)}
-                    placeholder="Explain why this ballot is faulty..."
-                    style={{
-                      width: "100%", boxSizing: "border-box" as const,
-                      height: 80, padding: "10px 12px",
-                      background: "var(--paper-2)", border: "0.5px solid var(--line-strong)",
-                      borderRadius: 8, fontSize: 13, color: "var(--ink)",
-                      outline: "none", resize: "none", fontFamily: "inherit",
-                      marginBottom: 8,
-                    }}
+                    placeholder="Explain why this ballot is faulty…"
+                    rows={3}
+                    style={{ marginBottom: 10 }}
                   />
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={handleReport} disabled={reporting} className="db-btn db-btn--danger" style={{ flex: 1, height: 36, fontSize: 13 }}>
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={handleReport} disabled={reporting} className="db-btn db-btn--danger" style={{ flex: 1, height: 38, fontSize: 13 }}>
                       {reporting ? "Submitting…" : "Submit report"}
                     </button>
-                    <button onClick={() => setShowReportForm(false)} className="db-btn db-btn--ghost" style={{ flex: 1, height: 36, fontSize: 13 }}>
+                    <button onClick={() => setShowReportForm(false)} className="db-btn db-btn--glass" style={{ flex: 1, height: 38, fontSize: 13 }}>
                       Cancel
                     </button>
                   </div>
                 </div>
               ) : (
-                <button onClick={() => setShowReportForm(true)} className="db-btn db-btn--ghost db-btn--block" style={{ fontSize: 12 }}>
+                <button onClick={() => setShowReportForm(true)} className="db-btn db-btn--glass db-btn--sm" style={{ fontSize: 12 }}>
                   ⚑ Report this ballot
                 </button>
               )}
             </div>
           )}
-        </div>
+        </section>
       )}
-
     </div>
   );
 }
 
-const eyebrow: React.CSSProperties = { fontSize: 10, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)", margin: 0 };
-const sectionLabel: React.CSSProperties = { fontSize: 10, fontWeight: 500, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 12px" };
+const backBtn: CSSProperties = { background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.65)", padding: "8px 0", textShadow: "0 1px 4px rgba(0,0,0,0.35)" };
+const eyebrow: CSSProperties = { fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 12px", textShadow: "0 1px 4px rgba(0,0,0,0.30)" };
+const rule: CSSProperties = { display: "flex", alignItems: "center", gap: 12, margin: "clamp(28px, 5vh, 44px) 0" };
+const ruleDot: CSSProperties = { width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 };
+const ruleLine: CSSProperties = { flex: 1, height: 1, background: "rgba(255,255,255,0.15)" };

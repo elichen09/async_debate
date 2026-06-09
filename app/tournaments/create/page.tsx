@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import type { CSSProperties } from "react";
 
 export default function CreateTournamentPage() {
   const router = useRouter();
@@ -22,114 +23,107 @@ export default function CreateTournamentPage() {
 
     const { data, error: err } = await supabase
       .from("tournaments")
-      .insert({
-        name: name.trim(),
-        size,
-        topic: topic.trim() || null,
-        created_by: session.user.id,
-        status: "registration",
-      })
-      .select()
-      .single();
+      .insert({ name: name.trim(), size, topic: topic.trim() || null, created_by: session.user.id, status: "registration" })
+      .select().single();
 
     if (err || !data) { setError(err?.message ?? "Failed to create tournament."); setLoading(false); return; }
 
-    // Auto-join as creator
-    await supabase.from("tournament_participants").insert({
-      tournament_id: data.id,
-      user_id: session.user.id,
-    });
-
+    await supabase.from("tournament_participants").insert({ tournament_id: data.id, user_id: session.user.id });
     router.push(`/tournaments/${data.id}`);
   }
 
   return (
-    <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 20px 80px" }}>
+    <>
       <style>{`.db-shell { background-image: url("/4.png") !important; }`}</style>
-      <div className="db-card db-rise" style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 12px" }}>
-        <button onClick={() => router.push("/tournaments")} style={ghostBtn}>← Back</button>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: "var(--ink)", margin: 0 }}>
-          New tournament
-        </h1>
-      </div>
+      <div style={{ maxWidth: 620, margin: "0 auto", padding: "0 clamp(24px, 5vw, 48px) 100px" }}>
 
-      {error && (
-        <div style={{ background: "color-mix(in srgb, var(--loss) 10%, transparent)", border: "0.5px solid color-mix(in srgb, var(--loss) 30%, transparent)", color: "var(--loss)", padding: "10px 14px", borderRadius: 8, marginBottom: 14, fontSize: 13 }}>
-          {error}
+        <div style={{ paddingTop: "clamp(20px, 4vh, 36px)" }}>
+          <button onClick={() => router.push("/tournaments")} style={backBtn}>← Tournaments</button>
         </div>
-      )}
 
-      <div className="db-rise" style={{ ...card, "--i": "1" } as React.CSSProperties}>
-        <p style={sectionLabel}>1. Tournament name</p>
-        <input
-          style={inputStyle}
-          placeholder="e.g. Spring Invitational"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && handleCreate()}
-        />
-      </div>
+        <section style={{ paddingTop: "clamp(20px, 4vh, 32px)", paddingBottom: "clamp(12px, 2vh, 20px)" }}>
+          <h1 className="ab-hero-line" style={{ '--i': '0', ...heroTitle } as CSSProperties}>
+            New<br />tournament
+          </h1>
+        </section>
 
-      <div className="db-rise" style={{ ...card, "--i": "2" } as React.CSSProperties}>
-        <p style={sectionLabel}>2. Bracket size</p>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+        {error && (
+          <p style={{ fontSize: 13, color: "oklch(0.70 0.20 28)", margin: "0 0 20px", textShadow: "0 1px 4px rgba(0,0,0,0.40)" }}>
+            ⚑ {error}
+          </p>
+        )}
+
+        <div style={rule}><div style={ruleDot} /><div style={ruleLine} /></div>
+
+        {/* 01 Name */}
+        <section>
+          <p style={eyebrow}>01 — Tournament name</p>
+          <input
+            className="lp-input"
+            placeholder="e.g. Spring Invitational"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && handleCreate()}
+          />
+        </section>
+
+        <div style={rule}><div style={ruleDot} /><div style={ruleLine} /></div>
+
+        {/* 02 Bracket size */}
+        <section>
+          <p style={eyebrow}>02 — Bracket size</p>
           {([4, 8] as const).map(s => (
             <div
               key={s}
               onClick={() => setSize(s)}
-              style={{
-                padding: "16px", borderRadius: 8, cursor: "pointer", textAlign: "center",
-                background: size === s ? "var(--accent)" : "var(--card)",
-                border: `0.5px solid ${size === s ? "var(--accent)" : "var(--line-strong)"}`,
-              }}
+              style={{ display: "flex", alignItems: "center", gap: 18, padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.08)", cursor: "pointer" }}
             >
-              <p style={{ fontWeight: 700, fontSize: 20, margin: "0 0 4px", color: size === s ? "var(--accent-ink)" : "var(--ink)" }}>{s}</p>
-              <p style={{ fontSize: 11, margin: 0, color: size === s ? "var(--accent-ink)" : "var(--muted)" }}>
-                {s === 4 ? "Semis + Final" : "QF + Semis + Final"}
-              </p>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 15, color: size === s ? "var(--accent)" : "rgba(255,255,255,0.22)", transition: "color 0.15s", lineHeight: 1 }}>
+                {size === s ? "●" : "○"}
+              </span>
+              <div>
+                <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: size === s ? "#fff" : "rgba(255,255,255,0.50)", textShadow: "0 1px 6px rgba(0,0,0,0.35)", transition: "color 0.15s" }}>
+                  {s} players
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.32)" }}>
+                  {s === 4 ? "Semifinals + Final" : "Quarterfinals + Semifinals + Final"}
+                </p>
+              </div>
             </div>
           ))}
+        </section>
+
+        <div style={rule}><div style={ruleDot} /><div style={ruleLine} /></div>
+
+        {/* 03 Topic */}
+        <section>
+          <p style={eyebrow}>03 — Shared topic (optional)</p>
+          <input
+            className="lp-input"
+            placeholder="All rounds debate this resolution"
+            value={topic}
+            onChange={e => setTopic(e.target.value)}
+          />
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.30)", margin: "10px 0 0" }}>
+            If blank, each match uses a generic "Tournament Match" topic.
+          </p>
+        </section>
+
+        <div style={{ marginTop: "clamp(40px, 7vh, 64px)" }}>
+          <button onClick={handleCreate} disabled={loading} className="db-btn db-btn--accent db-btn--block db-btn--lg">
+            {loading ? "Creating…" : "Create tournament"}
+            {!loading && <span className="db-btn__arrow" aria-hidden="true">→</span>}
+          </button>
         </div>
-      </div>
 
-      <div className="db-rise" style={{ ...card, "--i": "3" } as React.CSSProperties}>
-        <p style={sectionLabel}>3. Shared topic (optional)</p>
-        <input
-          style={inputStyle}
-          placeholder="All rounds debate this resolution"
-          value={topic}
-          onChange={e => setTopic(e.target.value)}
-        />
-        <p style={{ margin: "8px 0 0", fontSize: 11, color: "var(--muted)" }}>
-          If left blank, each match uses a generic "Tournament Match" topic.
-        </p>
       </div>
-
-      <button onClick={handleCreate} disabled={loading} style={primaryBtn}>
-        {loading ? "Creating…" : "Create tournament"}
-      </button>
-    </div>
+    </>
   );
 }
 
-const card: React.CSSProperties = {
-  background: "var(--card)", border: "0.5px solid var(--line)",
-  borderRadius: 14, padding: "18px 20px", marginBottom: 12,
-};
-const sectionLabel: React.CSSProperties = {
-  fontSize: 10, fontWeight: 500, color: "var(--muted)",
-  textTransform: "uppercase", letterSpacing: "0.12em", margin: "0 0 12px",
-};
-const inputStyle: React.CSSProperties = {
-  width: "100%", boxSizing: "border-box", height: 42, padding: "0 13px",
-  background: "var(--card)", border: "0.5px solid var(--line-strong)",
-  borderRadius: 8, fontSize: 14, color: "var(--ink)", outline: "none",
-};
-const ghostBtn: React.CSSProperties = {
-  background: "transparent", border: "0.5px solid var(--line-strong)",
-  borderRadius: 8, padding: "8px 14px", fontSize: 14, color: "var(--muted)", cursor: "pointer",
-};
-const primaryBtn: React.CSSProperties = {
-  width: "100%", height: 46, background: "var(--accent)", color: "var(--accent-ink)",
-  border: "none", borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: "pointer", marginTop: 4,
-};
+const backBtn: CSSProperties = { background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.65)", padding: "8px 0", textShadow: "0 1px 4px rgba(0,0,0,0.35)" };
+const heroTitle: CSSProperties = { fontFamily: "var(--font-display)", fontSize: "clamp(52px, 11vw, 100px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.02em", margin: 0, lineHeight: 0.92, textShadow: "0 2px 20px rgba(0,0,0,0.45), 0 8px 40px rgba(0,0,0,0.22)" };
+const eyebrow: CSSProperties = { fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 16px", textShadow: "0 1px 4px rgba(0,0,0,0.30)" };
+const rule: CSSProperties = { display: "flex", alignItems: "center", gap: 12, margin: "clamp(28px, 5vh, 44px) 0" };
+const ruleDot: CSSProperties = { width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 };
+const ruleLine: CSSProperties = { flex: 1, height: 1, background: "rgba(255,255,255,0.15)" };

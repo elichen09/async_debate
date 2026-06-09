@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Barlow_Condensed, Chivo } from "next/font/google";
+import { Geist_Mono, Fraunces, Lora } from "next/font/google";
 import "./globals.css";
 import NavBar from "./components/NavBar";
 import ParticleField from "./components/ParticleField";
+import SiteFooter from "./components/SiteFooter";
 import { Analytics } from "@vercel/analytics/next"
 
 const geistMono = Geist_Mono({
@@ -10,17 +11,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const barlowCondensed = Barlow_Condensed({
+const fraunces = Fraunces({
   variable: "--font-barlow",
   subsets: ["latin"],
-  weight: ["400", "600", "700", "800"],
+  weight: ["400", "600", "700", "800", "900"],
   style: ["normal", "italic"],
 });
 
-const chivo = Chivo({
+const lora = Lora({
   variable: "--font-chivo",
   subsets: ["latin"],
-  weight: ["300", "400", "700"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
 });
 
 export const metadata: Metadata = {
@@ -37,7 +39,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistMono.variable} ${barlowCondensed.variable} ${chivo.variable} antialiased`}
+      className={`${geistMono.variable} ${fraunces.variable} ${lora.variable} antialiased`}
     >
       <head />
       <body>
@@ -45,6 +47,7 @@ export default function RootLayout({
           <ParticleField />
           <NavBar />
           <main className="db-main">{children}</main>
+          <SiteFooter />
         </div>
         <Analytics />
       </body>

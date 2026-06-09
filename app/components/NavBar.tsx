@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
-const HIDE_ON = ["/", "/login", "/signup", "/about", "/founders"];
+const HIDE_ON = ["/", "/login", "/signup", "/about", "/founders", "/future", "/terms", "/privacy"];
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Rounds" },
@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { href: "/watch", label: "Watch" },
   { href: "/history", label: "History" },
   { href: "/judge", label: "Judge" },
+  { href: "/future", label: "Future" },
 ];
 
 export default function TopNav() {
