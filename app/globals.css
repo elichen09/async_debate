@@ -1589,15 +1589,23 @@ input, button, textarea, select { font-family: inherit; }
   will-change: transform;
 }
 @media (prefers-reduced-motion: reduce) { .db-drag-card { animation: none; } }
+/* Once gh-focus-in has completed, switch to float-only so the entrance can never restart */
+.db-drag-card.is-entered {
+  animation: gh-float 4.8s ease-in-out infinite;
+}
 .db-drag-card.is-active {
   z-index: 200;
   box-shadow:
     0 28px 72px oklch(0 0 0 / 0.28),
     0 8px 24px oklch(0 0 0 / 0.14);
   border-radius: var(--radius);
-  transform: scale(1.018) rotate(-0.4deg);
-  transition: transform 0.18s var(--ease-out-quint), box-shadow 0.18s ease;
-  animation: none;
+  scale: 1.018;
+  rotate: -0.4deg;
+  transition: scale 0.18s var(--ease-out-quint), box-shadow 0.18s ease;
+  animation-play-state: paused;
+}
+.db-drag-card.is-entered.is-active {
+  animation-play-state: paused;
 }
 .db-drag-card.is-active * {
   cursor: grabbing !important;

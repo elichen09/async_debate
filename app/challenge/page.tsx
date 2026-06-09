@@ -17,7 +17,7 @@ export default function ChallengePage() {
   const [results, setResults] = useState<Profile[]>([]);
   const [selected, setSelected] = useState<Profile | null>(null);
   const [topic, setTopic] = useState("");
-  const [side, setSide] = useState<"pro" | "con">("pro");
+  const [pick, setPick] = useState<"pro" | "con" | "first" | "second">("pro");
   const [isRanked, setIsRanked] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -39,11 +39,15 @@ export default function ChallengePage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push("/login"); return; }
     const myId = session.user.id;
+    // For side picks, assign roles now. For order picks, challenger is pro provisionally.
+    const pro_id = pick === "con" ? selected.id : myId;
+    const con_id = pick === "con" ? myId : selected.id;
     const { error } = await supabase.from("rounds").insert({
       topic,
-      pro_id: side === "pro" ? myId : selected.id,
-      con_id: side === "con" ? myId : selected.id,
+      pro_id,
+      con_id,
       challenger_id: myId,
+      challenger_pick: pick,
       status: "pending",
       current_speech: 1,
       is_ranked: isRanked,
@@ -103,12 +107,17 @@ export default function ChallengePage() {
 
       {/* Step 3 */}
       <div className="db-rise" style={{ ...card, '--i': '3' } as React.CSSProperties}>
-        <p style={sectionLabel}>3. Choose your side</p>
+        <p style={sectionLabel}>3. Choose your pick</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          {(["pro", "con"] as const).map(s => (
-            <div key={s} onClick={() => setSide(s)} style={{ padding: "14px 16px", borderRadius: 8, cursor: "pointer", textAlign: "center", background: side === s ? "var(--accent)" : "var(--card)", border: `0.5px solid ${side === s ? "var(--accent)" : "var(--line-strong)"}` }}>
-              <p style={{ fontWeight: 600, margin: "0 0 4px", fontSize: 14, color: side === s ? "var(--accent-ink)" : "var(--ink)" }}>{s === "pro" ? "Pro" : "Con"}</p>
-              <p style={{ fontSize: 12, margin: 0, color: side === s ? "var(--accent-ink)" : "var(--muted)" }}>{s === "pro" ? "You speak first" : "Opponent speaks first"}</p>
+          {([
+            { value: "pro",    label: "Pro",    sub: "You're Pro · opponent picks order" },
+            { value: "con",    label: "Con",    sub: "You're Con · opponent picks order" },
+            { value: "first",  label: "1st",   sub: "You speak first · opponent picks side" },
+            { value: "second", label: "2nd",   sub: "You speak second · opponent picks side" },
+          ] as const).map(opt => (
+            <div key={opt.value} onClick={() => setPick(opt.value)} style={{ padding: "14px 16px", borderRadius: 8, cursor: "pointer", textAlign: "center", background: pick === opt.value ? "var(--accent)" : "var(--card)", border: `0.5px solid ${pick === opt.value ? "var(--accent)" : "var(--line-strong)"}` }}>
+              <p style={{ fontWeight: 600, margin: "0 0 4px", fontSize: 14, color: pick === opt.value ? "var(--accent-ink)" : "var(--ink)" }}>{opt.label}</p>
+              <p style={{ fontSize: 11, margin: 0, color: pick === opt.value ? "var(--accent-ink)" : "var(--muted)" }}>{opt.sub}</p>
             </div>
           ))}
         </div>

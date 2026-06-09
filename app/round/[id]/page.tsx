@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AudioPlayer from "@/app/components/AudioPlayer";
 
-const SPEECH_ORDER = [
+const PRO_FIRST_ORDER = [
   { label: "Pro Constructive", role: "pro" },
   { label: "Con Constructive", role: "con" },
   { label: "Pro Rebuttal", role: "pro" },
@@ -14,6 +14,16 @@ const SPEECH_ORDER = [
   { label: "Con Summary", role: "con" },
   { label: "Pro Final Focus", role: "pro" },
   { label: "Con Final Focus", role: "con" },
+];
+const CON_FIRST_ORDER = [
+  { label: "Con Constructive", role: "con" },
+  { label: "Pro Constructive", role: "pro" },
+  { label: "Con Rebuttal", role: "con" },
+  { label: "Pro Rebuttal", role: "pro" },
+  { label: "Con Summary", role: "con" },
+  { label: "Pro Summary", role: "pro" },
+  { label: "Con Final Focus", role: "con" },
+  { label: "Pro Final Focus", role: "pro" },
 ];
 
 interface Speech {
@@ -29,6 +39,7 @@ interface Round {
   status: string;
   pro_id: string;
   con_id: string;
+  con_goes_first: boolean;
   current_speech: number;
   is_ranked: boolean;
   pro: { username: string; display_name: string };
@@ -81,7 +92,7 @@ export default function RoundPage() {
       const { data: roundData } = await supabase
         .from("rounds")
         .select(`
-          id, topic, status, pro_id, con_id, current_speech, is_ranked,
+          id, topic, status, pro_id, con_id, con_goes_first, current_speech, is_ranked,
           pro:profiles!pro_id(username, display_name),
           con:profiles!con_id(username, display_name)
         `)
@@ -178,8 +189,9 @@ export default function RoundPage() {
     setError("");
     setUploading(true);
 
+    const speechOrder = round.con_goes_first ? CON_FIRST_ORDER : PRO_FIRST_ORDER;
     const currentIndex = round.current_speech - 1;
-    const position = SPEECH_ORDER[currentIndex].label.toLowerCase().replace(/ /g, "_");
+    const position = speechOrder[currentIndex].label.toLowerCase().replace(/ /g, "_");
     const path = `${round.id}/${position}_${Date.now()}.webm`;
 
     const { error: uploadError } = await supabase.storage
@@ -208,8 +220,9 @@ export default function RoundPage() {
     setError("");
     setUploading(true);
 
+    const speechOrder = round.con_goes_first ? CON_FIRST_ORDER : PRO_FIRST_ORDER;
     const currentIndex = round.current_speech - 1;
-    const position = SPEECH_ORDER[currentIndex].label.toLowerCase().replace(/ /g, "_");
+    const position = speechOrder[currentIndex].label.toLowerCase().replace(/ /g, "_");
     const path = `${round.id}/${position}_${Date.now()}.mp3`;
 
     const { error: uploadError } = await supabase.storage
@@ -264,6 +277,7 @@ export default function RoundPage() {
 
   if (!round) return null;
 
+  const SPEECH_ORDER = round.con_goes_first ? CON_FIRST_ORDER : PRO_FIRST_ORDER;
   const currentIndex = round.current_speech - 1;
   const currentSpeech = SPEECH_ORDER[currentIndex];
   const isMyTurn = currentSpeech?.role === myRole && round.status === "active" && isParticipant;

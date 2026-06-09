@@ -19,6 +19,8 @@ interface Round {
   pro_id: string;
   con_id: string;
   challenger_id: string;
+  challenger_pick: string;
+  con_goes_first: boolean;
   current_speech: number;
   winner_id: string;
   is_ranked: boolean;
@@ -52,6 +54,7 @@ export default function DashboardPage() {
   const [staleRounds, setStaleRounds] = useState<Round[]>([]);
   const [lastSpeechMap, setLastSpeechMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [acceptPick, setAcceptPick] = useState<Record<string, string>>({});
 
   // Section card positions
   const [positions, setPositions] = useState<Record<string, Pos>>({});
@@ -66,6 +69,7 @@ export default function DashboardPage() {
   const profileDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const profileRafRef = useRef<number>(0);
   const [profileDragging, setProfileDragging] = useState(false);
+  const [enteredCards, setEnteredCards] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -110,7 +114,7 @@ export default function DashboardPage() {
       const { data: rounds } = await supabase
         .from("rounds")
         .select(`
-          id, topic, status, pro_id, con_id, challenger_id, current_speech, winner_id, is_ranked, created_at,
+          id, topic, status, pro_id, con_id, challenger_id, challenger_pick, con_goes_first, current_speech, winner_id, is_ranked, created_at,
           pro:profiles!pro_id(username, display_name, elo),
           con:profiles!con_id(username, display_name, elo)
         `)
@@ -146,7 +150,7 @@ export default function DashboardPage() {
       const { data: pubRounds } = await supabase
         .from("rounds")
         .select(`
-          id, topic, status, pro_id, con_id, challenger_id, current_speech, winner_id, is_ranked, created_at,
+          id, topic, status, pro_id, con_id, challenger_id, challenger_pick, con_goes_first, current_speech, winner_id, is_ranked, created_at,
           pro:profiles!pro_id(username, display_name, elo),
           con:profiles!con_id(username, display_name, elo)
         `)
@@ -161,8 +165,42 @@ export default function DashboardPage() {
     load();
   }, []);
 
-  async function handleAccept(roundId: string) {
-    await supabase.from("rounds").update({ status: "active" }).eq("id", roundId);
+  async function handleAccept(round: Round, opponentChoice: string) {
+    const myId = userId;
+    const challengerId = round.challenger_id;
+    const opponentId = myId;
+    const cp = round.challenger_pick;
+
+    let pro_id = round.pro_id;
+    let con_id = round.con_id;
+    let con_goes_first = false;
+
+    if (cp === "pro" || cp === "con") {
+      // Challenger picked side; opponentChoice is "first" or "second"
+      // pro_id/con_id are already correct; just compute con_goes_first
+      if (cp === "pro") {
+        // challenger=pro, opponent=con; opponent goes first if they picked "first"
+        con_goes_first = opponentChoice === "first";
+      } else {
+        // challenger=con, opponent=pro; challenger(con) goes first if opponent picked "second"
+        con_goes_first = opponentChoice === "second";
+      }
+    } else {
+      // Challenger picked order ("first"/"second"); opponentChoice is "pro" or "con"
+      if (opponentChoice === "pro") {
+        // opponent=pro, challenger=con
+        pro_id = opponentId;
+        con_id = challengerId;
+        con_goes_first = cp === "first"; // challenger(con) goes first if they picked "first"
+      } else {
+        // opponent=con, challenger=pro
+        pro_id = challengerId;
+        con_id = opponentId;
+        con_goes_first = cp === "second"; // challenger(pro) goes second → con goes first
+      }
+    }
+
+    await supabase.from("rounds").update({ status: "active", pro_id, con_id, con_goes_first }).eq("id", round.id);
     window.location.reload();
   }
   async function handleDecline(roundId: string) {
@@ -241,6 +279,12 @@ export default function DashboardPage() {
     "Pro Rebuttal", "Con Rebuttal",
     "Pro Summary", "Con Summary",
     "Pro Final Focus", "Con Final Focus",
+  ];
+  const conFirstLabels = [
+    "Con Constructive", "Pro Constructive",
+    "Con Rebuttal", "Pro Rebuttal",
+    "Con Summary", "Pro Summary",
+    "Con Final Focus", "Pro Final Focus",
   ];
   const otherPublicRounds = publicRounds.filter(r => r.pro_id !== userId && r.con_id !== userId);
   const topRound = otherPublicRounds.length > 0
@@ -348,7 +392,15 @@ export default function DashboardPage() {
                 </div>
                 {incoming.map(r => {
                   const opponent = r.challenger_id === r.pro_id ? r.pro : r.con;
-                  const myRole = r.pro_id === userId ? "Pro" : "Con";
+                  const cp = r.challenger_pick;
+                  const picksSide = cp === "pro" || cp === "con";
+                  const myRoleKnown = picksSide;
+                  const myRole = picksSide ? (cp === "pro" ? "Con" : "Pro") : null;
+                  const choiceOptions = picksSide
+                    ? [{ value: "first", label: "1st", sub: "I speak first" }, { value: "second", label: "2nd", sub: "I speak second" }]
+                    : [{ value: "pro", label: "Pro", sub: "Affirm the resolution" }, { value: "con", label: "Con", sub: "Negate the resolution" }];
+                  const challengerPickLabel = cp === "pro" ? "Pro" : cp === "con" ? "Con" : cp === "first" ? "1st speaker" : "2nd speaker";
+                  const myChoice = acceptPick[r.id];
                   return (
                     <div key={r.id} className="db-challenge-card db-challenge-card--flat">
                       <div className="db-challenge-card__hd">
@@ -358,10 +410,18 @@ export default function DashboardPage() {
                         </span>
                       </div>
                       <p className="db-challenge-card__meta">
-                        from @{opponent?.username} (ELO {opponent?.elo}) · you are {myRole}
+                        from @{opponent?.username} (ELO {opponent?.elo}) · they picked {challengerPickLabel}{myRoleKnown ? ` · you are ${myRole}` : ""}
                       </p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, margin: "10px 0" }}>
+                        {choiceOptions.map(opt => (
+                          <div key={opt.value} onClick={() => setAcceptPick(p => ({ ...p, [r.id]: opt.value }))} style={{ padding: "10px 12px", borderRadius: 8, cursor: "pointer", textAlign: "center", background: myChoice === opt.value ? "var(--accent)" : "var(--card)", border: `0.5px solid ${myChoice === opt.value ? "var(--accent)" : "var(--line-strong)"}` }}>
+                            <p style={{ fontWeight: 600, margin: "0 0 2px", fontSize: 13, color: myChoice === opt.value ? "var(--accent-ink)" : "var(--ink)" }}>{opt.label}</p>
+                            <p style={{ fontSize: 11, margin: 0, color: myChoice === opt.value ? "var(--accent-ink)" : "var(--muted)" }}>{opt.sub}</p>
+                          </div>
+                        ))}
+                      </div>
                       <div className="db-challenge-card__btns">
-                        <button onClick={() => handleAccept(r.id)} className="db-btn db-btn--accent db-btn--sm">Accept</button>
+                        <button onClick={() => myChoice && handleAccept(r, myChoice)} disabled={!myChoice} className="db-btn db-btn--accent db-btn--sm" style={{ opacity: myChoice ? 1 : 0.4 }}>Accept</button>
                         <button onClick={() => handleDecline(r.id)} className="db-btn db-btn--ghost db-btn--sm">Decline</button>
                       </div>
                     </div>
@@ -382,7 +442,10 @@ export default function DashboardPage() {
                   const myRole = r.pro_id === userId ? "pro" : "con";
                   const opponent = myRole === "pro" ? r.con : r.pro;
                   const currentSpeech = r.current_speech || 1;
-                  const isMyTurn = (currentSpeech % 2 === 1 && myRole === "pro") || (currentSpeech % 2 === 0 && myRole === "con");
+                  const conFirst = r.con_goes_first;
+                  const isMyTurn = conFirst
+                    ? (currentSpeech % 2 === 0 && myRole === "pro") || (currentSpeech % 2 === 1 && myRole === "con")
+                    : (currentSpeech % 2 === 1 && myRole === "pro") || (currentSpeech % 2 === 0 && myRole === "con");
                   const isStale = staleRounds.some(s => s.id === r.id);
                   const progress = ((currentSpeech - 1) / 8) * 100;
                   return (
@@ -397,7 +460,7 @@ export default function DashboardPage() {
                           {r.is_ranked && <span className="db-badge db-badge--turn">Ranked</span>}
                         </div>
                         <p className="db-round-row__meta">
-                          vs @{opponent?.username} (ELO {opponent?.elo}) · {myRole === "pro" ? "Pro" : "Con"} · {speechLabels[currentSpeech - 1]}
+                          vs @{opponent?.username} (ELO {opponent?.elo}) · {myRole === "pro" ? "Pro" : "Con"} · {(conFirst ? conFirstLabels : speechLabels)[currentSpeech - 1]}
                         </p>
                         <div className="db-round-row__bar-row">
                           <div className="db-round-row__bar">
@@ -474,8 +537,13 @@ export default function DashboardPage() {
           return (
             <div
               key={key}
-              className={`db-drag-card${isDragging ? " is-active" : ""}`}
+              className={`db-drag-card${enteredCards.has(key) ? " is-entered" : ""}${isDragging ? " is-active" : ""}`}
               style={{ left: pos.x, top: pos.y, '--i': String(keyIndex) } as React.CSSProperties}
+              onAnimationEnd={(e) => {
+                if (e.animationName === 'gh-focus-in') {
+                  setEnteredCards(prev => new Set([...prev, key]));
+                }
+              }}
             >
               {content}
             </div>
