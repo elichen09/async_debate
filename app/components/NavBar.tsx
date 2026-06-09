@@ -10,6 +10,7 @@ const HIDE_ON = ["/", "/login", "/signup", "/about", "/founders"];
 const NAV_LINKS = [
   { href: "/dashboard", label: "Rounds" },
   { href: "/challenge", label: "Challenge" },
+  { href: "/tournaments", label: "Tournaments" },
   { href: "/watch", label: "Watch" },
   { href: "/history", label: "History" },
   { href: "/judge", label: "Judge" },
