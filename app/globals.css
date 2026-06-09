@@ -1207,9 +1207,13 @@ input, button, textarea, select { font-family: inherit; }
    SITE FOOTER BAR
    ========================================================================= */
 .site-footer {
+  position: fixed;
+  bottom: 16px;
+  left: 0;
+  right: 0;
+  z-index: 50;
   display: flex;
   justify-content: center;
-  padding: 24px 24px 32px;
   pointer-events: none;
 }
 

@@ -11,29 +11,29 @@ const RESOURCES = [
   {
     label: "Truth testing",
     href: "https://docs.google.com/document/d/17cOfmAwSP-ODgqeFzNdAUmHc7bRttFZjcL7EpZqjhj0/edit?tab=t.0#heading=h.ipza44bmzcud",
-    desc: "Core framework for evaluating evidence and argument validity.",
+    desc: "Cute little framework for phils rounds, written by Eli and Rahul",
     tag: "Framework",
     indent: "0%",
   },
   {
     label: "AT: K framework",
     href: "https://docs.google.com/document/d/1FyiP2N9a3ajzwBiFsR9CEPgbsXc35lt8iZyWJEW1DwI/edit?tab=t.0",
-    desc: "Answers to kritik-style framework challenges.",
+    desc: "Answers to kritik framework - includes evidence indicts.",
     tag: "Blocks",
     indent: "8%",
   },
   {
     label: "AT: slop",
     href: "https://docs.google.com/document/d/1Mb6uBV8zEtvwM4A1G7dmejVBK6p9PgU9JSrBg_NznuE/edit?tab=t.0",
-    desc: "Blocks against low-quality or blippy arguments.",
+    desc: "Blocks against utter slop.",
     tag: "Blocks",
     indent: "4%",
   },
   {
     label: "Skep",
     href: "https://docs.google.com/document/d/1A52OX5VNW72JGsQ2gfezqaUbOZJl78Lla1XYohGaTtU/edit?tab=t.0",
-    desc: "Skepticism theory — positions, answers, and implications.",
-    tag: "Theory",
+    desc: "Fun skep shell for some unserious rounds.",
+    tag: "Phil",
     indent: "14%",
   },
 ];
@@ -210,7 +210,7 @@ export default function FuturePage() {
                 Help build<br />Grasshopper.
               </h2>
               <p style={{ fontSize: 14, color: "rgba(255,255,255,0.52)", lineHeight: 1.70, margin: 0, textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
-                We&rsquo;re looking for debaters with coding skills — or coders with debate interest. Share your accomplishments and we&rsquo;ll be in touch.
+                We&rsquo;re looking for debaters with coding skills — or coders with debate interest. Or people who want to help advertise! Share your accomplishments and we&rsquo;ll be in touch.
               </p>
             </div>
 
