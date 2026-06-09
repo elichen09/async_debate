@@ -85,7 +85,7 @@ export default function FoundersPage() {
             textShadow: "0 1px 8px rgba(0,0,0,0.40)",
           } as CSSProperties}
         >
-          Grasshopper was built by Eli and Gary, a whimsical little website to practice and have fun. We hope this website brings a smile to your face. 
+          Grasshopper is a whimsical little website to practice and have fun. We hope this website brings a smile to your face. 
         </p>
       </section>
 

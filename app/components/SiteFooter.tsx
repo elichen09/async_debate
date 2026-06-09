@@ -1,6 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export default function SiteFooter() {
+  const pathname = usePathname();
+  if (pathname === "/") return null;
   return (
     <footer className="site-footer">
       <span className="site-footer__text">
