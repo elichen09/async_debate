@@ -40,6 +40,7 @@ export default function ParticleField() {
     if (!ctx) return;
 
     let raf: number;
+    let running = false;
     let particles: Particle[] = [];
 
     function resize() {
@@ -85,9 +86,18 @@ export default function ParticleField() {
       raf = requestAnimationFrame(frame);
     }
 
-    frame();
+    // Pause entirely while the scene is toggled off (html.gh-bg-off)
+    function syncRunning() {
+      const shouldRun = !document.documentElement.classList.contains("gh-bg-off");
+      if (shouldRun && !running) { running = true; frame(); }
+      if (!shouldRun && running) { running = false; cancelAnimationFrame(raf); }
+    }
+    const observer = new MutationObserver(syncRunning);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    syncRunning();
 
     return () => {
+      observer.disconnect();
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
@@ -97,6 +107,7 @@ export default function ParticleField() {
     <canvas
       ref={canvasRef}
       aria-hidden="true"
+      className="gh-particles"
       style={{
         position: "fixed",
         inset: 0,

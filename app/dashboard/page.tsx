@@ -31,6 +31,15 @@ interface Round {
 
 interface Pos { x: number; y: number; }
 
+// Whose speech is the round waiting on?
+function isMyTurnIn(r: Round, uid: string): boolean {
+  const myRole = r.pro_id === uid ? "pro" : "con";
+  const cs = r.current_speech || 1;
+  return r.con_goes_first
+    ? (cs % 2 === 0 && myRole === "pro") || (cs % 2 === 1 && myRole === "con")
+    : (cs % 2 === 1 && myRole === "pro") || (cs % 2 === 0 && myRole === "con");
+}
+
 const SECTION_KEYS = ["cta", "incoming", "active", "outgoing", "watch"] as const;
 type SectionKey = typeof SECTION_KEYS[number];
 
@@ -141,8 +150,11 @@ export default function DashboardPage() {
       }
       setLastSpeechMap(speechMap);
 
+      // Only warn the debater who actually owes the next speech. The player
+      // who is waiting on their opponent gets no countdown alarm.
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       setStaleRounds(activeRounds.filter(r => {
+        if (!isMyTurnIn(r, id)) return false;
         const lastActivity = speechMap[r.id] || r.created_at;
         return lastActivity < oneDayAgo;
       }));
@@ -329,7 +341,7 @@ export default function DashboardPage() {
             return (
               <div key={r.id} className="db-stale-alert">
                 <div>
-                  <p className="db-stale-alert__title">Round expiring — {hoursLeft}h left</p>
+                  <p className="db-stale-alert__title">Your speech is due · {hoursLeft}h left</p>
                   <p className="db-stale-alert__sub">{r.topic} · vs @{opponent?.username}</p>
                 </div>
                 <button onClick={() => router.push(`/round/${r.id}`)} className="db-btn db-btn--sm db-btn--accent" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
@@ -443,9 +455,7 @@ export default function DashboardPage() {
                   const opponent = myRole === "pro" ? r.con : r.pro;
                   const currentSpeech = r.current_speech || 1;
                   const conFirst = r.con_goes_first;
-                  const isMyTurn = conFirst
-                    ? (currentSpeech % 2 === 0 && myRole === "pro") || (currentSpeech % 2 === 1 && myRole === "con")
-                    : (currentSpeech % 2 === 1 && myRole === "pro") || (currentSpeech % 2 === 0 && myRole === "con");
+                  const isMyTurn = isMyTurnIn(r, userId);
                   const isStale = staleRounds.some(s => s.id === r.id);
                   const progress = ((currentSpeech - 1) / 8) * 100;
                   return (

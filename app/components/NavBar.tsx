@@ -4,12 +4,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import SceneToggle from "./SceneToggle";
 
 const HIDE_ON = ["/", "/login", "/signup", "/about", "/founders", "/future", "/terms", "/privacy"];
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Rounds" },
   { href: "/challenge", label: "Challenge" },
+  { href: "/rankings", label: "Rankings" },
   { href: "/tournaments", label: "Tournaments" },
   { href: "/watch", label: "Watch" },
   { href: "/history", label: "History" },
@@ -65,27 +67,30 @@ export default function TopNav() {
           </svg>
         </button>
 
-        <div className="gh-topnav__left">
-          {NAV_LINKS.map(link => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`gh-topnav__link ${isActive(link.href) ? "is-active" : ""}`}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-
         <Link href="/dashboard" className="gh-topnav__brand">
           GRASS<b>H</b>OPPER
         </Link>
 
         <div className="gh-topnav__right">
+          <SceneToggle />
           {elo !== null && <span className="gh-topnav__elo">{elo}</span>}
           {username && <span className="gh-topnav__username">@{username}</span>}
           <button onClick={handleSignOut} className="gh-topnav__out">Sign out</button>
         </div>
+      </nav>
+
+      {/* Vertical rail: the primary links live on the left edge, rotated 90° */}
+      <nav className="gh-siderail" aria-label="Primary">
+        {NAV_LINKS.map((link, i) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={`gh-siderail__link ${isActive(link.href) ? "is-active" : ""}`}
+            style={{ "--i": String(i) } as React.CSSProperties}
+          >
+            {link.label}
+          </Link>
+        ))}
       </nav>
 
       <div
@@ -107,6 +112,9 @@ export default function TopNav() {
           </Link>
         ))}
         {username && <p className="gh-drawer__user">@{username} · ELO {elo}</p>}
+        <div style={{ padding: "8px 12px" }}>
+          <SceneToggle />
+        </div>
         <button onClick={handleSignOut} className="gh-drawer__out">Sign out</button>
       </aside>
     </>

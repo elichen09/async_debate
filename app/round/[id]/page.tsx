@@ -406,9 +406,20 @@ export default function RoundPage() {
         <section>
           <p style={eyebrow}>Judge's decision</p>
 
-          <p style={{ fontFamily: "var(--font-display)", fontSize: "clamp(36px, 8vw, 72px)", fontWeight: 800, letterSpacing: "-0.02em", color: ballot.winner_id === userId ? "var(--accent)" : "rgba(255,255,255,0.55)", margin: "0 0 24px", textShadow: "0 2px 20px rgba(0,0,0,0.45)", lineHeight: 0.95 }}>
-            {ballot.winner_id === userId ? "You won." : "You lost."}
-          </p>
+          <div className={`gh-verdict ${ballot.winner_id === userId ? "gh-verdict--win" : "gh-verdict--loss"}`}>
+            {isParticipant && ballot.winner_id === userId && (
+              <span className="gh-verdict__burst" aria-hidden="true">
+                {Array.from({ length: 14 }).map((_, i) => (
+                  <i key={i} style={{ "--a": `${(360 / 14) * i}deg`, "--d": `${56 + (i % 4) * 22}px`, "--t": `${0.45 + (i % 5) * 0.12}s` } as CSSProperties} />
+                ))}
+              </span>
+            )}
+            <p className="gh-verdict__text">
+              {!isParticipant
+                ? `${ballot.winner_id === round.pro_id ? "Pro" : "Con"} won.`
+                : ballot.winner_id === userId ? "You won." : "You lost."}
+            </p>
+          </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 clamp(24px, 5vw, 56px)", marginBottom: 28 }}>
             {[{ label: "Pro speaks", value: ballot.pro_speaks }, { label: "Con speaks", value: ballot.con_speaks }].map(s => (

@@ -41,7 +41,15 @@ export default function RootLayout({
       lang="en"
       className={`${geistMono.variable} ${fraunces.variable} ${lora.variable} antialiased`}
     >
-      <head />
+      <head>
+        <script
+          // Apply the saved "scene off" reading mode before first paint
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('gh-bg')==='off')document.documentElement.classList.add('gh-bg-off')}catch(e){}",
+          }}
+        />
+      </head>
       <body>
         <div className="db-shell">
           <ParticleField />
