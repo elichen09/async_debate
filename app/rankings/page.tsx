@@ -12,6 +12,8 @@ import {
 } from "@/lib/elo";
 import type { CSSProperties } from "react";
 
+const TOP_N = 10;
+
 interface RankedProfile {
   id: string;
   username: string;
@@ -165,9 +167,10 @@ export default function RankingsPage() {
     return () => { live = false; };
   }, [selectedId, profiles]);
 
+  // The ladder shows only the top 15; searching reaches the whole ladder.
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return profiles;
+    if (!q) return profiles.slice(0, TOP_N);
     return profiles.filter(p =>
       p.username.toLowerCase().includes(q) ||
       (p.display_name || "").toLowerCase().includes(q)
@@ -185,13 +188,15 @@ export default function RankingsPage() {
 
   function jumpToMe() {
     if (!myId) return;
-    setQuery("");
+    // Outside the top 15 the row only exists once searched for.
+    const me = profiles.find(p => p.id === myId);
+    setQuery(myRank > TOP_N ? me?.username ?? "" : "");
     setSelectedId(myId);
-    requestAnimationFrame(() => {
+    setTimeout(() => {
       rowRefs.current[myId]?.scrollIntoView({ behavior: "smooth", block: "center" });
       setFlashId(myId);
       setTimeout(() => setFlashId(null), 1400);
-    });
+    }, 60);
   }
 
   function selectPlayer(id: string) {
@@ -228,7 +233,7 @@ export default function RankingsPage() {
         <section style={{ paddingTop: "clamp(20px, 4vh, 32px)" }}>
           <h1 className="ab-hero-line" style={{ "--i": "0", ...heroTitle } as CSSProperties}>Rankings</h1>
           <div className="ab-hero-line gh-rank__sub" style={{ "--i": "1" } as CSSProperties}>
-            <span>{total} debater{total !== 1 ? "s" : ""} on the ladder</span>
+            <span>The top {TOP_N} debaters on the ladder</span>
             {myRank > 0 && (
               <button className="gh-rank__me-chip" onClick={jumpToMe}>
                 You are #{myRank} · top {Math.max(1, Math.round((myRank / total) * 100))}%
@@ -288,12 +293,15 @@ export default function RankingsPage() {
 
           {/* ---- Ladder ---- */}
           <div className="gh-rank__list-wrap">
+            <p className="gh-rank__top-label" style={{ fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 12px", textShadow: "0 1px 4px rgba(0,0,0,0.30)" }}>
+              {query.trim() ? "Search results — full ladder" : `Top ${TOP_N} debaters`}
+            </p>
             <input
               className="lp-input gh-rank__search"
-              placeholder="Search the ladder…"
+              placeholder="Search the full ladder…"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              aria-label="Search debaters by name or username"
+              aria-label="Search all debaters by name or username"
             />
 
             {filtered.length === 0 ? (
