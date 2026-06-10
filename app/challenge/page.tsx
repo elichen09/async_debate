@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { CSSProperties } from "react";
@@ -28,16 +28,56 @@ export default function ChallengePage() {
   const [pick, setPick] = useState<"pro" | "con" | "first" | "second">("pro");
   const [isRanked, setIsRanked] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [randomLoading, setRandomLoading] = useState(false);
   const [error, setError] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function handleSearch() {
-    if (!search.trim()) return;
+  const runSearch = useCallback(async (q: string) => {
+    if (!q.trim()) { setResults([]); return; }
     const { data } = await supabase
       .from("profiles")
       .select("id, username, display_name, elo")
-      .ilike("username", `%${search}%`)
-      .limit(5);
+      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+      .limit(8);
     setResults(data || []);
+  }, []);
+
+  function handleSearchChange(val: string) {
+    setSearch(val);
+    if (selected) { setSelected(null); }
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => runSearch(val), 250);
+  }
+
+  async function handleRandomOpponent() {
+    setRandomLoading(true);
+    setError("");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { router.push("/login"); return; }
+    const myId = session.user.id;
+    const { data: me } = await supabase
+      .from("profiles")
+      .select("elo")
+      .eq("id", myId)
+      .single();
+    const myElo = me?.elo ?? 1000;
+    const range = 150;
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, username, display_name, elo")
+      .neq("id", myId)
+      .gte("elo", myElo - range)
+      .lte("elo", myElo + range)
+      .limit(20);
+    setRandomLoading(false);
+    if (!data || data.length === 0) {
+      setError("No opponents found within ±150 ELO. Try a manual search.");
+      return;
+    }
+    const pick = data[Math.floor(Math.random() * data.length)];
+    setSelected(pick);
+    setSearch(pick.display_name || pick.username);
+    setResults([]);
   }
 
   async function handleChallenge() {
@@ -88,13 +128,19 @@ export default function ChallengePage() {
             <input
               className="lp-input"
               style={{ flex: 1 }}
-              placeholder="Search by username"
+              placeholder="Search by name or username…"
               value={search}
-              onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleSearch()}
+              onChange={e => handleSearchChange(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && runSearch(search)}
             />
-            <button onClick={handleSearch} style={searchBtn}>Search</button>
           </div>
+          <button
+            onClick={handleRandomOpponent}
+            disabled={randomLoading}
+            style={randomBtn}
+          >
+            {randomLoading ? "Finding…" : "Random opponent (±150 ELO)"}
+          </button>
 
           {results.map(p => (
             <div
@@ -217,3 +263,4 @@ const rule: CSSProperties = { display: "flex", alignItems: "center", gap: 12, ma
 const ruleDot: CSSProperties = { width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 };
 const ruleLine: CSSProperties = { flex: 1, height: 1, background: "rgba(255,255,255,0.15)" };
 const searchBtn: CSSProperties = { height: 46, padding: "0 20px", background: "rgba(255,255,255,0.10)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 10, fontSize: 13, fontWeight: 500, color: "rgba(255,255,255,0.75)", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "var(--font-body)" };
+const randomBtn: CSSProperties = { display: "flex", alignItems: "center", gap: 8, marginBottom: 16, height: 40, padding: "0 16px", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8, fontSize: 12, fontWeight: 500, color: "rgba(255,255,255,0.60)", cursor: "pointer", fontFamily: "var(--font-body)", letterSpacing: "0.02em" };
