@@ -17,6 +17,8 @@ interface Tournament {
   created_by: string;
   winner_id: string | null;
   created_at: string;
+  format: "open" | "private";
+  join_code: string | null;
 }
 
 interface Profile {
@@ -225,10 +227,12 @@ export default function TournamentPage() {
   const [participants, setParticipants] = useState<TournamentParticipant[]>([]);
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
   const [assignments, setAssignments] = useState<JudgingAssignment[]>([]);
+  const [creatorProfile, setCreatorProfile] = useState<Profile | null>(null);
   const [userId, setUserId] = useState("");
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const autoSynced = useRef(false);
 
@@ -252,7 +256,11 @@ export default function TournamentPage() {
       supabase.from("tournament_judging_assignments").select("*").eq("tournament_id", id),
     ]);
 
-    if (t) setTournament(t as Tournament);
+    if (t) {
+      setTournament(t as Tournament);
+      const { data: cp } = await supabase.from("profiles").select("id, username, display_name, elo").eq("id", t.created_by).single();
+      setCreatorProfile((cp as Profile) || null);
+    }
     setParticipants((p as unknown as TournamentParticipant[]) || []);
     setMatches((m as TournamentMatch[]) || []);
     setAssignments((a as JudgingAssignment[]) || []);
@@ -274,14 +282,57 @@ export default function TournamentPage() {
     await load();
   }
 
+  async function copyJoinCode() {
+    if (!tournament?.join_code) return;
+    await navigator.clipboard.writeText(tournament.join_code);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 1500);
+  }
+
+  // Creator assigns a seed; if another player holds it, the two swap.
+  async function assignSeed(targetUserId: string, newSeed: number) {
+    setActionLoading(true);
+    const target = participants.find(p => p.user_id === targetUserId);
+    const holder = participants.find(p => p.seed === newSeed && p.user_id !== targetUserId);
+    if (holder) {
+      await supabase.from("tournament_participants").update({ seed: target?.seed ?? null }).eq("tournament_id", id).eq("user_id", holder.user_id);
+    }
+    await supabase.from("tournament_participants").update({ seed: newSeed }).eq("tournament_id", id).eq("user_id", targetUserId);
+    setActionLoading(false);
+    await load();
+  }
+
+  async function assignJudge(matchId: string, judgeId: string) {
+    if (!judgeId) return;
+    setActionLoading(true);
+    const existing = assignments.find(a => a.match_id === matchId);
+    if (existing) {
+      if (!existing.completed) {
+        await supabase.from("tournament_judging_assignments").update({ judge_id: judgeId }).eq("id", existing.id);
+      }
+    } else {
+      await supabase.from("tournament_judging_assignments").insert({ tournament_id: id, match_id: matchId, judge_id: judgeId, completed: false });
+    }
+    setActionLoading(false);
+    await load();
+  }
+
   async function startTournament() {
     setError(""); setActionLoading(true);
     if (!tournament) { setActionLoading(false); return; }
     if (matches.length > 0) { setError("Tournament has already been started."); setActionLoading(false); return; }
 
-    const sorted = [...participants].sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime());
-    for (let i = 0; i < sorted.length; i++) {
-      await supabase.from("tournament_participants").update({ seed: i + 1 }).eq("tournament_id", id).eq("user_id", sorted[i].user_id);
+    let sorted: TournamentParticipant[];
+    if (tournament.format === "private") {
+      const seeds = participants.map(p => p.seed);
+      const validSeeds = seeds.every(s => s != null && s >= 1 && s <= tournament.size) && new Set(seeds).size === participants.length;
+      if (!validSeeds) { setError("Assign a unique seed to every player before starting."); setActionLoading(false); return; }
+      sorted = [...participants].sort((a, b) => (a.seed ?? 99) - (b.seed ?? 99));
+    } else {
+      sorted = [...participants].sort((a, b) => new Date(a.joined_at).getTime() - new Date(b.joined_at).getTime());
+      for (let i = 0; i < sorted.length; i++) {
+        await supabase.from("tournament_participants").update({ seed: i + 1 }).eq("tournament_id", id).eq("user_id", sorted[i].user_id);
+      }
     }
 
     const p = sorted;
@@ -324,19 +375,22 @@ export default function TournamentPage() {
 
     await Promise.all(round1.map((m, i) => supabase.from("tournament_matches").update({ round_id: rounds[i].id, status: "active" }).eq("id", m.id)));
 
-    const judgeRows = sz === 4
-      ? [
-          { tournament_id: id, match_id: sm[0].id, judge_id: p[1].user_id, completed: false },
-          { tournament_id: id, match_id: sm[1].id, judge_id: p[0].user_id, completed: false },
-        ]
-      : [
-          { tournament_id: id, match_id: sm[0].id, judge_id: p[2].user_id, completed: false },
-          { tournament_id: id, match_id: sm[1].id, judge_id: p[1].user_id, completed: false },
-          { tournament_id: id, match_id: sm[2].id, judge_id: p[3].user_id, completed: false },
-          { tournament_id: id, match_id: sm[3].id, judge_id: p[0].user_id, completed: false },
-        ];
+    // Private tournaments leave judging to the creator, who assigns judges per match.
+    if (tournament.format !== "private") {
+      const judgeRows = sz === 4
+        ? [
+            { tournament_id: id, match_id: sm[0].id, judge_id: p[1].user_id, completed: false },
+            { tournament_id: id, match_id: sm[1].id, judge_id: p[0].user_id, completed: false },
+          ]
+        : [
+            { tournament_id: id, match_id: sm[0].id, judge_id: p[2].user_id, completed: false },
+            { tournament_id: id, match_id: sm[1].id, judge_id: p[1].user_id, completed: false },
+            { tournament_id: id, match_id: sm[2].id, judge_id: p[3].user_id, completed: false },
+            { tournament_id: id, match_id: sm[3].id, judge_id: p[0].user_id, completed: false },
+          ];
 
-    await supabase.from("tournament_judging_assignments").insert(judgeRows);
+      await supabase.from("tournament_judging_assignments").insert(judgeRows);
+    }
     await supabase.from("tournaments").update({ status: "active" }).eq("id", id);
     setActionLoading(false);
     await load();
@@ -436,14 +490,17 @@ export default function TournamentPage() {
       const { data: newRound } = await supabase.from("rounds").insert({ topic, pro_id: p1Id, con_id: p2Id, challenger_id: userId, challenger_pick: "pro", status: "active", current_speech: 1, is_ranked: false, con_goes_first: false }).select().single();
       if (!newRound) continue;
 
-      const eligible = participants
-        .filter(p => p.user_id !== p1Id && p.user_id !== p2Id)
-        .map(p => ({ uid: p.user_id, load: fa.filter(a => a.judge_id === p.user_id).length }))
-        .sort((a, b) => a.load - b.load);
-      const judgeId = eligible[0]?.uid ?? null;
-
       await supabase.from("tournament_matches").update({ player1_id: p1Id, player2_id: p2Id, round_id: newRound.id, status: "active" }).eq("id", pending.id);
-      if (judgeId) await supabase.from("tournament_judging_assignments").insert({ tournament_id: id, match_id: pending.id, judge_id: judgeId, completed: false });
+
+      // Open tournaments auto-assign the least-loaded judge; private ones wait for the creator.
+      if (tournament?.format !== "private") {
+        const eligible = participants
+          .filter(p => p.user_id !== p1Id && p.user_id !== p2Id)
+          .map(p => ({ uid: p.user_id, load: fa.filter(a => a.judge_id === p.user_id).length }))
+          .sort((a, b) => a.load - b.load);
+        const judgeId = eligible[0]?.uid ?? null;
+        if (judgeId) await supabase.from("tournament_judging_assignments").insert({ tournament_id: id, match_id: pending.id, judge_id: judgeId, completed: false });
+      }
     }
 
     const { data: finalMatch } = await supabase.from("tournament_matches").select("*").eq("tournament_id", id).order("round_number", { ascending: false }).limit(1).single();
@@ -475,7 +532,11 @@ export default function TournamentPage() {
   const isCreator     = tournament.created_by === userId;
   const isParticipant = participants.some(p => p.user_id === userId);
   const isFull        = participants.length >= tournament.size;
-  const canStart      = isCreator && tournament.status === "registration" && isFull;
+  const isPrivate     = tournament.format === "private";
+  const seedsValid    = isFull
+    && participants.every(p => p.seed != null && p.seed >= 1 && p.seed <= tournament.size)
+    && new Set(participants.map(p => p.seed)).size === participants.length;
+  const canStart      = isCreator && tournament.status === "registration" && isFull && (!isPrivate || seedsValid);
   const myStatus      = participants.find(p => p.user_id === userId)?.status;
   const myAssignments = assignments
     .filter(a => a.judge_id === userId)
@@ -483,6 +544,12 @@ export default function TournamentPage() {
     .filter(x => x.match !== null);
   const myActiveMatch = matches.find(m => (m.player1_id === userId || m.player2_id === userId) && m.status === "active");
   const winner = tournament.winner_id ? participants.find(p => p.user_id === tournament.winner_id) : null;
+
+  // Resolves any user on this page — participants, or the creator when they organize without playing.
+  const profileFor = (uid: string | null): Profile | null => {
+    if (!uid) return null;
+    return participants.find(p => p.user_id === uid)?.user ?? (creatorProfile?.id === uid ? creatorProfile : null);
+  };
 
   const statusColor = { registration: "var(--accent)", active: "#fff", complete: "rgba(255,255,255,0.40)" }[tournament.status];
   const statusLabel = { registration: "Open", active: "Live", complete: "Complete" }[tournament.status];
@@ -508,8 +575,20 @@ export default function TournamentPage() {
           <p style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", margin: "0 0 8px", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>{tournament.topic}</p>
         )}
         <p style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em", margin: 0 }}>
-          {tournament.size}-person bracket · {participants.length}/{tournament.size} registered
+          {tournament.size}-person bracket · {participants.length}/{tournament.size} registered{isPrivate && " · Private"}
         </p>
+
+        {isPrivate && tournament.join_code && tournament.status === "registration" && (
+          <div style={{ marginTop: 18, display: "inline-flex", alignItems: "center", gap: 14, padding: "10px 16px", background: "rgba(255,255,255,0.06)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.14)", borderRadius: 8 }}>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,200,80,0.85)" }}>Join code</span>
+            <span style={{ fontFamily: "var(--font-mono)", fontSize: 18, fontWeight: 700, letterSpacing: "0.22em", color: "#fff", textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
+              {tournament.join_code}
+            </span>
+            <button onClick={copyJoinCode} style={{ background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.08em", textTransform: "uppercase", color: codeCopied ? "var(--accent)" : "rgba(255,255,255,0.50)", padding: 0 }}>
+              {codeCopied ? "Copied ✓" : "Copy"}
+            </button>
+          </div>
+        )}
 
         {tournament.status === "complete" && winner && (
           <div style={{ marginTop: 20, display: "flex", alignItems: "center", gap: 14 }}>
@@ -541,18 +620,41 @@ export default function TournamentPage() {
             )}
 
             {participants.map(ptcp => (
-              <div key={ptcp.user_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-                <div>
+              <div key={ptcp.user_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.08)", gap: 12 }}>
+                <div style={{ minWidth: 0 }}>
                   <span style={{ fontSize: 15, fontWeight: ptcp.user_id === userId ? 600 : 400, color: "#fff", textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
                     {ptcp.user.display_name || ptcp.user.username}
                   </span>
                   <span style={{ fontSize: 12, color: "rgba(255,255,255,0.38)", marginLeft: 8 }}>@{ptcp.user.username}</span>
                 </div>
-                <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.38)" }}>
-                  {ptcp.user.elo}
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
+                  {isPrivate && (isCreator ? (
+                    <select
+                      value={ptcp.seed ?? ""}
+                      disabled={actionLoading}
+                      onChange={e => assignSeed(ptcp.user_id, Number(e.target.value))}
+                      style={darkSelect}
+                    >
+                      <option value="" disabled>Seed</option>
+                      {Array.from({ length: tournament.size }, (_, si) => si + 1).map(s => (
+                        <option key={s} value={s}>#{s}</option>
+                      ))}
+                    </select>
+                  ) : ptcp.seed != null ? (
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,200,80,0.85)" }}>#{ptcp.seed}</span>
+                  ) : null)}
+                  <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.38)" }}>
+                    {ptcp.user.elo}
+                  </span>
+                </div>
               </div>
             ))}
+
+            {isPrivate && isCreator && participants.length > 0 && (
+              <p style={{ fontSize: 12, color: "rgba(255,255,255,0.30)", marginTop: 14 }}>
+                Assign a unique seed (1–{tournament.size}) to each player. Seed 1 meets the lowest seed in round one.
+              </p>
+            )}
           </section>
 
           <div style={{ display: "flex", gap: 12, marginTop: "clamp(28px, 5vh, 44px)", flexWrap: "wrap" }}>
@@ -561,7 +663,7 @@ export default function TournamentPage() {
                 {actionLoading ? "Joining…" : "Join tournament"}
               </button>
             )}
-            {isParticipant && !isCreator && (
+            {isParticipant && (!isCreator || isPrivate) && (
               <button onClick={handleLeave} disabled={actionLoading} className="db-btn db-btn--glass" style={{ height: 46, padding: "0 24px", border: "1px solid rgba(200,60,60,0.35)", color: "rgba(255,160,160,0.85)", background: "rgba(200,60,60,0.08)" }}>
                 {actionLoading ? "Leaving…" : "Leave"}
               </button>
@@ -579,6 +681,13 @@ export default function TournamentPage() {
           {!isFull && (
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.30)", marginTop: 16 }}>
               Waiting for {tournament.size - participants.length} more player{tournament.size - participants.length !== 1 ? "s" : ""}.
+              {isPrivate && " Share the join code so players can find this tournament."}
+            </p>
+          )}
+
+          {isCreator && isPrivate && isFull && !seedsValid && (
+            <p style={{ fontSize: 12, color: "rgba(255,200,80,0.85)", marginTop: 16 }}>
+              Assign a unique seed to every player to unlock the start button.
             </p>
           )}
         </>
@@ -597,6 +706,61 @@ export default function TournamentPage() {
           </section>
 
           <div style={rule}><div style={{ ...ruleDot, background: "rgba(255,255,255,0.20)" }} /><div style={ruleLine} /></div>
+
+          {/* Judge assignment — private creator only */}
+          {isPrivate && isCreator && tournament.status === "active" && (
+            <section style={{ marginBottom: "clamp(28px, 5vh, 44px)" }}>
+              <p style={eyebrow}>Assign judges</p>
+              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: "0 0 16px", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
+                Pick a judge for each live match — including yourself, if you&apos;re not debating in it. New matches appear here as the bracket advances.
+              </p>
+              {matches.filter(m => m.status === "active" && m.round_id).length === 0 && (
+                <p style={{ fontSize: 13, color: "rgba(255,255,255,0.40)" }}>No live matches right now.</p>
+              )}
+              {matches.filter(m => m.status === "active" && m.round_id).map(match => {
+                const asgn = assignments.find(a => a.match_id === match.id);
+                const mp1 = profileFor(match.player1_id);
+                const mp2 = profileFor(match.player2_id);
+                const eligible = [
+                  ...participants.map(p => p.user),
+                  ...(creatorProfile && !participants.some(p => p.user_id === creatorProfile.id) ? [creatorProfile] : []),
+                ].filter(prof => prof.id !== match.player1_id && prof.id !== match.player2_id);
+                return (
+                  <div key={match.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.08)", gap: 16 }}>
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 500, color: "#fff", textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
+                        {mp1?.display_name || mp1?.username || "TBD"} vs {mp2?.display_name || mp2?.username || "TBD"}
+                      </p>
+                      <p style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 10, color: "rgba(255,255,255,0.35)", letterSpacing: "0.04em" }}>
+                        Round {match.round_number}, Match {match.match_number}
+                      </p>
+                    </div>
+                    <div style={{ flexShrink: 0 }}>
+                      {asgn?.completed ? (
+                        <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--accent)", letterSpacing: "0.06em" }}>
+                          ✓ {profileFor(asgn.judge_id)?.display_name || profileFor(asgn.judge_id)?.username || "Judged"}
+                        </span>
+                      ) : (
+                        <select
+                          value={asgn?.judge_id ?? ""}
+                          disabled={actionLoading}
+                          onChange={e => assignJudge(match.id, e.target.value)}
+                          style={darkSelect}
+                        >
+                          <option value="" disabled>Assign judge…</option>
+                          {eligible.map(j => (
+                            <option key={j.id} value={j.id}>
+                              {(j.display_name || j.username) + (j.id === userId ? " (you)" : "")}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+          )}
 
           {/* My current match */}
           {myActiveMatch && (
@@ -714,6 +878,7 @@ export default function TournamentPage() {
 
 const backBtn: CSSProperties = { background: "none", border: "none", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.65)", padding: "8px 0", textShadow: "0 1px 4px rgba(0,0,0,0.35)" };
 const eyebrow: CSSProperties = { fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 16px", textShadow: "0 1px 4px rgba(0,0,0,0.30)" };
+const darkSelect: CSSProperties = { background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.18)", borderRadius: 6, color: "#fff", fontFamily: "var(--font-mono)", fontSize: 12, padding: "6px 10px", cursor: "pointer", colorScheme: "dark" };
 const rule: CSSProperties = { display: "flex", alignItems: "center", gap: 12, margin: "clamp(28px, 5vh, 44px) 0" };
 const ruleDot: CSSProperties = { width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 };
 const ruleLine: CSSProperties = { flex: 1, height: 1, background: "rgba(255,255,255,0.15)" };

@@ -5,9 +5,17 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { CSSProperties } from "react";
 
+const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+function generateJoinCode() {
+  let code = "";
+  for (let i = 0; i < 6; i++) code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  return code;
+}
+
 export default function CreateTournamentPage() {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [format, setFormat] = useState<"open" | "private">("open");
   const [size, setSize] = useState<4 | 8>(4);
   const [topic, setTopic] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,14 +29,29 @@ export default function CreateTournamentPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push("/login"); return; }
 
-    const { data, error: err } = await supabase
-      .from("tournaments")
-      .insert({ name: name.trim(), size, topic: topic.trim() || null, created_by: session.user.id, status: "registration" })
-      .select().single();
+    const base = { name: name.trim(), size, topic: topic.trim() || null, created_by: session.user.id, status: "registration", format };
+
+    let data = null;
+    let err = null;
+    if (format === "private") {
+      // Retry on join-code collision (unique violation).
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const res = await supabase.from("tournaments").insert({ ...base, join_code: generateJoinCode() }).select().single();
+        data = res.data; err = res.error;
+        if (data || err?.code !== "23505") break;
+      }
+    } else {
+      const res = await supabase.from("tournaments").insert(base).select().single();
+      data = res.data; err = res.error;
+    }
 
     if (err || !data) { setError(err?.message ?? "Failed to create tournament."); setLoading(false); return; }
 
-    await supabase.from("tournament_participants").insert({ tournament_id: data.id, user_id: session.user.id });
+    // Open tournaments auto-enroll the creator. Private creators choose on the
+    // tournament page whether to play, judge, or both.
+    if (format === "open") {
+      await supabase.from("tournament_participants").insert({ tournament_id: data.id, user_id: session.user.id });
+    }
     router.push(`/tournaments/${data.id}`);
   }
 
@@ -69,9 +92,38 @@ export default function CreateTournamentPage() {
 
         <div style={rule}><div style={ruleDot} /><div style={ruleLine} /></div>
 
-        {/* 02 Bracket size */}
+        {/* 02 Format */}
         <section>
-          <p style={eyebrow}>02 — Bracket size</p>
+          <p style={eyebrow}>02 — Format</p>
+          {([
+            { value: "open" as const, label: "Open", desc: "Anyone can find and join. Seeds follow join order; judges are auto-assigned." },
+            { value: "private" as const, label: "Private", desc: "Joinable only with a generated code. You assign every seed and judge, and can play or judge yourself." },
+          ]).map(f => (
+            <div
+              key={f.value}
+              onClick={() => setFormat(f.value)}
+              style={{ display: "flex", alignItems: "center", gap: 18, padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.08)", cursor: "pointer" }}
+            >
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 15, color: format === f.value ? "var(--accent)" : "rgba(255,255,255,0.22)", transition: "color 0.15s", lineHeight: 1 }}>
+                {format === f.value ? "●" : "○"}
+              </span>
+              <div>
+                <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: format === f.value ? "#fff" : "rgba(255,255,255,0.50)", textShadow: "0 1px 6px rgba(0,0,0,0.35)", transition: "color 0.15s" }}>
+                  {f.label}
+                </p>
+                <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.32)" }}>
+                  {f.desc}
+                </p>
+              </div>
+            </div>
+          ))}
+        </section>
+
+        <div style={rule}><div style={ruleDot} /><div style={ruleLine} /></div>
+
+        {/* 03 Bracket size */}
+        <section>
+          <p style={eyebrow}>03 — Bracket size</p>
           {([4, 8] as const).map(s => (
             <div
               key={s}
@@ -95,9 +147,9 @@ export default function CreateTournamentPage() {
 
         <div style={rule}><div style={ruleDot} /><div style={ruleLine} /></div>
 
-        {/* 03 Topic */}
+        {/* 04 Topic */}
         <section>
-          <p style={eyebrow}>03 — Shared topic (optional)</p>
+          <p style={eyebrow}>04 — Shared topic (optional)</p>
           <input
             className="lp-input"
             placeholder="All rounds debate this resolution"
@@ -114,6 +166,11 @@ export default function CreateTournamentPage() {
             {loading ? "Creating…" : "Create tournament"}
             {!loading && <span className="db-btn__arrow" aria-hidden="true">→</span>}
           </button>
+          {format === "private" && (
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.30)", marginTop: 12, textAlign: "center" }}>
+              A join code is generated on creation — share it with your players.
+            </p>
+          )}
         </div>
 
       </div>
