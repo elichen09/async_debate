@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { searchTopics, type Topic } from "@/lib/topics";
 import type { CSSProperties } from "react";
 
 interface Profile {
@@ -24,7 +25,9 @@ export default function ChallengePage() {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<Profile[]>([]);
   const [selected, setSelected] = useState<Profile | null>(null);
-  const [topic, setTopic] = useState("");
+  const [topicQuery, setTopicQuery] = useState("");
+  const [topic, setTopic] = useState<Topic | null>(null);
+  const topicResults = topicQuery && !topic ? searchTopics(topicQuery) : [];
   const [pick, setPick] = useState<"pro" | "con" | "first" | "second">("pro");
   const [isRanked, setIsRanked] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -82,7 +85,7 @@ export default function ChallengePage() {
 
   async function handleChallenge() {
     setError("");
-    if (!selected || !topic.trim()) { setError("Select an opponent and enter a topic."); return; }
+    if (!selected || !topic) { setError("Select an opponent and a topic."); return; }
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push("/login"); return; }
@@ -90,7 +93,7 @@ export default function ChallengePage() {
     const pro_id = pick === "con" ? selected.id : myId;
     const con_id = pick === "con" ? myId : selected.id;
     const { error } = await supabase.from("rounds").insert({
-      topic, pro_id, con_id, challenger_id: myId,
+      topic: topic.text, pro_id, con_id, challenger_id: myId,
       challenger_pick: pick, status: "pending", current_speech: 1, is_ranked: isRanked,
     });
     setLoading(false);
@@ -179,10 +182,44 @@ export default function ChallengePage() {
           <p style={eyebrow}>02 — Topic</p>
           <input
             className="lp-input"
-            placeholder="Resolved: …"
-            value={topic}
-            onChange={e => setTopic(e.target.value)}
+            placeholder="Search resolutions — try “Taiwan”, “April 2025”, “nuclear”…"
+            value={topic ? topic.text : topicQuery}
+            onChange={e => { setTopic(null); setTopicQuery(e.target.value); }}
           />
+
+          {topicResults.map(t => (
+            <div
+              key={t.tag}
+              onClick={() => { setTopic(t); setTopicQuery(""); }}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14,
+                padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.08)",
+                cursor: "pointer",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: "#fff", lineHeight: 1.45, textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
+                {t.text}
+              </p>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.38)", whiteSpace: "nowrap", flexShrink: 0 }}>
+                {t.tag}
+              </span>
+            </div>
+          ))}
+
+          {topicQuery.trim() && !topic && topicResults.length === 0 && (
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.40)", marginTop: 12 }}>
+              No resolution matches that.
+            </p>
+          )}
+
+          {topic && (
+            <p style={{ fontSize: 13, color: "var(--accent)", marginTop: 12, lineHeight: 1.5, textShadow: "0 1px 4px rgba(0,0,0,0.30)" }}>
+              ✓ {topic.text}
+              <span style={{ color: "rgba(255,255,255,0.38)", fontFamily: "var(--font-mono)", fontSize: 11, marginLeft: 10 }}>
+                {topic.tag}
+              </span>
+            </p>
+          )}
         </section>
 
         <div style={rule}><div style={ruleDot} /><div style={ruleLine} /></div>

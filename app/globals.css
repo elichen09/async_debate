@@ -2585,3 +2585,103 @@ html.gh-bg-off .gh-particles { display: none; }
   .gh-verdict__text { animation: none; }
   .gh-verdict__burst { display: none; }
 }
+
+/* =========================================================================
+   CUSTOM CURSOR
+   Accent dot with a trailing glass ring — the firefly to the particle
+   field's embers. Fine pointers only; html.gh-cursor-text restores the
+   native caret over text fields.
+   ========================================================================= */
+@media (any-pointer: fine) {
+  html.gh-cursor, html.gh-cursor * { cursor: none !important; }
+  html.gh-cursor.gh-cursor-text, html.gh-cursor.gh-cursor-text * { cursor: auto !important; }
+}
+
+.gh-cursor-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+}
+.gh-cursor-dot, .gh-cursor-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+  transition: opacity 0.2s ease;
+}
+
+.gh-cursor-dot > i {
+  display: block;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow:
+    0 0 0 1.5px oklch(1 0 0 / 0.65),
+    0 0 14px var(--accent-glow),
+    0 1px 4px oklch(0 0 0 / 0.35);
+  transition: transform 0.18s var(--ease-out-quart);
+}
+
+.gh-cursor-ring > i {
+  display: block;
+  width: 38px;
+  height: 38px;
+  margin: -19px 0 0 -19px;
+  border-radius: 50%;
+  border: 1.5px solid color-mix(in oklch, var(--accent) 55%, transparent);
+  background: oklch(1 0 0 / 0.05);
+  transition:
+    transform 0.22s var(--ease-out-quart),
+    border-color 0.22s ease,
+    background-color 0.22s ease;
+}
+
+/* Interactive hover — the ring blooms, the dot tightens */
+.gh-cursor-layer.is-link .gh-cursor-ring > i {
+  transform: scale(1.45);
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.gh-cursor-layer.is-link .gh-cursor-dot > i { transform: scale(0.8); }
+
+/* Pressed — a quick compress */
+.gh-cursor-layer.is-down .gh-cursor-ring > i { transform: scale(0.8); }
+.gh-cursor-layer.is-down .gh-cursor-dot > i  { transform: scale(0.8); }
+.gh-cursor-layer.is-link.is-down .gh-cursor-ring > i { transform: scale(1.15); }
+
+/* Click — a dashed ring spins out from the click point and fades */
+.gh-cursor-spin {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.gh-cursor-spin > i {
+  display: block;
+  width: 34px;
+  height: 34px;
+  margin: -17px 0 0 -17px;
+  border-radius: 50%;
+  border: 2px dashed var(--accent);
+  opacity: 0;
+}
+.gh-cursor-spin.is-go > i {
+  animation: gh-cursor-spin 0.55s var(--ease-out-quart) forwards;
+}
+@keyframes gh-cursor-spin {
+  0%   { opacity: 0.9; transform: rotate(0turn) scale(0.5); }
+  100% { opacity: 0;   transform: rotate(0.75turn) scale(1.6); }
+}
+
+/* Off-window or over a text field */
+.gh-cursor-layer.is-hidden .gh-cursor-dot,
+.gh-cursor-layer.is-hidden .gh-cursor-ring,
+.gh-cursor-layer.is-text .gh-cursor-dot,
+.gh-cursor-layer.is-text .gh-cursor-ring { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gh-cursor-dot > i, .gh-cursor-ring > i { transition: none; }
+  .gh-cursor-spin.is-go > i { animation: none; }
+}

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { searchTopics, type Topic } from "@/lib/topics";
 import type { CSSProperties } from "react";
 
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -17,9 +18,11 @@ export default function CreateTournamentPage() {
   const [name, setName] = useState("");
   const [format, setFormat] = useState<"open" | "private">("open");
   const [size, setSize] = useState<4 | 8>(4);
-  const [topic, setTopic] = useState("");
+  const [topicQuery, setTopicQuery] = useState("");
+  const [topic, setTopic] = useState<Topic | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const topicResults = topicQuery && !topic ? searchTopics(topicQuery) : [];
 
   async function handleCreate() {
     setError("");
@@ -29,7 +32,7 @@ export default function CreateTournamentPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { router.push("/login"); return; }
 
-    const base = { name: name.trim(), size, topic: topic.trim() || null, created_by: session.user.id, status: "registration", format };
+    const base = { name: name.trim(), size, topic: topic?.text ?? null, created_by: session.user.id, status: "registration", format };
 
     let data = null;
     let err = null;
@@ -152,13 +155,46 @@ export default function CreateTournamentPage() {
           <p style={eyebrow}>04 — Shared topic (optional)</p>
           <input
             className="lp-input"
-            placeholder="All rounds debate this resolution"
-            value={topic}
-            onChange={e => setTopic(e.target.value)}
+            placeholder="Search resolutions — try “Taiwan”, “April 2025”, “nuclear”…"
+            value={topic ? topic.text : topicQuery}
+            onChange={e => { setTopic(null); setTopicQuery(e.target.value); }}
           />
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.30)", margin: "10px 0 0" }}>
-            If blank, each match uses a generic "Tournament Match" topic.
-          </p>
+
+          {topicResults.map(t => (
+            <div
+              key={t.tag}
+              onClick={() => { setTopic(t); setTopicQuery(""); }}
+              style={{
+                display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 14,
+                padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.08)",
+                cursor: "pointer",
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: "#fff", lineHeight: 1.45, textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
+                {t.text}
+              </p>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.38)", whiteSpace: "nowrap", flexShrink: 0 }}>
+                {t.tag}
+              </span>
+            </div>
+          ))}
+
+          {topic ? (
+            <p style={{ fontSize: 13, color: "var(--accent)", marginTop: 12, lineHeight: 1.5, textShadow: "0 1px 4px rgba(0,0,0,0.30)" }}>
+              ✓ {topic.text}
+              <span style={{ color: "rgba(255,255,255,0.38)", fontFamily: "var(--font-mono)", fontSize: 11, marginLeft: 10 }}>{topic.tag}</span>
+              {" "}
+              <button onClick={() => { setTopic(null); setTopicQuery(""); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.45)", cursor: "pointer", fontSize: 12, fontFamily: "var(--font-body)", textDecoration: "underline", padding: 0, marginLeft: 6 }}>
+                clear
+              </button>
+            </p>
+          ) : topicQuery.trim() && topicResults.length === 0 ? (
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.40)", marginTop: 12 }}>No resolution matches that.</p>
+          ) : (
+            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.30)", margin: "10px 0 0" }}>
+              If blank, each match uses a generic &ldquo;Tournament Match&rdquo; topic.
+            </p>
+          )}
         </section>
 
         <div style={{ marginTop: "clamp(40px, 7vh, 64px)" }}>

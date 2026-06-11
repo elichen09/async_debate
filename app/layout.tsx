@@ -3,6 +3,7 @@ import { Geist_Mono, Fraunces, Lora } from "next/font/google";
 import "./globals.css";
 import NavBar from "./components/NavBar";
 import ParticleField from "./components/ParticleField";
+import CustomCursor from "./components/CustomCursor";
 import SiteFooter from "./components/SiteFooter";
 import { Analytics } from "@vercel/analytics/next"
 
@@ -57,6 +58,7 @@ export default function RootLayout({
           <main className="db-main">{children}</main>
           <SiteFooter />
         </div>
+        <CustomCursor />
         <Analytics />
       </body>
     </html>
