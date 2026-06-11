@@ -44,10 +44,11 @@ export default function RootLayout({
     >
       <head>
         <script
-          // Apply the saved "scene off" reading mode before first paint
+          // Apply the saved scene (gh-bg-grid / gh-bg-dots / gh-bg-off…) before
+          // first paint; all non-default scenes are light (gh-light).
           dangerouslySetInnerHTML={{
             __html:
-              "try{if(localStorage.getItem('gh-bg')==='off')document.documentElement.classList.add('gh-bg-off')}catch(e){}",
+              "try{var v=localStorage.getItem('gh-bg');if(v&&v!=='on'){var c=document.documentElement.classList;c.add('gh-bg-'+v);c.add('gh-light')}}catch(e){}",
           }}
         />
       </head>

@@ -86,9 +86,10 @@ export default function ParticleField() {
       raf = requestAnimationFrame(frame);
     }
 
-    // Pause entirely while the scene is toggled off (html.gh-bg-off)
+    // Pause entirely while any alternate scene is active (html.gh-bg-*) —
+    // the fireflies belong to the default meadow photos.
     function syncRunning() {
-      const shouldRun = !document.documentElement.classList.contains("gh-bg-off");
+      const shouldRun = !/\bgh-bg-/.test(document.documentElement.className);
       if (shouldRun && !running) { running = true; frame(); }
       if (!shouldRun && running) { running = false; cancelAnimationFrame(raf); }
     }
