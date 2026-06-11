@@ -222,7 +222,7 @@ export default function RankingsPage() {
 
   return (
     <>
-      <style>{`.db-shell { background-image: url("/4.png") !important; }`}</style>
+      <style>{`.db-shell { background-image: url("/8.png") !important; }`}</style>
       <div className="gh-rank">
 
         <div style={{ paddingTop: "clamp(20px, 4vh, 36px)" }}>

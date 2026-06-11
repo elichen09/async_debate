@@ -42,7 +42,7 @@ export default function FuturePage() {
   return (
     <>
       <style>{`
-        .db-shell { background-image: url("/3.png") !important; }
+        .db-shell { background-image: url("/7.png") !important; }
         .ft-doc:hover .ft-doc-title { color: var(--accent) !important; }
         .ft-doc:hover .ft-doc-arrow { opacity: 1 !important; transform: translate(3px,-3px) !important; }
         .ft-doc-arrow { transition: opacity 0.15s, transform 0.18s; }
