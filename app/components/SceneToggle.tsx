@@ -6,10 +6,11 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 // by an inline script in the root layout) so every instance stays in sync.
 // "Meadow" is the default — the per-page photos with no class at all.
 const SCENES = [
-  { value: "on",   cls: null as string | null, light: false, label: "Meadow", desc: "Photos + fireflies" },
-  { value: "grid", cls: "gh-bg-grid",          light: true,  label: "Grid",   desc: "Light · graph paper" },
-  { value: "dots", cls: "gh-bg-dots",          light: true,  label: "Dots",   desc: "Light · dot matrix" },
-  { value: "off",  cls: "gh-bg-off",           light: true,  label: "Quiet",  desc: "Light · plain paper" },
+  { value: "on",     cls: null as string | null, light: false, label: "Meadow", desc: "Photos + fireflies" },
+  { value: "grid",   cls: "gh-bg-grid",          light: true,  label: "Grid",   desc: "Light · graph paper" },
+  { value: "dots",   cls: "gh-bg-dots",          light: true,  label: "Dots",   desc: "Light · dot matrix" },
+  { value: "shadow", cls: "gh-bg-shadow",        light: false, label: "Shadow", desc: "Dark · drifting smoke" },
+  { value: "off",    cls: "gh-bg-off",           light: true,  label: "Quiet",  desc: "Light · plain paper" },
 ] as const;
 
 type SceneValue = (typeof SCENES)[number]["value"];

@@ -3,6 +3,7 @@ import { Geist_Mono, Fraunces, Lora } from "next/font/google";
 import "./globals.css";
 import NavBar from "./components/NavBar";
 import ParticleField from "./components/ParticleField";
+import EtherealShadow from "./components/EtherealShadow";
 import CustomCursor from "./components/CustomCursor";
 import SiteFooter from "./components/SiteFooter";
 import { Analytics } from "@vercel/analytics/next"
@@ -44,17 +45,18 @@ export default function RootLayout({
     >
       <head>
         <script
-          // Apply the saved scene (gh-bg-grid / gh-bg-dots / gh-bg-off…) before
-          // first paint; all non-default scenes are light (gh-light).
+          // Apply the saved scene (gh-bg-grid / gh-bg-dots / gh-bg-shadow /
+          // gh-bg-off…) before first paint; paper scenes also get gh-light.
           dangerouslySetInnerHTML={{
             __html:
-              "try{var v=localStorage.getItem('gh-bg');if(v&&v!=='on'){var c=document.documentElement.classList;c.add('gh-bg-'+v);c.add('gh-light')}}catch(e){}",
+              "try{var v=localStorage.getItem('gh-bg');if(v&&v!=='on'){var c=document.documentElement.classList;c.add('gh-bg-'+v);if(v==='grid'||v==='dots'||v==='off')c.add('gh-light')}}catch(e){}",
           }}
         />
       </head>
       <body>
         <div className="db-shell">
           <ParticleField />
+          <EtherealShadow />
           <NavBar />
           <main className="db-main">{children}</main>
           <SiteFooter />

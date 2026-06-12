@@ -1182,16 +1182,17 @@ input, button, textarea, select { font-family: inherit; }
   pointer-events: auto;
 }
 
+/* Landing chrome is always on the hero photo — literal white, never themed */
 .gh-nav-link {
   font-family: var(--font-body);
   font-size: 13px;
   font-weight: 400;
   letter-spacing: 0.01em;
-  color: rgba(var(--wt), 0.78);
+  color: rgba(255, 255, 255, 0.78);
   text-decoration: none;
   transition: color 0.18s ease;
 }
-.gh-nav-link:hover { color: rgb(var(--wt)); }
+.gh-nav-link:hover { color: #fff; }
 
 .gh-center {
   flex: 1;
@@ -1207,7 +1208,7 @@ input, button, textarea, select { font-family: inherit; }
   font-size: clamp(56px, 13.5vw, 220px);
   font-weight: 800;
   letter-spacing: -0.01em;
-  color: rgb(var(--wt));
+  color: #fff;
   line-height: 0.92;
   text-align: center;
   text-shadow:
@@ -1230,7 +1231,7 @@ input, button, textarea, select { font-family: inherit; }
   font-family: var(--font-body);
   font-size: 11px;
   font-weight: 400;
-  color: rgba(var(--wt), 0.35);
+  color: rgba(255, 255, 255, 0.35);
   letter-spacing: 0.06em;
   margin: 10px 0 0;
   pointer-events: none;
@@ -1970,6 +1971,18 @@ html.gh-bg-dots .db-shell {
 html.gh-bg-dots .db-shell::before { background: transparent; }
 html.gh-bg-dots .gh-particles { display: none; }
 
+/* Shadow: drifting smoke on dark forest ink (the smoke layer itself is the
+   EtherealShadow component, mounted in the root layout) */
+html.gh-bg-shadow .db-shell {
+  background-image:
+    radial-gradient(1000px 680px at 12% -10%, oklch(0.20 0.04 152 / 0.8), transparent 60%),
+    linear-gradient(180deg, oklch(0.15 0.030 150), oklch(0.09 0.022 144)) !important;
+  background-color: oklch(0.11 0.025 147);
+  background-attachment: fixed;
+}
+html.gh-bg-shadow .db-shell::before { background: transparent; }
+html.gh-bg-shadow .gh-particles { display: none; }
+
 /* =========================================================================
    LIGHT SCENES — html.gh-light remaps the on-photo white palette to forest
    ink so the Grid / Dots / Quiet paper scenes read as a light mode.
@@ -1979,8 +1992,12 @@ html.gh-light {
   --accent-bright: var(--accent-deep);    /* bright-on-dark accent → deep-on-paper */
 }
 
-/* Photo-legibility halos read as smudges on paper */
-html.gh-light .db-shell * { text-shadow: none !important; }
+/* The landing page keeps its own hero photo in every scene, so its on-photo
+   palette never flips */
+html.gh-light .gh-overlay { --wt: 255, 255, 255; }
+
+/* Photo-legibility halos read as smudges on paper (kept on the landing) */
+html.gh-light .db-shell *:not(.gh-overlay, .gh-overlay *) { text-shadow: none !important; }
 
 /* Chrome scrims were dark fades over photos — fade from paper instead */
 html.gh-light .gh-topnav   { background: linear-gradient(to bottom, oklch(1 0 0 / 0.55) 0%, transparent 100%); }
@@ -2106,6 +2123,12 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
     radial-gradient(oklch(0.45 0.06 145 / 0.55) 1px, transparent 1.4px),
     linear-gradient(180deg, oklch(0.97 0.007 95), oklch(0.93 0.010 100));
   background-size: 6px 6px, 100% 100%;
+}
+.gh-scene-swatch--shadow {
+  background:
+    radial-gradient(10px 7px at 36% 42%, oklch(0.46 0.05 148 / 0.85), transparent),
+    radial-gradient(12px 8px at 70% 62%, oklch(0.38 0.05 150 / 0.7), transparent),
+    linear-gradient(180deg, oklch(0.18 0.032 150), oklch(0.10 0.024 146));
 }
 .gh-scene-swatch--off {
   background: linear-gradient(166deg, oklch(0.97 0.008 95), oklch(0.91 0.012 105));
