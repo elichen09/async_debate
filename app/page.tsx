@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { TextScramble } from "./components/TextScramble";
 
 export const metadata: Metadata = {
   title: "Grasshopper",
@@ -22,7 +23,16 @@ export default function Home() {
       </header>
 
       <main className="gh-center" aria-label="Grasshopper">
-        <h1 className="gh-title">Grasshopper.</h1>
+        <TextScramble
+          as="h1"
+          className="gh-title"
+          style={{ pointerEvents: "auto" }}
+          duration={1.1}
+          speed={0.045}
+          rescrambleOnHover
+        >
+          Grasshopper.
+        </TextScramble>
         <p className="gh-credit">made by Eli and Gary</p>
       </main>
 
