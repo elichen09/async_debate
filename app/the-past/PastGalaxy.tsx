@@ -36,6 +36,41 @@ function topicColor(topic: string): string {
   return PALETTE[h % PALETTE.length];
 }
 
+// Stars are colour-coded by topic: each resolution maps to a distinct,
+// luminous hue so same-topic rounds glow the same colour and you can read the
+// archive's clusters at a glance. Bright/high-value so they still feel starry
+// against the dark forest sky.
+const STAR_PALETTE = [
+  "#ff7a8a", "#ffa24c", "#ffd24c", "#c9f06b", "#7fe08a", "#5ad1a8",
+  "#4fd6d6", "#5ab8ff", "#7a93ff", "#b07cff", "#e07cff", "#ff7ad0",
+  "#ff9b6b", "#ffe08a", "#9be07f", "#6be0c0", "#74c7ff", "#c79bff",
+];
+function starColor(topic: string): string {
+  let h = 0;
+  for (let i = 0; i < topic.length; i++) h = (h * 31 + topic.charCodeAt(i)) >>> 0;
+  return STAR_PALETTE[h % STAR_PALETTE.length];
+}
+
+// One shared 5-point star outline reused by every star (and its hover halo).
+function makeStarGeometry(outer = 0.5, inner = 0.21, points = 5): THREE.ShapeGeometry {
+  const shape = new THREE.Shape();
+  for (let i = 0; i < points * 2; i++) {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+}
+const STAR_GEO = makeStarGeometry();
+
+// At/under this many visible rounds we switch from the star field to detailed
+// thumbnail cards — narrow the filters and the constellation resolves to rounds.
+const CARD_LIMIT = 80;
+
 // Even point distribution on a sphere (Fibonacci spiral).
 function spherePositions(n: number, radius: number): [number, number, number][] {
   const pts: [number, number, number][] = [];
@@ -187,6 +222,75 @@ const RoundCard = memo(
     a.onSelect === b.onSelect,
 );
 
+// --- 3D star (the unfiltered archive view) -----------------------------------
+
+type StarProps = {
+  round: PastRound;
+  position: [number, number, number];
+  hovered: boolean;
+  color: string;
+  onHover: (r: PastRound | null) => void;
+  onSelect: (r: PastRound) => void;
+};
+
+const RoundStar = memo(
+  function RoundStar({ round, position, hovered, color, onHover, onSelect }: StarProps) {
+    const group = useRef<THREE.Group>(null);
+    const appear = useRef(0);
+    const target = useMemo(
+      () => new THREE.Vector3(position[0], position[1], position[2]),
+      [position],
+    );
+    // Deeper elim rounds shine a little bigger — finals are the bright stars.
+    const baseScale = 1.0 + (round.stageRank / 100) * 0.6;
+
+    useFrame(({ camera }) => {
+      const g = group.current;
+      if (!g) return;
+      g.position.lerp(target, 0.1);
+      g.quaternion.copy(camera.quaternion); // billboard toward camera
+      const goal = (hovered ? 1.9 : 1) * baseScale;
+      appear.current = THREE.MathUtils.lerp(appear.current, goal, 0.16);
+      g.scale.setScalar(appear.current);
+    });
+
+    return (
+      <group ref={group}>
+        <mesh
+          geometry={STAR_GEO}
+          renderOrder={hovered ? 3 : 1}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            onHover(round);
+          }}
+          onPointerOut={(e) => {
+            e.stopPropagation();
+            onHover(null);
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect(round);
+          }}
+        >
+          <meshBasicMaterial color={hovered ? "#ffffff" : color} side={THREE.DoubleSide} toneMapped={false} transparent opacity={0.96} />
+        </mesh>
+        {hovered && (
+          <mesh geometry={STAR_GEO} position={[0, 0, -0.02]} scale={1.6}>
+            <meshBasicMaterial color={ACCENT} side={THREE.DoubleSide} toneMapped={false} transparent opacity={0.4} />
+          </mesh>
+        )}
+      </group>
+    );
+  },
+  (a, b) =>
+    a.round === b.round &&
+    a.position === b.position &&
+    a.hovered === b.hovered &&
+    a.color === b.color &&
+    a.onHover === b.onHover &&
+    a.onSelect === b.onSelect,
+);
+
 // --- camera auto-fit ---------------------------------------------------------
 
 // When the visible set (and thus radius) changes, glide the camera to frame it,
@@ -217,7 +321,7 @@ type SceneProps = {
   rounds: PastRound[];
   positions: [number, number, number][];
   hoveredId: string | null;
-  eager: boolean;
+  showCards: boolean;
   radius: number;
   onHover: (r: PastRound | null) => void;
   onSelect: (r: PastRound) => void;
@@ -229,7 +333,7 @@ function camDistFor(radius: number): number {
   return radius * 2.4 + 8;
 }
 
-function GalaxyScene({ rounds, positions, hoveredId, eager, radius, onHover, onSelect }: SceneProps) {
+function GalaxyScene({ rounds, positions, hoveredId, showCards, radius, onHover, onSelect }: SceneProps) {
   const camDist = camDistFor(radius);
   return (
     <>
@@ -241,18 +345,30 @@ function GalaxyScene({ rounds, positions, hoveredId, eager, radius, onHover, onS
         <sphereGeometry args={[radius * 0.55, 28, 28]} />
         <meshBasicMaterial color={ACCENT} wireframe transparent opacity={0.05} />
       </mesh>
-      {rounds.map((r, i) => (
-        <RoundCard
-          key={r.id}
-          round={r}
-          position={positions[i]}
-          hovered={hoveredId === r.id}
-          eager={eager}
-          color={topicColor(r.topic)}
-          onHover={onHover}
-          onSelect={onSelect}
-        />
-      ))}
+      {rounds.map((r, i) =>
+        showCards ? (
+          <RoundCard
+            key={r.id}
+            round={r}
+            position={positions[i]}
+            hovered={hoveredId === r.id}
+            eager
+            color={topicColor(r.topic)}
+            onHover={onHover}
+            onSelect={onSelect}
+          />
+        ) : (
+          <RoundStar
+            key={r.id}
+            round={r}
+            position={positions[i]}
+            hovered={hoveredId === r.id}
+            color={starColor(r.topic)}
+            onHover={onHover}
+            onSelect={onSelect}
+          />
+        ),
+      )}
       <OrbitControls
         makeDefault
         enablePan
@@ -316,7 +432,7 @@ export default function PastGalaxy({ rounds }: { rounds: PastRound[] }) {
 
   const radius = Math.max(7, Math.sqrt(Math.max(1, visible.length)) * 0.95);
   const positions = useMemo(() => spherePositions(visible.length, radius), [visible.length, radius]);
-  const eager = visible.length <= 70;
+  const showCards = visible.length <= CARD_LIMIT;
 
   const onHover = useCallback((r: PastRound | null) => setHovered(r), []);
   const onSelect = useCallback((r: PastRound) => setSelected(r), []);
@@ -380,7 +496,7 @@ export default function PastGalaxy({ rounds }: { rounds: PastRound[] }) {
           rounds={visible}
           positions={positions}
           hoveredId={hovered?.id ?? null}
-          eager={eager}
+          showCards={showCards}
           radius={radius}
           onHover={onHover}
           onSelect={onSelect}
