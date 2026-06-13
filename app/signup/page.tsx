@@ -5,13 +5,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { tierFor, ELO_MIN, ELO_MAX_START } from "@/lib/elo";
+import AuthCharacters from "@/app/components/AuthCharacters";
+import RevealButton from "@/app/components/RevealButton";
 import type { CSSProperties } from "react";
 
 const ELO_STOPS = [
   { value: 600,  label: "Brand new to debate" },
-  { value: 800,  label: "A season of rounds behind you" },
-  { value: 1000, label: "Competitive on your local circuit" },
-  { value: 1200, label: "Varsity confidence" },
+  { value: 800,  label: "Calm Dabbler" },
+  { value: 1000, label: "Local Warrior" },
+  { value: 1200, label: "Varsity Demon" },
 ];
 
 function nearestStop(elo: number) {
@@ -26,6 +28,8 @@ export default function SignupPage() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [typing, setTyping] = useState(false);
   const [startElo, setStartElo] = useState(600);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -74,7 +78,14 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="gh-auth">
+    <div className="gh-auth-split">
+      <aside className="gh-auth-stage">
+        <div className="gh-auth-stage__floor">
+          <AuthCharacters typing={typing} revealPassword={showPw} passwordLength={password.length} />
+        </div>
+      </aside>
+
+      <div className="gh-auth">
 
       <div style={{ paddingTop: "clamp(20px, 4vh, 36px)" }}>
         <Link href="/" style={backLink}>← Grasshopper</Link>
@@ -98,9 +109,11 @@ export default function SignupPage() {
         <p style={eyebrow}>01 — Who you are</p>
         <div className="gh-auth__pair">
           <input className="lp-input" placeholder="Username" autoComplete="username"
-            value={username} onChange={e => setUsername(e.target.value)} />
+            value={username} onChange={e => setUsername(e.target.value)}
+            onFocus={() => setTyping(true)} onBlur={() => setTyping(false)} />
           <input className="lp-input" placeholder="Display name (optional)"
-            value={displayName} onChange={e => setDisplayName(e.target.value)} />
+            value={displayName} onChange={e => setDisplayName(e.target.value)}
+            onFocus={() => setTyping(true)} onBlur={() => setTyping(false)} />
         </div>
       </section>
 
@@ -111,9 +124,14 @@ export default function SignupPage() {
         <p style={eyebrow}>02 — Your account</p>
         <div className="gh-auth__stack">
           <input className="lp-input" type="email" placeholder="Email" autoComplete="email"
-            value={email} onChange={e => setEmail(e.target.value)} />
-          <input className="lp-input" type="password" placeholder="Password (8+ characters)" autoComplete="new-password"
-            value={password} onChange={e => setPassword(e.target.value)} />
+            value={email} onChange={e => setEmail(e.target.value)}
+            onFocus={() => setTyping(true)} onBlur={() => setTyping(false)} />
+          <div className="gh-auth__pw">
+            <input className="lp-input" type={showPw ? "text" : "password"} placeholder="Password (8+ characters)" autoComplete="new-password"
+              value={password} onChange={e => setPassword(e.target.value)}
+              onFocus={() => setTyping(true)} onBlur={() => setTyping(false)} />
+            <RevealButton shown={showPw} onToggle={() => setShowPw(s => !s)} />
+          </div>
         </div>
       </section>
 
@@ -173,6 +191,7 @@ export default function SignupPage() {
         <p className="gh-auth__alt">
           Already have an account? <Link href="/login">Sign in</Link>
         </p>
+      </div>
       </div>
     </div>
   );

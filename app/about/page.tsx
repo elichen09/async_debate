@@ -38,7 +38,7 @@ export default function AboutPage() {
           <span className="ab-hero-line" style={{ '--i': '2', fontFamily: "var(--font-display)", fontSize: "clamp(72px, 14vw, 128px)", fontWeight: 800, letterSpacing: "-0.025em", color: "var(--accent)", textTransform: "uppercase", textShadow: "0 2px 20px rgba(0,0,0,0.45), 0 10px 60px rgba(0,0,0,0.22)" } as CSSProperties}>schedule.</span>
         </h1>
         <p className="ab-hero-line" style={{ '--i': '3', fontSize: "clamp(14px, 1.8vw, 16px)", color: "rgba(255,255,255,0.72)", maxWidth: "48ch", lineHeight: 1.65, marginBottom: "clamp(24px, 4vh, 36px)", textShadow: "0 1px 8px rgba(0,0,0,0.40)" } as CSSProperties}>
-          Async public forum for competitive thinkers. No scheduling overhead, no live sessions — just speeches, a real ballot, and a ladder that moves.
+          Grasshopper has been engineered by debaters for the love of the game. Join now!
         </p>
         <div className="ab-hero-line" style={{ '--i': '4', display: "flex", gap: 12, flexWrap: "wrap" } as CSSProperties}>
           <Link href="/signup" className="db-btn db-btn--accent">
