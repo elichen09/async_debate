@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { tierFor, ELO_MIN, ELO_MAX_START } from "@/lib/elo";
 import AuthCharacters from "@/app/components/AuthCharacters";
 import RevealButton from "@/app/components/RevealButton";
+import ForceGridScene from "@/app/components/ForceGridScene";
 import type { CSSProperties } from "react";
 
 const ELO_STOPS = [
@@ -79,6 +80,7 @@ export default function SignupPage() {
 
   return (
     <div className="gh-auth-split">
+      <ForceGridScene />
       <aside className="gh-auth-stage">
         <div className="gh-auth-stage__floor">
           <AuthCharacters typing={typing} revealPassword={showPw} passwordLength={password.length} />
@@ -197,8 +199,8 @@ export default function SignupPage() {
   );
 }
 
-const backLink: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(255,255,255,0.65)", padding: "8px 0", textDecoration: "none", textShadow: "0 1px 4px rgba(0,0,0,0.35)" };
-const heroTitle: CSSProperties = { fontFamily: "var(--font-display)", fontSize: "clamp(48px, 10vw, 92px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.02em", margin: 0, lineHeight: 0.92, textShadow: "0 2px 20px rgba(0,0,0,0.45), 0 8px 40px rgba(0,0,0,0.22)" };
+const backLink: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(var(--wt),0.65)", padding: "8px 0", textDecoration: "none" };
+const heroTitle: CSSProperties = { fontFamily: "var(--font-display)", fontSize: "clamp(48px, 10vw, 92px)", fontWeight: 800, color: "rgb(var(--wt))", letterSpacing: "-0.02em", margin: 0, lineHeight: 0.92 };
 const eyebrow: CSSProperties = { fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 16px", textShadow: "0 1px 4px rgba(0,0,0,0.30)" };
 const rule: CSSProperties = { display: "flex", alignItems: "center", gap: 12, margin: "clamp(24px, 4vh, 40px) 0" };
 const ruleDot: CSSProperties = { width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 };
