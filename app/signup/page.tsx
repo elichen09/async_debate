@@ -79,17 +79,17 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="gh-auth-split">
+    <div className="gh-auth-page">
       <ForceGridScene />
-      <aside className="gh-auth-stage">
-        <div className="gh-auth-stage__floor">
-          <AuthCharacters typing={typing} revealPassword={showPw} passwordLength={password.length} />
-        </div>
-      </aside>
 
-      <div className="gh-auth">
+      {/* Crew pinned to bottom-left corner */}
+      <div className="gh-auth-crew-corner">
+        <AuthCharacters typing={typing} revealPassword={showPw} passwordLength={password.length} />
+      </div>
 
-      <div style={{ paddingTop: "clamp(20px, 4vh, 36px)" }}>
+      <div className="gh-auth gh-auth--centered">
+
+      <div>
         <Link href="/" style={backLink}>← Grasshopper</Link>
       </div>
 
@@ -201,7 +201,7 @@ export default function SignupPage() {
 
 const backLink: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 13, color: "rgba(var(--wt),0.65)", padding: "8px 0", textDecoration: "none" };
 const heroTitle: CSSProperties = { fontFamily: "var(--font-display)", fontSize: "clamp(48px, 10vw, 92px)", fontWeight: 800, color: "rgb(var(--wt))", letterSpacing: "-0.02em", margin: 0, lineHeight: 0.92 };
-const eyebrow: CSSProperties = { fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 16px", textShadow: "0 1px 4px rgba(0,0,0,0.30)" };
+const eyebrow: CSSProperties = { fontFamily: "var(--font-mono)", fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 16px" };
 const rule: CSSProperties = { display: "flex", alignItems: "center", gap: 12, margin: "clamp(24px, 4vh, 40px) 0" };
 const ruleDot: CSSProperties = { width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 };
-const ruleLine: CSSProperties = { flex: 1, height: 1, background: "rgba(255,255,255,0.15)" };
+const ruleLine: CSSProperties = { flex: 1, height: 1, background: "rgba(var(--wt),0.15)" };

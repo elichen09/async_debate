@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import SceneToggle from "./SceneToggle";
 
-const HIDE_ON = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/about", "/founders", "/future", "/terms", "/privacy", "/the-past"];
+const HIDE_ON = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/about", "/future", "/terms", "/privacy", "/the-past"];
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Rounds" },

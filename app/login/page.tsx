@@ -20,35 +20,30 @@ export default function LoginPage() {
 
   async function handleLogin() {
     setError("");
-    if (!email || !password) {
-      setError("Please fill in all fields.");
-      return;
-    }
-
+    if (!email || !password) { setError("Please fill in all fields."); return; }
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-
     if (error) { setError(error.message); return; }
-
     router.push("/dashboard");
   }
 
   return (
-    <div className="gh-auth-split">
+    <div className="gh-auth-page">
       <ForceGridScene />
-      <aside className="gh-auth-stage">
-        <div className="gh-auth-stage__floor">
-          <AuthCharacters typing={typing} revealPassword={showPw} passwordLength={password.length} />
-        </div>
-      </aside>
 
-      <div className="gh-auth gh-auth--narrow">
-        <div style={{ paddingTop: "clamp(20px, 4vh, 36px)" }}>
+      {/* Crew pinned to bottom-left corner */}
+      <div className="gh-auth-crew-corner">
+        <AuthCharacters typing={typing} revealPassword={showPw} passwordLength={password.length} />
+      </div>
+
+      {/* Centered form */}
+      <div className="gh-auth gh-auth--narrow gh-auth--centered">
+        <div>
           <Link href="/" style={backLink}>← Grasshopper</Link>
         </div>
 
-        <section style={{ paddingTop: "clamp(16px, 3vh, 28px)" }}>
+        <section style={{ marginTop: "clamp(16px, 3vh, 28px)" }}>
           <h1 className="ab-hero-line" style={{ "--i": "0", ...heroTitle } as CSSProperties}>
             Welcome<br />back.
           </h1>
@@ -110,4 +105,4 @@ const backLink: CSSProperties = { fontFamily: "var(--font-body)", fontSize: 13, 
 const heroTitle: CSSProperties = { fontFamily: "var(--font-display)", fontSize: "clamp(48px, 10vw, 92px)", fontWeight: 800, color: "rgb(var(--wt))", letterSpacing: "-0.02em", margin: 0, lineHeight: 0.92 };
 const rule: CSSProperties = { display: "flex", alignItems: "center", gap: 12, margin: "clamp(24px, 4vh, 40px) 0" };
 const ruleDot: CSSProperties = { width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 };
-const ruleLine: CSSProperties = { flex: 1, height: 1, background: "rgba(255,255,255,0.15)" };
+const ruleLine: CSSProperties = { flex: 1, height: 1, background: "rgba(var(--wt),0.15)" };

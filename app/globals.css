@@ -2206,88 +2206,47 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
 }
 .gh-auth__reveal:hover { color: rgb(var(--wt)); background: rgba(var(--wt), 0.08); }
 
-/* --- Split: animated characters stage beside the form --- */
-.gh-auth-split {
-  display: grid;
-  grid-template-columns: 1fr;
-  align-items: start;
-}
-.gh-auth-stage { display: none; }
+/* --- Auth pages: full viewport, form centered, crew at bottom-left --- */
 
-@media (min-width: 1024px) {
-  /* No nav on the auth pages, so cancel db-main's 44px top padding — both
-     panes then fill the true viewport for honest centering / bottom-anchoring. */
-  .gh-auth-split {
-    grid-template-columns: 1.04fr 0.96fr;
-    column-gap: clamp(20px, 3vw, 56px);
-    margin-top: -44px;
-  }
-  .gh-auth-stage {
-    position: sticky;
-    top: 0;
-    height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-end;
-    padding: clamp(28px, 4vh, 56px) clamp(24px, 3vw, 56px) clamp(8px, 2vh, 24px);
-    overflow: hidden;
-  }
-  /* soft forest halo behind the crew */
-  .gh-auth-stage::before {
-    content: "";
-    position: absolute;
-    left: 50%;
-    bottom: 2%;
-    width: 600px;
-    height: 600px;
-    transform: translateX(-50%);
-    background: radial-gradient(circle, color-mix(in oklch, var(--accent) 26%, transparent), transparent 60%);
-    filter: blur(12px);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  /* center the form block vertically within the viewport */
-  .gh-auth-split .gh-auth {
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding-top: clamp(24px, 5vh, 56px);
-    padding-bottom: clamp(24px, 5vh, 56px);
-  }
+/* gh-auth-page is the true stacking root for the auth layout.
+   It fills the viewport (cancelling db-main's 44px nav padding),
+   and all positioning inside is relative to it. */
+.gh-auth-page {
+  position: relative;
+  min-height: 100dvh;
+  margin-top: -44px;
+  overflow: hidden;
 }
 
-.gh-auth-stage__floor {
+/* Form centered vertically within the viewport */
+.gh-auth--centered {
   position: relative;
   z-index: 1;
-  margin-top: auto;
+  min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   justify-content: center;
-  align-items: flex-end;
+  margin: 0 auto;
 }
 
-/* the ensemble keeps its intrinsic footprint; scale to fit the column */
+/* Crew anchored to the bottom-left of gh-auth-page */
+.gh-auth-crew-corner {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* The crew: 460×440 natural size, scaled down from the bottom-left corner */
 .gh-auth-crew {
   position: relative;
   width: 460px;
   height: 440px;
-  transform-origin: bottom center;
+  transform-origin: bottom left;
   transform: scale(0.72);
 }
-.gh-auth-crew::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -10px;
-  width: 440px;
-  height: 30px;
-  transform: translateX(-50%);
-  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.40), transparent 72%);
-  filter: blur(7px);
-  z-index: 0;
-}
+
 @media (min-width: 1200px) { .gh-auth-crew { transform: scale(0.84); } }
 @media (min-width: 1440px) { .gh-auth-crew { transform: scale(0.96); } }
 @media (min-width: 1680px) { .gh-auth-crew { transform: scale(1.05); } }
