@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import SceneToggle from "./SceneToggle";
 
-const HIDE_ON = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/about", "/founders", "/future", "/terms", "/privacy"];
+const HIDE_ON = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/about", "/founders", "/future", "/terms", "/privacy", "/the-past"];
 
 const NAV_LINKS = [
   { href: "/dashboard", label: "Rounds" },
@@ -14,6 +14,7 @@ const NAV_LINKS = [
   { href: "/rankings", label: "Rankings" },
   { href: "/tournaments", label: "Tournaments" },
   { href: "/watch", label: "Watch" },
+  { href: "/the-past", label: "The Past" },
   { href: "/history", label: "History" },
   { href: "/judge", label: "Judge" },
   { href: "/future", label: "Future" },

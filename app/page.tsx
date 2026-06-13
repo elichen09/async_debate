@@ -13,6 +13,7 @@ export default function Home() {
       <header className="gh-header">
         <div style={{ display: "flex", gap: 24 }}>
           <Link href="/about" className="gh-nav-link">About</Link>
+          <Link href="/the-past" className="gh-nav-link">The Past</Link>
           <Link href="/founders" className="gh-nav-link">Founders</Link>
           <Link href="/future" className="gh-nav-link">Future</Link>
         </div>

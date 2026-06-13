@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { createElement, useEffect, useRef, useState, type CSSProperties } from "react";
 
 // Text scramble effect: characters resolve left-to-right out of static.
 // Ported from the framer-motion version but dependency-free — the effect is
@@ -89,13 +89,16 @@ export function TextScramble({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger]);
 
-  return (
-    <Component
-      className={className}
-      style={style}
-      onMouseEnter={rescrambleOnHover ? () => scramble() : undefined}
-    >
-      {displayText}
-    </Component>
+  // createElement (not JSX) so the polymorphic `as` element keeps a normal
+  // children type — three.js' global JSX augmentation otherwise collapses a
+  // bare <Component> child prop to `never`.
+  return createElement(
+    Component,
+    {
+      className,
+      style,
+      onMouseEnter: rescrambleOnHover ? () => scramble() : undefined,
+    },
+    displayText,
   );
 }
