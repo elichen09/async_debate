@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import SceneToggle from "./SceneToggle";
+import CursorToggle from "./CursorToggle";
 
 const HIDE_ON = ["/", "/login", "/signup", "/forgot-password", "/reset-password", "/about", "/future", "/terms", "/privacy", "/the-past"];
 
@@ -74,6 +75,7 @@ export default function TopNav() {
 
         <div className="gh-topnav__right">
           <SceneToggle />
+          <CursorToggle />
           {elo !== null && <span className="gh-topnav__elo">{elo}</span>}
           {username && <span className="gh-topnav__username">@{username}</span>}
           <button onClick={handleSignOut} className="gh-topnav__out">Sign out</button>
@@ -113,8 +115,9 @@ export default function TopNav() {
           </Link>
         ))}
         {username && <p className="gh-drawer__user">@{username} · ELO {elo}</p>}
-        <div style={{ padding: "8px 12px" }}>
+        <div style={{ padding: "8px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
           <SceneToggle />
+          <CursorToggle />
         </div>
         <button onClick={handleSignOut} className="gh-drawer__out">Sign out</button>
       </aside>

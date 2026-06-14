@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // Custom cursor: an accent dot with a trailing glass ring (see globals.css
 // CUSTOM CURSOR section). Fine pointers only — touch devices never see it,
@@ -34,7 +34,22 @@ export default function CustomCursor() {
   const ringRef = useRef<HTMLDivElement>(null);
   const spinRef = useRef<HTMLDivElement>(null);
 
+  // The custom cursor can be toggled off (persisted in localStorage). The
+  // toggle lives in the nav and fires a "gh-cursor-change" event we react to.
+  const [enabled, setEnabled] = useState(true);
   useEffect(() => {
+    const read = () => { try { setEnabled(localStorage.getItem("gh-cursor") !== "off"); } catch {} };
+    read();
+    window.addEventListener("gh-cursor-change", read);
+    window.addEventListener("storage", read);
+    return () => {
+      window.removeEventListener("gh-cursor-change", read);
+      window.removeEventListener("storage", read);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
     // any-pointer (not pointer): touchscreen laptops often report a coarse
     // primary pointer even with a mouse attached.
     if (!window.matchMedia("(any-pointer: fine)").matches) return;
@@ -109,7 +124,9 @@ export default function CustomCursor() {
       document.documentElement.removeEventListener("mouseleave", onLeave);
       document.documentElement.removeEventListener("mouseenter", onEnter);
     };
-  }, []);
+  }, [enabled]);
+
+  if (!enabled) return null;
 
   return (
     <div ref={rootRef} className="gh-cursor-layer is-hidden" aria-hidden="true">

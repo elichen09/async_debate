@@ -45,18 +45,22 @@ export default function AboutPage() {
         .db-main { padding-top: 0 !important; }
 
         /* ── Full-bleed gallery: the centerpiece, no box ─────────────── */
-        .gh-hero3d { position: relative; width: 100%; height: 88vh; min-height: 520px; }
+        /* Tall track + sticky viewport = the gallery pins while you scroll the
+           photos by, then releases into the content below. */
+        .gh-hero3d { position: relative; width: 100%; height: 300vh; }
+        .gh-hero3d__sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; }
         .gh-hero3d__canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-        .gh-hero3d__canvas canvas { display: block; }
+        .gh-hero3d__canvas canvas { display: block; touch-action: pan-y; }
+        .gh-hero3d, .gh-hero3d__canvas { touch-action: pan-y; }
         /* Melt the bottom of the gallery into the content band below it */
-        .gh-hero3d::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 240px; background: linear-gradient(180deg, rgba(10,13,11,0) 0%, ${CONTENT_BG} 92%); pointer-events: none; z-index: 1; }
+        .gh-hero3d__sticky::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 240px; background: linear-gradient(180deg, rgba(10,13,11,0) 0%, ${CONTENT_BG} 92%); pointer-events: none; z-index: 1; }
 
         .gh-hero3d__bar { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: clamp(16px, 3vh, 26px) clamp(20px, 5vw, 56px); }
         .gh-hero3d__back { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: 13px; color: rgba(255,255,255,0.85); text-decoration: none; padding: 8px 14px; border-radius: 999px; background: rgba(8,11,9,0.55); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.12); transition: background .15s ease; }
         .gh-hero3d__back:hover { background: rgba(8,11,9,0.8); }
         .gh-hero3d__tag { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(255,255,255,0.6); }
         .gh-hero3d__hint { position: absolute; left: 0; right: 0; bottom: 26px; z-index: 2; text-align: center; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255,255,255,0.6); pointer-events: none; }
-        @media (max-width: 640px) { .gh-hero3d { height: 64vh; min-height: 400px; } }
+        @media (max-width: 640px) { .gh-hero3d { height: 240vh; } }
 
         /* ── Content band: solid dark so text is always legible ──────── */
         .gh-content { position: relative; z-index: 1; background: ${CONTENT_BG}; }
@@ -105,14 +109,17 @@ export default function AboutPage() {
         .gh-email:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.4); }
       `}</style>
 
-      {/* ── The scrolling photo gallery — full-bleed centerpiece ─────── */}
+      {/* ── Pinned scrollytelling gallery: scroll drives the photos by while the
+            page stays put, then it releases into the content below ─────────── */}
       <div className="gh-hero3d">
-        <InfiniteGallery images={GALLERY} visibleCount={10} speed={1} className="gh-hero3d__canvas" />
-        <div className="gh-hero3d__bar">
-          <Link href="/" className="gh-hero3d__back">← debate.fish</Link>
-          <span className="gh-hero3d__tag">About</span>
+        <div className="gh-hero3d__sticky">
+          <InfiniteGallery images={GALLERY} visibleCount={10} speed={1} autoplay={false} className="gh-hero3d__canvas" />
+          <div className="gh-hero3d__bar">
+            <Link href="/" className="gh-hero3d__back">← debate.fish</Link>
+            <span className="gh-hero3d__tag">About</span>
+          </div>
+          <p className="gh-hero3d__hint">Keep scrolling — the photos come to you</p>
         </div>
-        <p className="gh-hero3d__hint">Scroll — the photos drift toward you</p>
       </div>
 
       {/* ── All text lives below the gallery, on a solid dark band ───── */}

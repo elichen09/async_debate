@@ -24,6 +24,7 @@ interface InfiniteGalleryProps {
   speed?: number;
   zSpacing?: number;
   visibleCount?: number;
+  autoplay?: boolean;
   falloff?: { near: number; far: number };
   fadeSettings?: FadeSettings;
   blurSettings?: BlurSettings;
@@ -180,6 +181,7 @@ function GalleryScene({
   images,
   speed = 1,
   visibleCount = 8,
+  autoplay = true,
   fadeSettings = {
     fadeIn: { start: 0.05, end: 0.15 },
     fadeOut: { start: 0.85, end: 0.95 },
@@ -191,7 +193,7 @@ function GalleryScene({
   },
 }: Omit<InfiniteGalleryProps, "className" | "style">) {
   const [scrollVelocity, setScrollVelocity] = useState(0);
-  const [autoPlay, setAutoPlay] = useState(true);
+  const [autoPlay, setAutoPlay] = useState(autoplay);
   const lastInteraction = useRef(Date.now());
 
   const normalizedImages = useMemo(
@@ -258,10 +260,10 @@ function GalleryScene({
     }));
   }, [depthRange, spatialPositions, totalImages, visibleCount]);
 
-  // Drive the gallery from the page's own scroll position. We never call
-  // preventDefault, so the page keeps scrolling normally and the text stays
-  // readable — the photos simply flow toward the camera as you move down the
-  // page. When the page is idle, autoplay keeps new images drifting in.
+  // Drive the gallery from page scroll: each bit of scroll pushes the photos by.
+  // On the About page the gallery sits in a pinned (sticky) section, so this
+  // scroll is "captured" — the page stays put and the photos advance until the
+  // pinned track ends, then normal scrolling resumes.
   useEffect(() => {
     let lastY = window.scrollY;
     const onScroll = () => {
@@ -269,26 +271,26 @@ function GalleryScene({
       const dy = y - lastY;
       lastY = y;
       if (dy === 0) return;
-      setScrollVelocity((prev) => prev + dy * 0.02 * speed);
-      setAutoPlay(false);
+      setScrollVelocity((prev) => prev + dy * 0.03 * speed);
+      if (autoplay) setAutoPlay(false);
       lastInteraction.current = Date.now();
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [speed]);
+  }, [speed, autoplay]);
 
+  // When autoplay is enabled, resume drifting after a few idle seconds.
   useEffect(() => {
+    if (!autoplay) return;
     const interval = setInterval(() => {
-      if (Date.now() - lastInteraction.current > 3000) {
-        setAutoPlay(true);
-      }
+      if (Date.now() - lastInteraction.current > 3000) setAutoPlay(true);
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [autoplay]);
 
   useFrame((state, delta) => {
     if (autoPlay) {
-      setScrollVelocity((prev) => prev + 0.3 * delta);
+      setScrollVelocity((prev) => prev + 0.3 * delta * speed);
     }
 
     setScrollVelocity((prev) => prev * 0.95);
@@ -449,6 +451,7 @@ export default function InfiniteGallery({
   images,
   speed = 1,
   visibleCount = 8,
+  autoplay = true,
   className = "h-96 w-full",
   style,
   fadeSettings = {
@@ -489,6 +492,7 @@ export default function InfiniteGallery({
             images={images}
             speed={speed}
             visibleCount={visibleCount}
+            autoplay={autoplay}
             fadeSettings={fadeSettings}
             blurSettings={blurSettings}
           />
