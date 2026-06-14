@@ -12,6 +12,7 @@ import Link from "next/link";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
+import { useRouter } from "next/navigation";
 import type { PastRound } from "@/lib/pastRounds";
 
 // ---------------------------------------------------------------------------
@@ -403,6 +404,8 @@ export default function PastGalaxy({ rounds }: { rounds: PastRound[] }) {
   const [hovered, setHovered] = useState<PastRound | null>(null);
   const [selected, setSelected] = useState<PastRound | null>(null);
 
+  const router = useRouter();
+
   const facets = useMemo(
     () => ({
       topics: [...new Set(rounds.map((r) => r.topic))].sort((a, b) => a.localeCompare(b)),
@@ -506,7 +509,16 @@ export default function PastGalaxy({ rounds }: { rounds: PastRound[] }) {
       {/* heading + controls, stacked top-left */}
       <div className="gh-past-ui">
         <div className="gh-past-head">
-          <Link href="/" className="gh-past-back">← debate.fish</Link>
+          <Link
+            href="/"
+            className="gh-past-back"
+            onClick={(e) => {
+              if (window.history.length > 1) {
+                e.preventDefault();
+                router.back();
+              }
+            }}
+          >← Back</Link>
           <h1 className="gh-past-title">The Past</h1>
           <p className="gh-past-sub">
             {rounds.length} recorded rounds — orbit the archive, hover to peek, click to watch.

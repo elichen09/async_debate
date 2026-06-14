@@ -17,7 +17,7 @@ const NAV_LINKS = [
   { href: "/the-past", label: "The Past" },
   { href: "/history", label: "History" },
   { href: "/judge", label: "Judge" },
-  { href: "/future", label: "Future" },
+  { href: "/future", label: "Learn" },
 ];
 
 export default function TopNav() {

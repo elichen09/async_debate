@@ -3,8 +3,8 @@ import type { CSSProperties } from "react";
 import BackButton from "./BackButton";
 
 export const metadata: Metadata = {
-  title: "Future — debate.fish",
-  description: "Learning resources and joining the debate.fish team.",
+  title: "Learn — debate.fish",
+  description: "Learning resources from debate.fish — request a lecture on any topic.",
 };
 
 const RESOURCES = [
@@ -80,7 +80,7 @@ export default function FuturePage() {
                 textShadow: "0 2px 24px rgba(0,0,0,0.50), 0 12px 64px rgba(0,0,0,0.24)",
               } as CSSProperties}
             >
-              FUTURE
+              LEARN
             </h1>
 
           </div>
@@ -196,47 +196,62 @@ export default function FuturePage() {
           <div style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--accent)", flexShrink: 0 }} />
         </div>
 
-        {/* ── Join ────────────────────────────────────────────────── */}
+        {/* ── Request a lecture ───────────────────────────────────── */}
         <section>
           <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.20em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 clamp(20px, 4vh, 36px)" }}>
-            02 — Join the team
+            02 — Learn anything
           </p>
 
-          {/* Two-column asymmetric */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "clamp(24px, 5vw, 64px)", alignItems: "start", marginBottom: "clamp(32px, 6vh, 52px)" }}>
-            {/* Left — pitch */}
-            <div className="ab-step-in" style={{ '--i': '0' } as CSSProperties}>
-              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(28px, 4vw, 48px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.025em", margin: "0 0 16px", lineHeight: 0.93, textTransform: "uppercase", textShadow: "0 2px 16px rgba(0,0,0,0.42)", textWrap: "balance" } as CSSProperties}>
-                Help build<br />debate.fish.
-              </h2>
-              <p style={{ fontSize: 14, color: "rgba(255,255,255,0.52)", lineHeight: 1.70, margin: 0, textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
-                We&rsquo;re looking for debaters with coding skills — or coders with debate interest. Or people who want to help advertise! Share your accomplishments and we&rsquo;ll be in touch.
-              </p>
-            </div>
-
-            {/* Right — benefits */}
-            <div className="ab-step-in" style={{ '--i': '1' } as CSSProperties}>
-              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.32)", margin: "0 0 14px" }}>What you get</p>
-              {[
-                "Free prep materials",
-                "Coaching from experienced debaters",
-                "Direct role in website development",
-              ].map((b, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                  <span style={{ color: "var(--accent)", fontSize: 11, flexShrink: 0, marginTop: 2 }}>✓</span>
-                  <p style={{ margin: 0, fontSize: 13, color: "rgba(255,255,255,0.65)", lineHeight: 1.55, textShadow: "0 1px 4px rgba(0,0,0,0.30)" }}>{b}</p>
-                </div>
-              ))}
-            </div>
+          {/* Pitch */}
+          <div className="ab-step-in" style={{ '--i': '0', marginBottom: "clamp(28px, 5vh, 44px)" } as CSSProperties}>
+            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(28px, 4.4vw, 52px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.025em", margin: "0 0 16px", lineHeight: 0.93, textTransform: "uppercase", textShadow: "0 2px 16px rgba(0,0,0,0.42)", textWrap: "balance" } as CSSProperties}>
+              Tell us what you<br />want to learn.
+            </h2>
+            <p style={{ fontSize: 14, color: "rgba(255,255,255,0.55)", lineHeight: 1.70, margin: 0, maxWidth: "62ch", textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
+              We&rsquo;re happy to give a lecture on any topic---a framework, a position, flowing, whatever you&rsquo;re curious about. Drop a DM in Discord or send us an email and we&rsquo;ll put something together.
+            </p>
           </div>
 
+          {/* Discord — full-bleed band */}
+          <a
+            href="https://discord.gg/Y6KAnrqcfV"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ft-yt"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 20,
+              padding: "clamp(16px, 3vh, 24px) clamp(20px, 4vw, 36px)",
+              border: "1px solid rgba(255,255,255,0.14)",
+              borderLeft: "3px solid var(--accent)",
+              background: "rgba(255,255,255,0.04)",
+              textDecoration: "none",
+              transition: "background 0.15s, border-color 0.15s",
+              marginBottom: "clamp(28px, 5vh, 44px)",
+            }}
+          >
+            <div>
+              <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 6px" }}>
+                Join the community
+              </p>
+              <p style={{ fontFamily: "var(--font-display)", fontSize: "clamp(18px, 2.8vw, 28px)", fontWeight: 700, color: "#fff", margin: 0, letterSpacing: "-0.01em", textShadow: "0 1px 10px rgba(0,0,0,0.38)" }}>
+                Discord ↗
+              </p>
+            </div>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: "clamp(32px, 6vw, 64px)", fontWeight: 800, color: "rgba(255,255,255,0.07)", letterSpacing: "-0.04em", flexShrink: 0, lineHeight: 1 }}>
+              ✦
+            </span>
+          </a>
+
           {/* Email — billboard scale */}
-          <div className="ab-step-in" style={{ '--i': '2' } as CSSProperties}>
+          <div className="ab-step-in" style={{ '--i': '1' } as CSSProperties}>
             <p style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.28)", margin: "0 0 12px" }}>
-              Apply via email
+              Or email us
             </p>
             <a
-              href="mailto:elichen314@gmail.com?subject=debate.fish team application"
+              href="mailto:elichen314@gmail.com?subject=Lecture%20request"
               className="ft-email"
               style={{
                 display: "block",

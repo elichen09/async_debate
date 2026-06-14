@@ -858,61 +858,59 @@ input, button, textarea, select { font-family: inherit; }
   top: 44px;
   left: 0;
   bottom: 0;
-  width: 56px;
+  width: 132px;
   z-index: 90;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: safe center;
-  gap: clamp(14px, 2.8vh, 26px);
-  padding: 20px 0 28px;
+  gap: clamp(12px, 2.4vh, 22px);
+  padding: 20px 14px 28px 20px;
   overflow-y: auto;
-  background: linear-gradient(to right, oklch(0 0 0 / 0.32) 0%, transparent 100%);
+  background: linear-gradient(to right, oklch(0 0 0 / 0.42) 0%, oklch(0 0 0 / 0.12) 58%, transparent 100%);
   animation: gh-siderail-in 0.5s var(--ease-out-quint) 0.08s both;
 }
 @media (prefers-reduced-motion: reduce) { .gh-siderail { animation: none; } }
 
 .gh-siderail__link {
-  writing-mode: vertical-rl;
   font-family: var(--font-body);
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  color: rgba(var(--wt), 0.70);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: rgba(var(--wt), 0.74);
   text-decoration: none;
   white-space: nowrap;
   position: relative;
-  padding-left: 3px;
+  padding: 2px 0 4px;
   transition: color 0.18s ease, letter-spacing 0.22s var(--ease-out-quint);
 }
-/* Underline analog: a hairline beside the glyphs that grows in reading
-   direction (top to bottom). */
+/* Underline analog: a hairline beneath the glyphs that grows left → right. */
 .gh-siderail__link::after {
   content: '';
   position: absolute;
-  left: -1px;
-  top: 0;
+  left: 0;
+  right: 0;
   bottom: 0;
-  width: 1px;
+  height: 1px;
   background: rgb(var(--wt));
-  transform: scaleY(0);
-  transform-origin: center top;
+  transform: scaleX(0);
+  transform-origin: left center;
   transition: transform 0.22s var(--ease-out-quint);
 }
 .gh-siderail__link:hover,
 .gh-siderail__link.is-active { color: rgb(var(--wt)); }
-.gh-siderail__link:hover { letter-spacing: 0.10em; }
+.gh-siderail__link:hover { letter-spacing: 0.07em; }
 .gh-siderail__link:hover::after,
-.gh-siderail__link.is-active::after { transform: scaleY(1); }
+.gh-siderail__link.is-active::after { transform: scaleX(1); }
 @media (prefers-reduced-motion: reduce) {
   .gh-siderail__link { transition: color 0.18s ease; }
-  .gh-siderail__link:hover { letter-spacing: 0.06em; }
+  .gh-siderail__link:hover { letter-spacing: 0.04em; }
 }
 
 /* Clear the rail: pad both sides so centered layouts stay centered */
 @media (min-width: 769px) {
   .db-shell:has(.gh-siderail) .db-main {
-    padding-left: 56px;
-    padding-right: 56px;
+    padding-left: 140px;
+    padding-right: 140px;
   }
 }
 @media (max-width: 768px) {
@@ -1186,13 +1184,15 @@ input, button, textarea, select { font-family: inherit; }
 .gh-nav-link {
   font-family: var(--font-body);
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: 0.01em;
-  color: rgba(255, 255, 255, 0.78);
+  color: #fff;
   text-decoration: none;
-  transition: color 0.18s ease;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 2px 12px rgba(0, 0, 0, 0.45);
+  transition: color 0.18s ease, opacity 0.18s ease;
+  opacity: 0.92;
 }
-.gh-nav-link:hover { color: #fff; }
+.gh-nav-link:hover { color: #fff; opacity: 1; }
 
 .gh-center {
   flex: 1;
