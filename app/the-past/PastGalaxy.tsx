@@ -13,6 +13,7 @@ import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Stars } from "@react-three/drei";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 import type { PastRound } from "@/lib/pastRounds";
 
 // ---------------------------------------------------------------------------
@@ -406,6 +407,19 @@ export default function PastGalaxy({ rounds }: { rounds: PastRound[] }) {
 
   const router = useRouter();
 
+  // The Past is a logged-in-only archive — bounce anonymous visitors to login
+  // before the heavy WebGL galaxy ever mounts.
+  const [authed, setAuthed] = useState<boolean | null>(null);
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      if (data.session) setAuthed(true);
+      else { setAuthed(false); router.replace("/login"); }
+    });
+    return () => { active = false; };
+  }, [router]);
+
   const facets = useMemo(
     () => ({
       topics: [...new Set(rounds.map((r) => r.topic))].sort((a, b) => a.localeCompare(b)),
@@ -478,10 +492,10 @@ export default function PastGalaxy({ rounds }: { rounds: PastRound[] }) {
     setSort("new");
   }
 
-  if (!mounted) {
+  if (!mounted || authed !== true) {
     return (
       <div className="gh-past-root gh-past-loading">
-        <span>Charting {rounds.length} rounds…</span>
+        <span>{authed === false ? "Redirecting…" : `Charting ${rounds.length} rounds…`}</span>
       </div>
     );
   }

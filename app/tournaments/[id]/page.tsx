@@ -11,7 +11,7 @@ import type { CSSProperties } from "react";
 interface Tournament {
   id: string;
   name: string;
-  size: 4 | 8;
+  size: 4 | 8 | 16;
   status: "registration" | "active" | "complete";
   topic: string | null;
   created_by: string;
@@ -76,21 +76,40 @@ function getTopY(ri: number, mi: number, firstCount: number, totalH: number) {
   return getMidY(ri, mi, firstCount, totalH) - MH / 2;
 }
 
+// Standard single-elimination seeding — returns 1-indexed seeds in bracket
+// order so the top two seeds can only meet in the final. Length = n (power of 2).
+function seedOrder(n: number): number[] {
+  let seeds = [1];
+  while (seeds.length < n) {
+    const sum = seeds.length * 2 + 1;
+    const next: number[] = [];
+    for (const s of seeds) next.push(s, sum - s);
+    seeds = next;
+  }
+  return seeds;
+}
+
+// Singular stage name for a round (1-indexed) in a bracket of `size`.
+function stageName(roundNumber: number, size: number): string {
+  const fromFinal = Math.log2(size) - roundNumber; // 0 = final
+  return ["Final", "Semifinal", "Quarterfinal", "Round of 16"][fromFinal] ?? `Round ${roundNumber}`;
+}
+
 interface BracketProps {
   matches: TournamentMatch[];
   participants: TournamentParticipant[];
   userId: string;
-  size: 4 | 8;
+  size: 4 | 8 | 16;
 }
 
 function Bracket({ matches, participants, userId, size }: BracketProps) {
-  const firstCount  = size === 4 ? 2 : 4;
-  const totalRounds = size === 4 ? 2 : 3;
+  const firstCount  = size / 2;
+  const totalRounds = Math.log2(size);
   const totalH = firstCount * SB;
   const totalW = totalRounds * MW + (totalRounds - 1) * RG;
-  const roundLabels = size === 4
-    ? ["Semifinals", "Final"]
-    : ["Quarterfinals", "Semifinals", "Final"];
+  const roundLabels = Array.from({ length: totalRounds }, (_, ri) =>
+    ["Final", "Semifinals", "Quarterfinals", "Round of 16"][totalRounds - 1 - ri] ?? `Round ${ri + 1}`
+  );
 
   const roundGroups: TournamentMatch[][] = [];
   for (let r = 1; r <= totalRounds; r++) {
@@ -337,33 +356,38 @@ export default function TournamentPage() {
 
     const p = sorted;
     const sz = tournament.size;
-    const matchDefs = sz === 4
-      ? [
-          { round_number: 1, match_number: 1, player1_id: p[0].user_id, player2_id: p[3].user_id },
-          { round_number: 1, match_number: 2, player1_id: p[1].user_id, player2_id: p[2].user_id },
-          { round_number: 2, match_number: 1, player1_id: null, player2_id: null },
-        ]
-      : [
-          { round_number: 1, match_number: 1, player1_id: p[0].user_id, player2_id: p[7].user_id },
-          { round_number: 1, match_number: 2, player1_id: p[3].user_id, player2_id: p[4].user_id },
-          { round_number: 1, match_number: 3, player1_id: p[1].user_id, player2_id: p[6].user_id },
-          { round_number: 1, match_number: 4, player1_id: p[2].user_id, player2_id: p[5].user_id },
-          { round_number: 2, match_number: 1, player1_id: null, player2_id: null },
-          { round_number: 2, match_number: 2, player1_id: null, player2_id: null },
-          { round_number: 3, match_number: 1, player1_id: null, player2_id: null },
-        ];
+    const totalRounds = Math.log2(sz);
+    const order = seedOrder(sz); // 1-indexed seeds in standard bracket order
+
+    // Round 1 is seeded from `order`; later rounds start empty and fill as the
+    // bracket advances. Works for any power-of-two size (4 / 8 / 16).
+    const matchDefs: { round_number: number; match_number: number; player1_id: string | null; player2_id: string | null }[] = [];
+    for (let i = 0; i < sz / 2; i++) {
+      matchDefs.push({
+        round_number: 1,
+        match_number: i + 1,
+        player1_id: p[order[2 * i] - 1].user_id,
+        player2_id: p[order[2 * i + 1] - 1].user_id,
+      });
+    }
+    for (let r = 2; r <= totalRounds; r++) {
+      for (let i = 0; i < sz / Math.pow(2, r); i++) {
+        matchDefs.push({ round_number: r, match_number: i + 1, player1_id: null, player2_id: null });
+      }
+    }
 
     const { data: created, error: matchErr } = await supabase.from("tournament_matches").insert(matchDefs.map(m => ({ ...m, tournament_id: id, status: "pending" }))).select();
     if (matchErr || !created) { setError("Failed to create bracket."); setActionLoading(false); return; }
 
     const sm = [...created].sort((a, b) => a.round_number !== b.round_number ? a.round_number - b.round_number : a.match_number - b.match_number);
-    const links = sz === 4
-      ? [{ id: sm[0].id, nxt: sm[2].id }, { id: sm[1].id, nxt: sm[2].id }]
-      : [
-          { id: sm[0].id, nxt: sm[4].id }, { id: sm[1].id, nxt: sm[4].id },
-          { id: sm[2].id, nxt: sm[5].id }, { id: sm[3].id, nxt: sm[5].id },
-          { id: sm[4].id, nxt: sm[6].id }, { id: sm[5].id, nxt: sm[6].id },
-        ];
+
+    // Each adjacent pair of matches in a round feeds one match in the next round.
+    const links: { id: string; nxt: string }[] = [];
+    for (let r = 1; r < totalRounds; r++) {
+      const cur = sm.filter(m => m.round_number === r).sort((a, b) => a.match_number - b.match_number);
+      const nxt = sm.filter(m => m.round_number === r + 1).sort((a, b) => a.match_number - b.match_number);
+      cur.forEach((m, i) => links.push({ id: m.id, nxt: nxt[Math.floor(i / 2)].id }));
+    }
     await Promise.all(links.map(l => supabase.from("tournament_matches").update({ next_match_id: l.nxt }).eq("id", l.id)));
 
     const round1 = sm.filter(m => m.round_number === 1);
@@ -377,18 +401,13 @@ export default function TournamentPage() {
 
     // Private tournaments leave judging to the creator, who assigns judges per match.
     if (tournament.format !== "private") {
-      const judgeRows = sz === 4
-        ? [
-            { tournament_id: id, match_id: sm[0].id, judge_id: p[1].user_id, completed: false },
-            { tournament_id: id, match_id: sm[1].id, judge_id: p[0].user_id, completed: false },
-          ]
-        : [
-            { tournament_id: id, match_id: sm[0].id, judge_id: p[2].user_id, completed: false },
-            { tournament_id: id, match_id: sm[1].id, judge_id: p[1].user_id, completed: false },
-            { tournament_id: id, match_id: sm[2].id, judge_id: p[3].user_id, completed: false },
-            { tournament_id: id, match_id: sm[3].id, judge_id: p[0].user_id, completed: false },
-          ];
-
+      // Each round-one match is judged by a player drawn from another match.
+      const judgeRows = round1.map((m, i) => ({
+        tournament_id: id,
+        match_id: m.id,
+        judge_id: round1[(i + 1) % round1.length].player1_id as string,
+        completed: false,
+      }));
       await supabase.from("tournament_judging_assignments").insert(judgeRows);
     }
     await supabase.from("tournaments").update({ status: "active" }).eq("id", id);
@@ -774,11 +793,7 @@ export default function TournamentPage() {
                         vs {participants.find(p => p.user_id === (myActiveMatch.player1_id === userId ? myActiveMatch.player2_id : myActiveMatch.player1_id))?.user.display_name || "Opponent"}
                       </p>
                       <p style={{ margin: 0, fontFamily: "var(--font-mono)", fontSize: 11, color: "rgba(255,255,255,0.38)", letterSpacing: "0.04em" }}>
-                        Round {myActiveMatch.round_number}
-                        {myActiveMatch.round_number === 1 && tournament.size === 4 && " · Semifinal"}
-                        {myActiveMatch.round_number === 1 && tournament.size === 8 && " · Quarterfinal"}
-                        {myActiveMatch.round_number === 2 && tournament.size === 8 && " · Semifinal"}
-                        {myActiveMatch.round_number === tournament.size / 2 && " · Final"}
+                        Round {myActiveMatch.round_number} · {stageName(myActiveMatch.round_number, tournament.size)}
                       </p>
                     </div>
                     <span style={{ fontSize: 13, color: "var(--accent)" }}>View round →</span>

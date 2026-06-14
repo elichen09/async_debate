@@ -17,7 +17,7 @@ export default function CreateTournamentPage() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [format, setFormat] = useState<"open" | "private">("open");
-  const [size, setSize] = useState<4 | 8>(4);
+  const [size, setSize] = useState<4 | 8 | 16>(4);
   const [topicQuery, setTopicQuery] = useState("");
   const [topic, setTopic] = useState<Topic | null>(null);
   const [loading, setLoading] = useState(false);
@@ -127,7 +127,7 @@ export default function CreateTournamentPage() {
         {/* 03 Bracket size */}
         <section>
           <p style={eyebrow}>03 — Bracket size</p>
-          {([4, 8] as const).map(s => (
+          {([4, 8, 16] as const).map(s => (
             <div
               key={s}
               onClick={() => setSize(s)}
@@ -141,7 +141,7 @@ export default function CreateTournamentPage() {
                   {s} players
                 </p>
                 <p style={{ margin: 0, fontSize: 12, color: "rgba(255,255,255,0.32)" }}>
-                  {s === 4 ? "Semifinals + Final" : "Quarterfinals + Semifinals + Final"}
+                  {s === 4 ? "Semifinals + Final" : s === 8 ? "Quarterfinals + Semifinals + Final" : "Round of 16 + Quarters + Semis + Final"}
                 </p>
               </div>
             </div>
