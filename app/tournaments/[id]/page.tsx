@@ -161,10 +161,10 @@ function Bracket({ matches, participants, userId, size }: BracketProps) {
                   background: "rgba(255,255,255,0.07)",
                   backdropFilter: "blur(12px)",
                   border: `1px solid ${isMyMatch ? "rgba(var(--accent-raw, 80,160,80), 0.50)" : "rgba(255,255,255,0.12)"}`,
-                  borderColor: isMyMatch ? "oklch(0.54 0.16 142 / 0.50)" : "rgba(255,255,255,0.12)",
+                  borderColor: isMyMatch ? "oklch(0.60 0.15 42 / 0.50)" : "rgba(255,255,255,0.12)",
                   borderRadius: 8,
                   overflow: "hidden",
-                  boxShadow: isMyMatch ? "0 0 0 1.5px oklch(0.54 0.16 142 / 0.20)" : "none",
+                  boxShadow: isMyMatch ? "0 0 0 1.5px oklch(0.60 0.15 42 / 0.20)" : "none",
                 }}
               >
                 {players.map((player, pi) => (
@@ -556,7 +556,7 @@ export default function TournamentPage() {
 
   return (
     <div style={{ maxWidth: 720, margin: "0 auto", padding: "0 clamp(24px, 5vw, 48px) 100px" }}>
-      <style>{`.db-shell { background-image: url("/4.png") !important; }`}</style>
+      <style>{`.db-shell { background-image: url("/fish/fish2.png") !important; }`}</style>
 
       {/* Back + status */}
       <div style={{ paddingTop: "clamp(20px, 4vh, 36px)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>

@@ -90,7 +90,7 @@ export default function SignupPage() {
       <div className="gh-auth gh-auth--centered">
 
       <div>
-        <Link href="/" style={backLink}>← Grasshopper</Link>
+        <Link href="/" style={backLink}>← debate.fish</Link>
       </div>
 
       <section style={{ paddingTop: "clamp(16px, 3vh, 28px)" }}>

@@ -28,7 +28,7 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "Grasshopper",
+  title: "debate.fish",
   description:
     "Debate anyone, on your schedule. Record speeches whenever you have a free minute and climb the ladder.",
 };

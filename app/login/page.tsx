@@ -40,7 +40,7 @@ export default function LoginPage() {
       {/* Centered form */}
       <div className="gh-auth gh-auth--narrow gh-auth--centered">
         <div>
-          <Link href="/" style={backLink}>← Grasshopper</Link>
+          <Link href="/" style={backLink}>← debate.fish</Link>
         </div>
 
         <section style={{ marginTop: "clamp(16px, 3vh, 28px)" }}>

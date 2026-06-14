@@ -5,7 +5,7 @@ import { parseRounds } from "@/lib/pastRounds";
 import PastGalaxy from "./PastGalaxy";
 
 export const metadata: Metadata = {
-  title: "The Past — Grasshopper",
+  title: "The Past — debate.fish",
   description:
     "A galaxy of recorded debate rounds. Orbit, filter, and watch the rounds that shaped the activity.",
 };

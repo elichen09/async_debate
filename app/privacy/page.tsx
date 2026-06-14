@@ -3,7 +3,7 @@ import Link from "next/link";
 import BackButton from "@/app/future/BackButton";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Grasshopper",
+  title: "Privacy Policy — debate.fish",
 };
 
 export default function PrivacyPage() {
@@ -38,7 +38,7 @@ export default function PrivacyPage() {
           <h2>2. How We Use Your Information</h2>
           <p>Your information is used to:</p>
           <ul>
-            <li>Operate and improve the Grasshopper platform</li>
+            <li>Operate and improve the debate.fish platform</li>
             <li>Display leaderboards and tournament standings</li>
             <li>Send transactional emails (e.g., round notifications)</li>
           </ul>
@@ -93,7 +93,7 @@ export default function PrivacyPage() {
         <section className="legal-section">
           <h2>7. Children&apos;s Privacy</h2>
           <p>
-            Grasshopper is not directed at children under 13. We do not
+            debate.fish is not directed at children under 13. We do not
             knowingly collect personal information from children under 13. If
             you believe we have, please contact us so we can delete it.
           </p>

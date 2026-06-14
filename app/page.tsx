@@ -3,7 +3,7 @@ import Link from "next/link";
 import { TextScramble } from "./components/TextScramble";
 
 export const metadata: Metadata = {
-  title: "Grasshopper",
+  title: "debate.fish",
   description: "Debate anyone, on your schedule.",
 };
 
@@ -22,7 +22,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="gh-center" aria-label="Grasshopper">
+      <main className="gh-center" aria-label="debate.fish">
         <TextScramble
           as="h1"
           className="gh-title"
@@ -31,14 +31,14 @@ export default function Home() {
           speed={0.045}
           rescrambleOnHover
         >
-          Grasshopper.
+          debate.fish
         </TextScramble>
         <p className="gh-credit">made by Eli and Gary</p>
       </main>
 
       <footer style={{ position: "absolute", bottom: 20, left: 0, right: 0, display: "flex", justifyContent: "center", pointerEvents: "none" }}>
         <span style={{ fontFamily: "var(--font-body)", fontSize: 11, color: "oklch(0.97 0.006 80 / 0.35)", letterSpacing: "0.02em", pointerEvents: "auto" }}>
-          &copy; {new Date().getFullYear()} Grasshopper. By using this site, you agree to our{" "}
+          &copy; {new Date().getFullYear()} debate.fish. By using this site, you agree to our{" "}
           <Link href="/terms" style={{ color: "inherit", textDecoration: "underline" }}>Terms</Link>
           {" "}and{" "}
           <Link href="/privacy" style={{ color: "inherit", textDecoration: "underline" }}>Privacy Policy</Link>.

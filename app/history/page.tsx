@@ -54,7 +54,7 @@ export default function HistoryPage() {
 
   return (
     <>
-      <style>{`.db-shell { background-image: url("/6.png") !important; }`}</style>
+      <style>{`.db-shell { background-image: url("/fish/fish2.png") !important; }`}</style>
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 clamp(24px, 5vw, 48px) 100px" }}>
 
       <div style={{ paddingTop: "clamp(20px, 4vh, 36px)" }}>

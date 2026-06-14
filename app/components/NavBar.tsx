@@ -69,7 +69,7 @@ export default function TopNav() {
         </button>
 
         <Link href="/dashboard" className="gh-topnav__brand">
-          GRASS<b>H</b>OPPER
+          debate<b>.</b>fish
         </Link>
 
         <div className="gh-topnav__right">
@@ -101,7 +101,7 @@ export default function TopNav() {
 
       <aside className={`gh-drawer ${open ? "is-open" : ""}`}>
         <Link href="/dashboard" className="gh-drawer__brand">
-          GRASS<b>H</b>OPPER
+          debate<b>.</b>fish
         </Link>
         {NAV_LINKS.map(link => (
           <Link

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 /* =========================================================================
    AUTH CHARACTERS — a little ensemble of debaters that watch your cursor.
    Adapted from the "animated characters login" concept and re-themed to the
-   Grasshopper forest palette. Driven entirely by props so each auth page can
+   debate.fish ocean palette. Driven entirely by props so each auth page can
    wire in its own form state:
      • eyes track the cursor and bodies lean toward it
      • they glance at each other the moment you focus a field   (`typing`)
@@ -13,13 +13,13 @@ import { useEffect, useRef, useState } from "react";
        reveal your password                          (`revealPassword`)
    ========================================================================= */
 
-// Forest-meshed body colors (was purple / black / orange / yellow)
+// Ocean-meshed body colors — deep sea, teal, warm coral fish, pale aqua
 const C = {
-  tall: "#4FA463", // back rectangle — grasshopper green
-  ink: "#26352C", // middle rectangle — deep forest
-  warm: "#E2A45B", // front-left dome — wheat / amber
-  sage: "#C9DA8C", // front-right — pale sage
-  pupil: "#26352C", // deep forest ink for pupils
+  tall: "#3E8FB0", // back rectangle — ocean teal-blue
+  ink: "#1C2B3A", // middle rectangle — deep sea navy
+  warm: "#E0985E", // front-left dome — warm coral (the fish)
+  sage: "#86C7D6", // front-right — pale aqua
+  pupil: "#1C2B3A", // deep sea ink for pupils
 } as const;
 
 interface PupilProps {

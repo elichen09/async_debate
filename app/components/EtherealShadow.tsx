@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-// "Shadow" scene layer: a forest-green smoke mask drifted by animated SVG
+// "Shadow" scene layer: a ocean-blue smoke mask drifted by animated SVG
 // turbulence. Ported dependency-free from the framer-motion "etheral shadow"
 // component; renders only while the gh-bg-shadow scene is active so the
 // filter work stops the moment another scene is picked.
@@ -12,7 +12,7 @@ const NOISE_URL = "https://framerusercontent.com/images/g0QcWrxr87K0ufOxIUFBakwY
 
 const SCALE = 100;        // displacement intensity, 1–100
 const SPEED = 90;         // drift speed, 1–100
-const COLOR = "rgba(104, 134, 108, 0.9)"; // forest smoke
+const COLOR = "rgba(78, 120, 150, 0.9)"; // ocean smoke
 const NOISE_OPACITY = 0.5;
 const NOISE_SCALE = 1.2;
 

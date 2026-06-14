@@ -3,8 +3,8 @@ import type { CSSProperties } from "react";
 import BackButton from "./BackButton";
 
 export const metadata: Metadata = {
-  title: "Future — Grasshopper",
-  description: "Learning resources and joining the Grasshopper team.",
+  title: "Future — debate.fish",
+  description: "Learning resources and joining the debate.fish team.",
 };
 
 const RESOURCES = [
@@ -42,12 +42,12 @@ export default function FuturePage() {
   return (
     <>
       <style>{`
-        .db-shell { background-image: url("/7.png") !important; }
+        .db-shell { background-image: url("/fish/fish2.png") !important; }
         .ft-doc:hover .ft-doc-title { color: var(--accent) !important; }
         .ft-doc:hover .ft-doc-arrow { opacity: 1 !important; transform: translate(3px,-3px) !important; }
         .ft-doc-arrow { transition: opacity 0.15s, transform 0.18s; }
         .ft-doc-title { transition: color 0.15s; }
-        .ft-yt:hover { border-color: oklch(0.54 0.16 142 / 0.70) !important; background: oklch(0.54 0.16 142 / 0.10) !important; }
+        .ft-yt:hover { border-color: oklch(0.60 0.15 42 / 0.70) !important; background: oklch(0.60 0.15 42 / 0.10) !important; }
         .ft-email:hover { opacity: 0.70; }
       `}</style>
 
@@ -57,7 +57,7 @@ export default function FuturePage() {
         <div style={{ paddingTop: "clamp(20px, 4vh, 36px)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <BackButton />
           <span style={{ fontFamily: "var(--font-mono)", fontSize: 9, letterSpacing: "0.18em", textTransform: "uppercase", color: "rgba(255,255,255,0.22)" }}>
-            Grasshopper / 2026
+            debate.fish / 2026
           </span>
         </div>
 
@@ -207,7 +207,7 @@ export default function FuturePage() {
             {/* Left — pitch */}
             <div className="ab-step-in" style={{ '--i': '0' } as CSSProperties}>
               <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(28px, 4vw, 48px)", fontWeight: 800, color: "#fff", letterSpacing: "-0.025em", margin: "0 0 16px", lineHeight: 0.93, textTransform: "uppercase", textShadow: "0 2px 16px rgba(0,0,0,0.42)", textWrap: "balance" } as CSSProperties}>
-                Help build<br />Grasshopper.
+                Help build<br />debate.fish.
               </h2>
               <p style={{ fontSize: 14, color: "rgba(255,255,255,0.52)", lineHeight: 1.70, margin: 0, textShadow: "0 1px 5px rgba(0,0,0,0.35)" }}>
                 We&rsquo;re looking for debaters with coding skills — or coders with debate interest. Or people who want to help advertise! Share your accomplishments and we&rsquo;ll be in touch.
@@ -236,7 +236,7 @@ export default function FuturePage() {
               Apply via email
             </p>
             <a
-              href="mailto:elichen314@gmail.com?subject=Grasshopper team application"
+              href="mailto:elichen314@gmail.com?subject=debate.fish team application"
               className="ft-email"
               style={{
                 display: "block",

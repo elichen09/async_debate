@@ -6,9 +6,9 @@ import InfiniteGallery from "@/app/components/InfiniteGallery";
 import ForceDarkScene from "@/app/components/ForceDarkScene";
 
 export const metadata: Metadata = {
-  title: "About — Grasshopper",
+  title: "About — debate.fish",
   description:
-    "Grasshopper was built by Gary and Eli, competitive debaters from Lincoln-Sudbury who wanted to make getting better at debate easier. Chess.com, but for debate.",
+    "debate.fish was built by Gary and Eli, competitive debaters from Lincoln-Sudbury who wanted to make getting better at debate easier. Chess.com, but for debate.",
 };
 
 const RECORD = [
@@ -30,7 +30,7 @@ const GALLERY = [
   { src: `${GP}/IMG_8861.JPG`, alt: "Debate rounds" },
   { src: `${GP}/IMG_8860.JPG`, alt: "On the circuit" },
   { src: `${GP}/IMG_4706.jpeg`, alt: "With the team" },
-  { src: `${GP}/IMG_0127.PNG`, alt: "The Grasshopper team" },
+  { src: `${GP}/IMG_0127.PNG`, alt: "The debate.fish team" },
   { src: `${GP}/PXL_20251018_170055704.jpg`, alt: "Between rounds" },
 ];
 
@@ -41,7 +41,7 @@ export default function AboutPage() {
     <>
       <ForceDarkScene />
       <style>{`
-        .db-shell { background-image: url("/2.png") !important; }
+        .db-shell { background-image: url("/fish/fish2.png") !important; }
         .db-main { padding-top: 0 !important; }
 
         /* ── Full-bleed gallery: the centerpiece, no box ─────────────── */
@@ -109,7 +109,7 @@ export default function AboutPage() {
       <div className="gh-hero3d">
         <InfiniteGallery images={GALLERY} visibleCount={10} speed={1} className="gh-hero3d__canvas" />
         <div className="gh-hero3d__bar">
-          <Link href="/" className="gh-hero3d__back">← Grasshopper</Link>
+          <Link href="/" className="gh-hero3d__back">← debate.fish</Link>
           <span className="gh-hero3d__tag">About</span>
         </div>
         <p className="gh-hero3d__hint">Scroll — the photos drift toward you</p>
@@ -125,7 +125,7 @@ export default function AboutPage() {
               Gary <em>&</em> Eli
             </h1>
             <p className="gh-about__sub ab-hero-line" style={{ "--i": "2" } as CSSProperties}>
-              Debaters from Lincoln Sudbury High School — we built Grasshopper because the game deserved better tools.
+              Debaters from Lincoln Sudbury High School — we built debate.fish because the game deserved better tools.
             </p>
           </section>
 
@@ -184,7 +184,7 @@ export default function AboutPage() {
                 </p>
                 <a
                   className="db-btn db-btn--accent db-btn--lg"
-                  href="mailto:gary.r.ayala@gmail.com,elichen314@gmail.com?subject=Joining%20the%20Grasshopper%20team"
+                  href="mailto:gary.r.ayala@gmail.com,elichen314@gmail.com?subject=Joining%20the%20debate.fish%20team"
                 >
                   Apply via email
                   <span className="db-btn__arrow" aria-hidden="true">→</span>
@@ -205,7 +205,7 @@ export default function AboutPage() {
           {/* Closer */}
           <section className="gh-closer">
             <p className="gh-closer__text">
-              Thanks for using Grasshopper. We&rsquo;d love to hear how we can make it better.
+              Thanks for using debate.fish. We&rsquo;d love to hear how we can make it better.
             </p>
             <div className="gh-emails">
               <a className="gh-email" href="mailto:gary.r.ayala@gmail.com">gary.r.ayala@gmail.com</a>

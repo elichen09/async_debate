@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 /* =========================================================================
-   GRASSHOPPER — Debate, on your terms.
-   Nature-glass aesthetic: macro photography backgrounds, frosted surfaces,
-   Barlow Condensed display type, ember accent on dark greens.
+   debate.fish — Debate, on your terms.
+   Underwater aesthetic: ocean-photo backgrounds, frosted surfaces,
+   Barlow Condensed display type, warm coral accent on deep ocean blue.
    ========================================================================= */
 
 :root {
@@ -28,12 +28,12 @@
    ACCENT
    ========================================================================= */
 :root {
-  --accent:      oklch(0.54 0.16 142);   /* forest green — echoes the moss, bokeh, and grasshopper coloring */
-  --accent-deep: oklch(0.44 0.16 142);
-  --accent-ink:  oklch(0.97 0.008 142);
+  --accent:      oklch(0.60 0.15 42);    /* warm coral — the fish, the striped deck chair, against ocean blue */
+  --accent-deep: oklch(0.50 0.15 42);
+  --accent-ink:  oklch(0.98 0.012 60);
 
   /* On-photo text palette as an RGB triple: white on the dark photo scenes,
-     re-pointed to forest ink by html.gh-light (see LIGHT SCENES). */
+     re-pointed to deep-ocean ink by html.gh-light (see LIGHT SCENES). */
   --wt: 255, 255, 255;
 }
 
@@ -43,17 +43,17 @@
    ========================================================================= */
 :root {
   --paper:       transparent;
-  --paper-2:     oklch(0.14 0.042 145 / 0.05);
+  --paper-2:     oklch(0.14 0.042 232 / 0.05);
   --card:        oklch(0.97 0.006 80 / 0.65);    /* frosted glass — more transparent for stronger blur effect */
-  --ink:         oklch(0.12 0.040 145);            /* dark forest text */
-  --ink-soft:    oklch(0.32 0.025 145);            /* secondary text */
-  --muted:       oklch(0.50 0.015 145);            /* tertiary / placeholder */
-  --line:        oklch(0.12 0.040 145 / 0.08);    /* subtle dark border */
-  --line-strong: oklch(0.12 0.040 145 / 0.15);    /* visible dark border */
+  --ink:         oklch(0.16 0.055 240);            /* deep ocean ink */
+  --ink-soft:    oklch(0.34 0.040 238);            /* secondary text */
+  --muted:       oklch(0.50 0.015 232);            /* tertiary / placeholder */
+  --line:        oklch(0.12 0.040 232 / 0.08);    /* subtle dark border */
+  --line-strong: oklch(0.12 0.040 232 / 0.15);    /* visible dark border */
 
   --pro:   oklch(0.40 0.18 230);
   --con:   oklch(0.50 0.20 28);
-  --win:   oklch(0.42 0.18 155);
+  --win:   oklch(0.52 0.15 168);
   --loss:  oklch(0.50 0.20 28);
   --warn:  oklch(0.52 0.18 55);
 
@@ -61,18 +61,18 @@
   --shadow-md: 0 5px 24px oklch(0 0 0 / 0.16);
   --shadow-lg: 0 14px 56px oklch(0 0 0 / 0.24);
 
-  --primary-bg:       oklch(0.14 0.042 145);
-  --primary-ink:      oklch(0.96 0.006 80);
-  --primary-bg-hover: oklch(0.22 0.042 145);
+  --primary-bg:       oklch(0.20 0.065 238);
+  --primary-ink:      oklch(0.97 0.012 220);
+  --primary-bg-hover: oklch(0.27 0.07 238);
 
-  --hero-bg:    oklch(0.08 0.042 145);
+  --hero-bg:    oklch(0.13 0.06 240);
   --hero-ink:   oklch(0.95 0.008 80);
   --hero-muted: oklch(0.58 0.016 80);
 }
 
 @theme inline {
   --color-background: oklch(0.92 0.010 80);
-  --color-foreground: oklch(0.12 0.040 145);
+  --color-foreground: oklch(0.12 0.040 232);
 }
 
 /* =========================================================================
@@ -239,14 +239,14 @@ input, button, textarea, select { font-family: inherit; }
 }
 
 .db-btn--ghost {
-  background: oklch(0.12 0.040 145 / 0.07);
+  background: oklch(0.12 0.040 232 / 0.07);
   color: var(--ink-soft);
   border-color: var(--line-strong);
 }
 .db-btn--ghost:hover:not(:disabled) {
-  background: oklch(0.12 0.040 145 / 0.12);
+  background: oklch(0.12 0.040 232 / 0.12);
   color: var(--ink);
-  border-color: oklch(0.12 0.040 145 / 0.24);
+  border-color: oklch(0.12 0.040 232 / 0.24);
 }
 
 .db-btn--glass {
@@ -311,7 +311,7 @@ input, button, textarea, select { font-family: inherit; }
 }
 @media (prefers-reduced-motion: reduce) { .db-badge--turn { animation: none; } }
 .db-badge--wait {
-  background: oklch(0.12 0.040 145 / 0.07);
+  background: oklch(0.12 0.040 232 / 0.07);
   color: var(--muted);
   border: 1px solid var(--line);
 }
@@ -370,7 +370,7 @@ input, button, textarea, select { font-family: inherit; }
    STAT TILES
    ========================================================================= */
 .db-stat {
-  background: oklch(0.12 0.040 145 / 0.05);
+  background: oklch(0.12 0.040 232 / 0.05);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: 14px 16px;
@@ -594,15 +594,15 @@ input, button, textarea, select { font-family: inherit; }
    ========================================================================= */
 .db-shell {
   min-height: 100dvh;
-  background: url("/1.png") center center / cover no-repeat fixed;
-  background-color: oklch(0.68 0.08 145);
+  background: url("/fish/fish2.png") center center / cover no-repeat fixed;
+  background-color: oklch(0.45 0.09 238);
   position: relative;
 }
 .db-shell::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: oklch(0.06 0.025 145 / 0.45);
+  background: oklch(0.06 0.025 232 / 0.45);
   pointer-events: none;
   z-index: 0;
 }
@@ -625,7 +625,7 @@ input, button, textarea, select { font-family: inherit; }
   overflow-y: auto;
   background: oklch(0.97 0.006 80 / 0.92);
   backdrop-filter: blur(22px) saturate(1.4);
-  border-right: 1px solid oklch(0.12 0.040 145 / 0.10);
+  border-right: 1px solid oklch(0.12 0.040 232 / 0.10);
   padding: 20px 12px;
   display: flex;
   flex-direction: column;
@@ -676,7 +676,7 @@ input, button, textarea, select { font-family: inherit; }
 }
 .db-side__ic { flex: none; opacity: 0.55; }
 .db-side__link:hover {
-  background: oklch(0.12 0.040 145 / 0.07);
+  background: oklch(0.12 0.040 232 / 0.07);
   color: var(--ink);
 }
 .db-side__link.is-active {
@@ -693,7 +693,7 @@ input, button, textarea, select { font-family: inherit; }
   align-items: baseline;
   gap: 6px;
   padding: 9px 12px;
-  background: oklch(0.12 0.040 145 / 0.05);
+  background: oklch(0.12 0.040 232 / 0.05);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   margin: 0 2px 8px;
@@ -729,7 +729,7 @@ input, button, textarea, select { font-family: inherit; }
   transition: background .15s ease, color .15s ease;
 }
 .db-side__out:hover {
-  background: oklch(0.12 0.040 145 / 0.07);
+  background: oklch(0.12 0.040 232 / 0.07);
   color: var(--ink);
 }
 
@@ -751,7 +751,7 @@ input, button, textarea, select { font-family: inherit; }
     padding: 0 18px;
     background: oklch(0.97 0.006 80 / 0.92);
     backdrop-filter: blur(22px) saturate(1.4);
-    border-bottom: 1px solid oklch(0.12 0.040 145 / 0.10);
+    border-bottom: 1px solid oklch(0.12 0.040 232 / 0.10);
   }
   .db-topbar__burger {
     background: none;
@@ -1020,7 +1020,7 @@ input, button, textarea, select { font-family: inherit; }
   border-radius: var(--radius-sm);
   transition: background 0.15s, color 0.15s;
 }
-.gh-drawer__link:hover { background: oklch(0.12 0.040 145 / 0.06); color: var(--ink); }
+.gh-drawer__link:hover { background: oklch(0.12 0.040 232 / 0.06); color: var(--ink); }
 .gh-drawer__link.is-active { color: var(--accent); background: var(--accent-tint); }
 
 .gh-drawer__user {
@@ -1171,7 +1171,7 @@ input, button, textarea, select { font-family: inherit; }
   display: flex;
   flex-direction: column;
   pointer-events: none;
-  background: url("/hero-bg.png") center center / cover no-repeat;
+  background: url("/fish/fish1.png") center center / cover no-repeat;
 }
 
 .gh-header {
@@ -1294,7 +1294,7 @@ input, button, textarea, select { font-family: inherit; }
 .legal-card {
   background: oklch(0.97 0.006 80 / 0.90);
   backdrop-filter: blur(24px) saturate(1.4);
-  border: 1px solid oklch(0.12 0.040 145 / 0.12);
+  border: 1px solid oklch(0.12 0.040 232 / 0.12);
   border-radius: var(--radius-lg);
   box-shadow:
     0 4px 24px oklch(0 0 0 / 0.10),
@@ -1350,7 +1350,7 @@ input, button, textarea, select { font-family: inherit; }
   font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.7;
-  color: oklch(0.28 0.022 145);
+  color: oklch(0.28 0.022 232);
   margin: 0 0 10px;
 }
 
@@ -1375,7 +1375,7 @@ input, button, textarea, select { font-family: inherit; }
   color: var(--muted);
   margin-top: 40px;
   padding-top: 24px;
-  border-top: 1px solid oklch(0.12 0.040 145 / 0.10);
+  border-top: 1px solid oklch(0.12 0.040 232 / 0.10);
 }
 
 .legal-related a {
@@ -1450,7 +1450,7 @@ input, button, textarea, select { font-family: inherit; }
 
 .db-dash__stats {
   display: flex;
-  border: 1px solid oklch(0.12 0.040 145 / 0.14);
+  border: 1px solid oklch(0.12 0.040 232 / 0.14);
   border-radius: var(--radius);
   overflow: hidden;
   flex-shrink: 0;
@@ -1458,12 +1458,12 @@ input, button, textarea, select { font-family: inherit; }
 
 .db-dash__stat {
   padding: 10px 20px;
-  background: oklch(0.12 0.040 145 / 0.04);
+  background: oklch(0.12 0.040 232 / 0.04);
   text-align: center;
 }
 
 .db-dash__stat + .db-dash__stat {
-  border-left: 1px solid oklch(0.12 0.040 145 / 0.14);
+  border-left: 1px solid oklch(0.12 0.040 232 / 0.14);
 }
 
 .db-dash__stat-val {
@@ -1900,7 +1900,7 @@ input, button, textarea, select { font-family: inherit; }
    ACCENT, BRIGHT — legible accent for text and data on the dark photo bgs
    ========================================================================= */
 :root {
-  --accent-bright: oklch(0.80 0.14 142);
+  --accent-bright: oklch(0.80 0.14 232);
 }
 
 /* =========================================================================
@@ -1930,7 +1930,7 @@ input, button, textarea, select { font-family: inherit; }
 /* Quiet: plain warm paper */
 html.gh-bg-off .db-shell {
   background-image:
-    radial-gradient(1100px 700px at 8% -12%, oklch(0.94 0.022 145 / 0.9), transparent 62%),
+    radial-gradient(1100px 700px at 8% -12%, oklch(0.94 0.022 232 / 0.9), transparent 62%),
     radial-gradient(900px 720px at 106% 114%, oklch(0.93 0.025 120 / 0.8), transparent 58%),
     linear-gradient(166deg, oklch(0.965 0.008 95), oklch(0.935 0.010 100) 56%, oklch(0.915 0.012 105)) !important;
   background-color: oklch(0.94 0.009 95);
@@ -1942,10 +1942,10 @@ html.gh-bg-off .gh-particles { display: none; }
 /* Grid: graph paper — fine 24px cells, 120px majors */
 html.gh-bg-grid .db-shell {
   background-image:
-    linear-gradient(oklch(0.45 0.07 145 / 0.28) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.45 0.07 145 / 0.28) 1px, transparent 1px),
-    linear-gradient(oklch(0.45 0.07 145 / 0.14) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.45 0.07 145 / 0.14) 1px, transparent 1px),
+    linear-gradient(oklch(0.45 0.07 232 / 0.28) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.45 0.07 232 / 0.28) 1px, transparent 1px),
+    linear-gradient(oklch(0.45 0.07 232 / 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.45 0.07 232 / 0.14) 1px, transparent 1px),
     linear-gradient(180deg, oklch(0.965 0.007 95), oklch(0.935 0.010 100)) !important;
   background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px, 100% 100%;
   /* the base .db-shell shorthand sets no-repeat center — undo it */
@@ -1960,7 +1960,7 @@ html.gh-bg-grid .gh-particles { display: none; }
 /* Dots: a dot-matrix field on the same paper */
 html.gh-bg-dots .db-shell {
   background-image:
-    radial-gradient(oklch(0.45 0.07 145 / 0.50) 1.5px, transparent 2px),
+    radial-gradient(oklch(0.45 0.07 232 / 0.50) 1.5px, transparent 2px),
     linear-gradient(180deg, oklch(0.965 0.007 95), oklch(0.935 0.010 100)) !important;
   background-size: 26px 26px, 100% 100%;
   background-repeat: repeat;
@@ -1975,20 +1975,20 @@ html.gh-bg-dots .gh-particles { display: none; }
    EtherealShadow component, mounted in the root layout) */
 html.gh-bg-shadow .db-shell {
   background-image:
-    radial-gradient(1000px 680px at 12% -10%, oklch(0.20 0.04 152 / 0.8), transparent 60%),
-    linear-gradient(180deg, oklch(0.15 0.030 150), oklch(0.09 0.022 144)) !important;
-  background-color: oklch(0.11 0.025 147);
+    radial-gradient(1000px 680px at 12% -10%, oklch(0.20 0.04 232 / 0.8), transparent 60%),
+    linear-gradient(180deg, oklch(0.15 0.030 232), oklch(0.09 0.022 232)) !important;
+  background-color: oklch(0.11 0.025 232);
   background-attachment: fixed;
 }
 html.gh-bg-shadow .db-shell::before { background: transparent; }
 html.gh-bg-shadow .gh-particles { display: none; }
 
 /* =========================================================================
-   LIGHT SCENES — html.gh-light remaps the on-photo white palette to forest
+   LIGHT SCENES — html.gh-light remaps the on-photo white palette to deep-ocean
    ink so the Grid / Dots / Quiet paper scenes read as a light mode.
    ========================================================================= */
 html.gh-light {
-  --wt: 38, 52, 43;                       /* ≈ forest ink as an RGB triple */
+  --wt: 26, 44, 62;                       /* ≈ deep-ocean ink as an RGB triple */
   --accent-bright: var(--accent-deep);    /* bright-on-dark accent → deep-on-paper */
 }
 
@@ -2012,7 +2012,7 @@ html.gh-light .gh-scene-menu {
   border-color: var(--line-strong);
   box-shadow: 0 14px 44px oklch(0 0 0 / 0.18);
 }
-html.gh-light .gh-scene-menu__item:hover { background: oklch(0.12 0.04 145 / 0.06); }
+html.gh-light .gh-scene-menu__item:hover { background: oklch(0.12 0.04 232 / 0.06); }
 html.gh-light .gh-scene-swatch { border-color: var(--line-strong); }
 
 /* ---- Inline styles ----
@@ -2050,7 +2050,7 @@ html.gh-light [style*="border-top: 1px solid rgba(255, 255, 255"]    { border-to
 html.gh-light [style*="border-left:1px solid rgba(255,255,255"],
 html.gh-light [style*="border-left: 1px solid rgba(255, 255, 255"]   { border-left-color: var(--line-strong) !important; }
 html.gh-light [style*="background:rgba(255,255,255"],
-html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklch(0.25 0.035 145 / 0.07) !important; }
+html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklch(0.25 0.035 232 / 0.07) !important; }
 
 /* ---- Scene picker menu ---- */
 .gh-scene { position: relative; display: inline-flex; }
@@ -2063,7 +2063,7 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
   min-width: 210px;
   padding: 6px;
   border-radius: var(--radius-lg);
-  background: oklch(0.13 0.03 148 / 0.92);
+  background: oklch(0.13 0.03 232 / 0.92);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid oklch(1 0 0 / 0.12);
@@ -2109,26 +2109,26 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
 .gh-scene-swatch--on {
   background:
     radial-gradient(5px 5px at 68% 30%, oklch(0.78 0.12 110 / 0.9), transparent),
-    linear-gradient(135deg, oklch(0.46 0.10 145), oklch(0.18 0.05 150));
+    linear-gradient(135deg, oklch(0.46 0.10 232), oklch(0.18 0.05 232));
 }
 .gh-scene-swatch--grid {
   background:
-    linear-gradient(oklch(0.45 0.06 145 / 0.45) 1px, transparent 1px),
-    linear-gradient(90deg, oklch(0.45 0.06 145 / 0.45) 1px, transparent 1px),
+    linear-gradient(oklch(0.45 0.06 232 / 0.45) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.45 0.06 232 / 0.45) 1px, transparent 1px),
     linear-gradient(180deg, oklch(0.97 0.007 95), oklch(0.93 0.010 100));
   background-size: 7px 7px, 7px 7px, 100% 100%;
 }
 .gh-scene-swatch--dots {
   background:
-    radial-gradient(oklch(0.45 0.06 145 / 0.55) 1px, transparent 1.4px),
+    radial-gradient(oklch(0.45 0.06 232 / 0.55) 1px, transparent 1.4px),
     linear-gradient(180deg, oklch(0.97 0.007 95), oklch(0.93 0.010 100));
   background-size: 6px 6px, 100% 100%;
 }
 .gh-scene-swatch--shadow {
   background:
-    radial-gradient(10px 7px at 36% 42%, oklch(0.46 0.05 148 / 0.85), transparent),
-    radial-gradient(12px 8px at 70% 62%, oklch(0.38 0.05 150 / 0.7), transparent),
-    linear-gradient(180deg, oklch(0.18 0.032 150), oklch(0.10 0.024 146));
+    radial-gradient(10px 7px at 36% 42%, oklch(0.46 0.05 232 / 0.85), transparent),
+    radial-gradient(12px 8px at 70% 62%, oklch(0.38 0.05 232 / 0.7), transparent),
+    linear-gradient(180deg, oklch(0.18 0.032 232), oklch(0.10 0.024 232));
 }
 .gh-scene-swatch--off {
   background: linear-gradient(166deg, oklch(0.97 0.008 95), oklch(0.91 0.012 105));
@@ -2313,7 +2313,7 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: oklch(0.92 0.04 145);
+  background: oklch(0.92 0.04 232);
   border: 2px solid var(--accent-bright);
   box-shadow: 0 0 14px var(--accent-glow);
   margin-top: -7.5px;
@@ -2335,7 +2335,7 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: oklch(0.92 0.04 145);
+  background: oklch(0.92 0.04 232);
   border: 2px solid var(--accent-bright);
   box-shadow: 0 0 14px var(--accent-glow);
   transition: transform 0.15s var(--ease-out-quint);
@@ -2734,7 +2734,7 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
 .gh-graph__tip {
   position: absolute;
   transform: translate(-50%, calc(-100% - 16px));
-  background: oklch(0.13 0.03 145 / 0.94);
+  background: oklch(0.13 0.03 232 / 0.94);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(var(--wt), 0.16);
   border-radius: 8px;

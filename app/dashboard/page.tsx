@@ -272,7 +272,7 @@ export default function DashboardPage() {
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100dvh - 44px)" }}>
       <div className="db-card" style={{ padding: "28px 40px", textAlign: "center" }}>
         <p style={{ fontFamily: "var(--font-display)", fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: "0 0 14px", textTransform: "uppercase" }}>
-          Grasshopper
+          debate.fish
         </p>
         <div className="gh-loading-dots">
           <span /><span /><span />
@@ -307,11 +307,11 @@ export default function DashboardPage() {
 
   return (
     <>
-      <style>{`.db-shell { background-image: url("/bg-app.png"), url("/hero-bg.png") !important; }`}</style>
+      <style>{`.db-shell { background-image: url("/fish/fish2.png") !important; }`}</style>
       {/* Mobile-only profile strip */}
       <div className="gh-mobile-profile" style={{ padding: "16px 20px 0" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p className="db-eyebrow">Grasshopper</p>
+          <p className="db-eyebrow">debate.fish</p>
           <h1 className="db-dash__name">{displayName}</h1>
           <p className="db-dash__username">@{profile.username}</p>
         </div>

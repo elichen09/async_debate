@@ -215,7 +215,7 @@ export default function RoundPage() {
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100dvh - 44px)" }}>
       <div className="db-card" style={{ padding: "28px 40px", textAlign: "center" }}>
-        <p style={{ fontFamily: "var(--font-display)", fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: "0 0 14px", textTransform: "uppercase" }}>Grasshopper</p>
+        <p style={{ fontFamily: "var(--font-display)", fontSize: 11, letterSpacing: "0.1em", color: "var(--muted)", margin: "0 0 14px", textTransform: "uppercase" }}>debate.fish</p>
         <div className="gh-loading-dots"><span /><span /><span /></div>
       </div>
     </div>

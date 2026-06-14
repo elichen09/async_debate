@@ -3,7 +3,7 @@ import Link from "next/link";
 import BackButton from "@/app/future/BackButton";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions — Grasshopper",
+  title: "Terms & Conditions — debate.fish",
 };
 
 export default function TermsPage() {
@@ -18,7 +18,7 @@ export default function TermsPage() {
         <section className="legal-section">
           <h2>1. Acceptance of Terms</h2>
           <p>
-            By accessing or using Grasshopper ("the Service"), you agree to be
+            By accessing or using debate.fish ("the Service"), you agree to be
             bound by these Terms &amp; Conditions. If you do not agree, please
             do not use the Service.
           </p>
@@ -28,7 +28,7 @@ export default function TermsPage() {
           <h2>2. Eligibility</h2>
           <p>
             You must be at least 13 years old to create an account and use
-            Grasshopper. By registering, you confirm that you meet this
+            debate.fish. By registering, you confirm that you meet this
             requirement.
           </p>
         </section>
@@ -47,7 +47,7 @@ export default function TermsPage() {
           <p>
             You retain ownership of any debate recordings, arguments, or other
             content you submit ("User Content"). By submitting User Content, you
-            grant Grasshopper a non-exclusive, royalty-free license to host,
+            grant debate.fish a non-exclusive, royalty-free license to host,
             display, and distribute that content within the Service.
           </p>
           <p>
@@ -73,7 +73,7 @@ export default function TermsPage() {
           <h2>6. Intellectual Property</h2>
           <p>
             All platform code, design, trademarks, and non-user content are the
-            exclusive property of Grasshopper and its creators. Nothing in these
+            exclusive property of debate.fish and its creators. Nothing in these
             Terms grants you a right to use our trademarks or branding.
           </p>
         </section>
@@ -82,7 +82,7 @@ export default function TermsPage() {
           <h2>7. Disclaimers</h2>
           <p>
             The Service is provided "as is" without warranties of any kind.
-            Grasshopper does not guarantee uninterrupted access or that debate
+            debate.fish does not guarantee uninterrupted access or that debate
             scores and ELO ratings are free of errors.
           </p>
         </section>
@@ -90,7 +90,7 @@ export default function TermsPage() {
         <section className="legal-section">
           <h2>8. Limitation of Liability</h2>
           <p>
-            To the maximum extent permitted by law, Grasshopper and its creators
+            To the maximum extent permitted by law, debate.fish and its creators
             shall not be liable for any indirect, incidental, or consequential
             damages arising from your use of the Service.
           </p>

@@ -22,7 +22,7 @@ import type { PastRound } from "@/lib/pastRounds";
 // loaded onto a card lazily once you hover it, so 800+ cards stay smooth.
 // ---------------------------------------------------------------------------
 
-const ACCENT = "#5cae72"; // forest green, echoes the site accent
+const ACCENT = "#E0985E"; // warm coral, echoes the site accent
 
 // Luminous, mostly earthy palette so same-topic cards cluster by color.
 const PALETTE = [
@@ -39,7 +39,7 @@ function topicColor(topic: string): string {
 // Stars are colour-coded by topic: each resolution maps to a distinct,
 // luminous hue so same-topic rounds glow the same colour and you can read the
 // archive's clusters at a glance. Bright/high-value so they still feel starry
-// against the dark forest sky.
+// against the deep-sea sky.
 const STAR_PALETTE = [
   "#ff7a8a", "#ffa24c", "#ffd24c", "#c9f06b", "#7fe08a", "#5ad1a8",
   "#4fd6d6", "#5ab8ff", "#7a93ff", "#b07cff", "#e07cff", "#ff7ad0",
@@ -337,8 +337,8 @@ function GalaxyScene({ rounds, positions, hoveredId, showCards, radius, onHover,
   const camDist = camDistFor(radius);
   return (
     <>
-      <color attach="background" args={["#070b09"]} />
-      <fog attach="fog" args={["#070b09", camDist - radius * 0.6, camDist + radius * 2.6]} />
+      <color attach="background" args={["#05080e"]} />
+      <fog attach="fog" args={["#05080e", camDist - radius * 0.6, camDist + radius * 2.6]} />
       <ambientLight intensity={0.9} />
       <Stars radius={Math.max(140, radius * 4)} depth={70} count={5000} factor={4} saturation={0} fade speed={0.4} />
       <mesh>
@@ -506,7 +506,7 @@ export default function PastGalaxy({ rounds }: { rounds: PastRound[] }) {
       {/* heading + controls, stacked top-left */}
       <div className="gh-past-ui">
         <div className="gh-past-head">
-          <Link href="/" className="gh-past-back">← Grasshopper</Link>
+          <Link href="/" className="gh-past-back">← debate.fish</Link>
           <h1 className="gh-past-title">The Past</h1>
           <p className="gh-past-sub">
             {rounds.length} recorded rounds — orbit the archive, hover to peek, click to watch.

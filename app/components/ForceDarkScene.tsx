@@ -6,7 +6,7 @@ import { useEffect } from "react";
    background. The global scene system can otherwise swap in a *light* paper
    background (grid / dots / quiet) with higher CSS specificity, which would
    leave the white text invisible. While About is mounted we strip every scene
-   class so the base dark `.db-shell` (plus the page's own /2.png) shows, then
+   class so the base dark `.db-shell` (plus the page's own /fish/fish2.png) shows, then
    restore the user's saved scene on the way out. Renders nothing. */
 const SCENE_CLASSES = ["gh-bg-grid", "gh-bg-dots", "gh-bg-shadow", "gh-bg-off", "gh-light"];
 
