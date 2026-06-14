@@ -1194,6 +1194,10 @@ input, button, textarea, select { font-family: inherit; }
 }
 .gh-nav-link:hover { color: #fff; opacity: 1; }
 
+/* Cursor toggle in the landing header reads like the nav links */
+.gh-header .gh-scene-toggle { color: #fff; opacity: 0.92; font-size: 13px; text-shadow: 0 1px 3px rgba(0,0,0,0.55), 0 2px 12px rgba(0,0,0,0.45); }
+.gh-header .gh-scene-toggle:hover { color: #fff; opacity: 1; }
+
 .gh-center {
   flex: 1;
   display: flex;

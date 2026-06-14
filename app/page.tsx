@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TextScramble } from "./components/TextScramble";
+import CursorToggle from "./components/CursorToggle";
 
 export const metadata: Metadata = {
   title: "debate.fish",
@@ -15,7 +16,8 @@ export default function Home() {
           <Link href="/about" className="gh-nav-link">About</Link>
           <Link href="/future" className="gh-nav-link">Learn</Link>
         </div>
-        <div style={{ display: "flex", gap: 24 }}>
+        <div style={{ display: "flex", gap: 24, alignItems: "center" }}>
+          <CursorToggle />
           <Link href="/login" className="gh-nav-link">Log in</Link>
           <Link href="/signup" className="gh-nav-link">Sign up</Link>
         </div>
