@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import AudioPlayer from "@/app/components/AudioPlayer";
+import RoundChat from "@/app/components/RoundChat";
 import type { CSSProperties } from "react";
 
 const PRO_FIRST_ORDER = [
@@ -399,6 +400,24 @@ export default function RoundPage() {
             All speeches were automatically deleted.
           </p>
         </div>
+      )}
+
+      {/* Chat with your opponent — private to the two debaters */}
+      {isParticipant && (
+        <>
+          <div style={rule}><div style={{ ...ruleDot, background: "rgba(255,255,255,0.20)" }} /><div style={ruleLine} /></div>
+          <section style={{ marginBottom: 32 }}>
+            <p style={eyebrow}>Chat · @{opponent?.username}</p>
+            <RoundChat
+              roundId={round.id}
+              userId={userId}
+              names={{
+                [round.pro_id]: round.pro?.display_name || round.pro?.username || "Pro",
+                [round.con_id]: round.con?.display_name || round.con?.username || "Con",
+              }}
+            />
+          </section>
+        </>
       )}
 
       {/* Ballot */}
