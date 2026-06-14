@@ -125,7 +125,7 @@ export default function AboutPage() {
               Gary <em>&</em> Eli
             </h1>
             <p className="gh-about__sub ab-hero-line" style={{ "--i": "2" } as CSSProperties}>
-              Debaters from Lincoln Sudbury High School — we built debate.fish because the game deserved better tools.
+              We built debate.fish for people who love the game. 
             </p>
           </section>
 
@@ -150,7 +150,7 @@ export default function AboutPage() {
               <h2 className="gh-about__h">Just debate <em>more.</em></h2>
               <p>
                 The biggest question Eli and I get asked is &ldquo;How do I get better at debate?&rdquo; The answer is
-                pretty simple. Debate more! But while debating more seems easy, it&rsquo;s not. So we created this
+                pretty simple. Debate more! But while that might seem easy, often times it&rsquo;s not. So we created this
                 website to make the process easier.
               </p>
               <p>
