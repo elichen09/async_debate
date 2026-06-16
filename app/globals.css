@@ -3569,16 +3569,20 @@ html.flow-route .gh-topnav__burger {
   position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 1px 0;
+  gap: 10px;
+  padding: 3px 0 3px 10px;
+  border-left: 2px solid transparent;   /* indent guide rail, tinted per level */
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  transition: background 0.12s ease;
 }
+.flow-node:hover { background: rgba(255, 255, 255, 0.035); }
 .flow-node__label {
   flex-shrink: 0;
-  min-width: 26px;
+  min-width: 30px;
   text-align: right;
   padding-top: 4px;
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   user-select: none;
 }
@@ -3586,23 +3590,26 @@ html.flow-route .gh-topnav__burger {
   flex: 1;
   min-width: 0;
   box-sizing: border-box;
-  padding: 3px 6px;
+  padding: 4px 8px;
   background: none;
   border: none;
   border-radius: var(--radius-sm);
   font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 18px;
+  line-height: 1.55;
+  font-weight: 500;
   resize: none;
   overflow: hidden;
   outline: none;
 }
-.flow-node__text:focus { background: rgba(255, 255, 255, 0.06); }
+.flow-node__text:focus { background: rgba(255, 255, 255, 0.07); }
 .flow-node__text::placeholder { color: rgba(255, 255, 255, 0.3); }
 
-/* Alternating level colors (echoing red / black flowing) */
-.flow-node--c0 .flow-node__label, .flow-node--c0 .flow-node__text { color: oklch(0.72 0.17 25); }
-.flow-node--c1 .flow-node__label, .flow-node--c1 .flow-node__text { color: rgba(255, 255, 255, 0.9); }
+/* Alternating two-color levels (coral / light, echoing red-black flowing) */
+.flow-node--c0 { border-left-color: oklch(0.72 0.17 30 / 0.45); }
+.flow-node--c0 .flow-node__label, .flow-node--c0 .flow-node__text { color: oklch(0.76 0.17 32); }
+.flow-node--c1 { border-left-color: oklch(0.85 0.02 240 / 0.32); }
+.flow-node--c1 .flow-node__label, .flow-node--c1 .flow-node__text { color: oklch(0.94 0.015 240); }
 
 /* Highlighter */
 .flow-node--hl .flow-node__text {
@@ -3636,6 +3643,8 @@ html.flow-route .gh-topnav__burger {
   transition: color 0.15s ease, background 0.15s ease;
 }
 .flow-node__btn:hover { color: #fff; background: rgba(255, 255, 255, 0.14); }
+.flow-node__btn--sub { width: auto; padding: 0 5px; font-size: 12px; color: var(--accent); }
+.flow-node__btn--sub:hover { color: var(--accent-ink); background: var(--accent); }
 
 /* ---- Speech doc ---- */
 .flow-speech { max-width: 760px; height: 100%; }

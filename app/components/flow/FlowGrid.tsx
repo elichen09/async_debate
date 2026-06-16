@@ -118,6 +118,15 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
     insertNode(row, cell.depth);
   }
 
+  // Add a sub-point nested one level inside this point.
+  function addChild(cell: FlowCell) {
+    const list = sorted();
+    const idx = list.findIndex((c) => c.id === cell.id);
+    const next = list[idx + 1];
+    const row = next ? (cell.row_index + next.row_index) / 2 : cell.row_index + 1;
+    insertNode(row, cell.depth + 1);
+  }
+
   // Tab: indent (cap at one deeper than the node above). Shift+Tab: outdent.
   function reIndent(cell: FlowCell, dir: 1 | -1) {
     const list = sorted();
@@ -230,6 +239,7 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
             }}
           />
           <div className="flow-node__tools">
+            <button className="flow-node__btn flow-node__btn--sub" onClick={() => addChild(cell)} title="Add sub-point inside" aria-label="Add sub-point">↳+</button>
             <button className="flow-node__btn" onClick={() => reIndent(cell, -1)} title="Outdent (Shift+Tab)" aria-label="Outdent">←</button>
             <button className="flow-node__btn" onClick={() => reIndent(cell, 1)} title="Indent (Tab)" aria-label="Indent">→</button>
             <button className="flow-node__btn" onClick={() => toggleHighlight(cell)} title="Highlight (Ctrl+E)" aria-label="Highlight">▤</button>
