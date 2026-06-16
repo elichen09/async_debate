@@ -3768,6 +3768,36 @@ html.flow-route .gh-topnav__burger {
   color: var(--ink);
 }
 
+/* ---- Light scenes — flow text sits on light paper, so flip it to dark ink ---- */
+html.gh-light .flow-work__title { color: var(--ink); }
+html.gh-light .flow-tab { color: var(--muted); }
+html.gh-light .flow-tab:hover,
+html.gh-light .flow-tab.is-active { color: var(--ink); }
+html.gh-light .flow-pill { color: var(--ink-soft); background: oklch(0.12 0.04 232 / 0.06); border-color: var(--line-strong); }
+html.gh-light .flow-pill:hover { background: oklch(0.12 0.04 232 / 0.12); }
+html.gh-light .flow-pill.is-active { color: var(--accent-ink); background: var(--accent); border-color: var(--accent-deep); }
+
+html.gh-light .flow-empty, html.gh-light .flow-loading { color: var(--ink-soft); }
+html.gh-light .flow-empty__title { color: var(--ink); text-shadow: none; }
+html.gh-light .flow-empty__sub { color: var(--ink-soft); }
+html.gh-light .flow-outline__add { color: var(--ink-soft); border-color: var(--line-strong); background: oklch(0.12 0.04 232 / 0.04); }
+html.gh-light .flow-outline__error { color: var(--loss); }
+
+html.gh-light .flow-node:hover { background: oklch(0.12 0.04 232 / 0.05); }
+html.gh-light .flow-node__text:focus { background: oklch(0.12 0.04 232 / 0.07); }
+html.gh-light .flow-node__text::placeholder { color: var(--muted); }
+html.gh-light .flow-node--c0 .flow-node__label, html.gh-light .flow-node--c0 .flow-node__text { color: oklch(0.55 0.18 32); }
+html.gh-light .flow-node--c1 .flow-node__label, html.gh-light .flow-node--c1 .flow-node__text { color: var(--ink); }
+html.gh-light .flow-node--c0 { border-left-color: oklch(0.6 0.16 32 / 0.4); }
+html.gh-light .flow-node--c1 { border-left-color: oklch(0.3 0.04 238 / 0.25); }
+html.gh-light .flow-node__btn { color: oklch(0.3 0.04 238 / 0.55); }
+html.gh-light .flow-node__btn:hover { color: var(--ink); background: oklch(0.12 0.04 232 / 0.1); }
+html.gh-light .flow-node__btn--sub { color: var(--accent-deep); }
+html.gh-light .flow-node__btn--sub:hover { color: var(--accent-ink); background: var(--accent); }
+
+html.gh-light .flow-speech__text { color: var(--ink); background: oklch(0.99 0.004 80 / 0.6); border-color: var(--line-strong); }
+html.gh-light .flow-speech__text::placeholder { color: var(--muted); }
+
 @media (max-width: 760px) {
   .flow-snip { position: fixed; right: 0; top: 44px; bottom: 0; z-index: 150; }
 }
