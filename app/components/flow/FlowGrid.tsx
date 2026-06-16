@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { FLOW_COLUMNS, type FlowCell, type EditorInsert } from "@/app/flow/shared";
+import type { FlowCell, EditorInsert } from "@/app/flow/shared";
 
 interface FlowGridProps {
   flowId: string;
@@ -10,11 +10,31 @@ interface FlowGridProps {
   registerInsert: (fn: EditorInsert | null) => void;
 }
 
-// The flow sheet. Columns share a vertical axis (row_index is a float shared
-// across all 8 columns), so a response placed at a card's row lines up with it —
-// no empty-box padding. Tab/→ responds in the next column at the same row; Enter
-// stacks a new card below (a fractional row between this one and the next).
-// Edits persist on blur and stream via Supabase Realtime.
+const SEL = "id, flow_id, col, row_index, depth, highlighted, content, updated_by, updated_at";
+const INDENT = 26; // px per outline level
+
+function toAlpha(n: number): string {
+  let s = "";
+  while (n > 0) { n--; s = String.fromCharCode(97 + (n % 26)) + s; n = Math.floor(n / 26); }
+  return s;
+}
+function toRoman(n: number): string {
+  const map: [number, string][] = [[1000,"m"],[900,"cm"],[500,"d"],[400,"cd"],[100,"c"],[90,"xc"],[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]];
+  let r = "";
+  for (const [v, s] of map) while (n >= v) { r += s; n -= v; }
+  return r;
+}
+// Numbering cycles by depth: 1. / a. / i. / 1. / a. / i. …
+function nodeLabel(count: number, depth: number): string {
+  const k = depth % 3;
+  if (k === 0) return `${count}.`;
+  if (k === 1) return `${toAlpha(count)}.`;
+  return `${toRoman(count)}.`;
+}
+
+// A debate flow as a nested outline: Enter adds a sibling point, Tab indents it
+// into a response, Shift+Tab outdents, and highlighting marks key cards. Numbers
+// and colors alternate by depth. Edits persist on blur and stream via Realtime.
 export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridProps) {
   const [cells, setCells] = useState<FlowCell[]>([]);
   const cellsRef = useRef<FlowCell[]>([]);
@@ -28,7 +48,7 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
     let active = true;
     supabase
       .from("flow_cells")
-      .select("id, flow_id, col, row_index, content, updated_by, updated_at")
+      .select(SEL)
       .eq("flow_id", flowId)
       .then(({ data }) => { if (active && data) setCells(data as FlowCell[]); });
 
@@ -59,58 +79,66 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
     return () => { active = false; supabase.removeChannel(channel); };
   }, [flowId]);
 
-  function setLocal(id: string, content: string) {
-    setCells((prev) => prev.map((c) => (c.id === id ? { ...c, content } : c)));
+  const sorted = () => [...cellsRef.current].sort((a, b) => a.row_index - b.row_index);
+
+  function setLocal(id: string, patch: Partial<FlowCell>) {
+    setCells((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
 
-  async function saveCell(id: string, content: string) {
-    await supabase
-      .from("flow_cells")
-      .update({ content, updated_by: userId, updated_at: new Date().toISOString() })
-      .eq("id", id);
+  async function saveContent(id: string, content: string) {
+    await supabase.from("flow_cells").update({ content, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id);
+  }
+  async function saveMeta(id: string, patch: { depth?: number; highlighted?: boolean }) {
+    await supabase.from("flow_cells").update({ ...patch, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id);
   }
 
-  async function insertCell(col: number, row: number, focus = true) {
+  async function insertNode(row: number, depth: number) {
     const { data } = await supabase
       .from("flow_cells")
-      .insert({ flow_id: flowId, col, row_index: row, content: "", updated_by: userId })
-      .select("id, flow_id, col, row_index, content, updated_by, updated_at")
+      .insert({ flow_id: flowId, col: 0, row_index: row, depth, content: "", updated_by: userId })
+      .select(SEL)
       .single();
     if (data) {
-      if (focus) focusId.current = (data as FlowCell).id;
+      focusId.current = (data as FlowCell).id;
       setCells((prev) => (prev.some((c) => c.id === data.id) ? prev : [...prev, data as FlowCell]));
     }
   }
 
-  // A fractional row between `row` and the next-lowest distinct row anywhere in
-  // the sheet — so stacking below a card keeps later rows (and their alignment).
-  function rowBelow(row: number): number {
-    const rows = [...new Set(cellsRef.current.map((c) => c.row_index))].sort((a, b) => a - b);
-    const below = rows.find((r) => r > row);
-    return below !== undefined ? (row + below) / 2 : row + 1;
+  // Enter: new sibling right below, at the same depth.
+  function addSibling(cell: FlowCell) {
+    const list = sorted();
+    const idx = list.findIndex((c) => c.id === cell.id);
+    const next = list[idx + 1];
+    const row = next ? (cell.row_index + next.row_index) / 2 : cell.row_index + 1;
+    insertNode(row, cell.depth);
   }
 
-  // Enter: new card directly below in the same column.
-  function addBelow(col: number, row: number) { insertCell(col, rowBelow(row)); }
-
-  // Tab / →: respond in the next column, aligned to this card's row.
-  function respond(col: number, row: number) {
-    if (col >= FLOW_COLUMNS.length - 1) return;
-    const target = col + 1;
-    const existing = cellsRef.current.find((c) => c.col === target && c.row_index === row);
-    if (existing) { focusId.current = existing.id; setCells((p) => [...p]); return; }
-    insertCell(target, row);
+  // Tab: indent (cap at one deeper than the node above). Shift+Tab: outdent.
+  function reIndent(cell: FlowCell, dir: 1 | -1) {
+    const list = sorted();
+    const idx = list.findIndex((c) => c.id === cell.id);
+    const prev = list[idx - 1];
+    const maxDepth = prev ? prev.depth + 1 : 0;
+    const newDepth = dir === 1 ? Math.min(cell.depth + 1, maxDepth) : Math.max(cell.depth - 1, 0);
+    if (newDepth === cell.depth) return;
+    setLocal(cell.id, { depth: newDepth });
+    saveMeta(cell.id, { depth: newDepth });
   }
 
-  // Column header +: append a card at the bottom of that column.
-  function appendToColumn(col: number) {
-    const colRows = cellsRef.current.filter((c) => c.col === col).map((c) => c.row_index);
-    insertCell(col, colRows.length ? Math.max(...colRows) + 1 : 0);
+  function toggleHighlight(cell: FlowCell) {
+    const v = !cell.highlighted;
+    setLocal(cell.id, { highlighted: v });
+    saveMeta(cell.id, { highlighted: v });
   }
 
-  async function delCard(id: string) {
-    setCells((prev) => prev.filter((c) => c.id !== id));
-    await supabase.from("flow_cells").delete().eq("id", id);
+  async function delNode(cell: FlowCell, focusPrev = false) {
+    if (focusPrev) {
+      const list = sorted();
+      const idx = list.findIndex((c) => c.id === cell.id);
+      if (list[idx - 1]) focusId.current = list[idx - 1].id;
+    }
+    setCells((prev) => prev.filter((c) => c.id !== cell.id));
+    await supabase.from("flow_cells").delete().eq("id", cell.id);
   }
 
   function makeInsert(id: string): EditorInsert {
@@ -118,9 +146,9 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
       const el = activeEl.current;
       const current = cellsRef.current.find((c) => c.id === id)?.content ?? "";
       const pos = el ? (el.selectionStart ?? current.length) : current.length;
-      const next = current.slice(0, pos) + text + current.slice(pos);
-      setLocal(id, next);
-      saveCell(id, next);
+      const nextVal = current.slice(0, pos) + text + current.slice(pos);
+      setLocal(id, { content: nextVal });
+      saveContent(id, nextVal);
     };
   }
 
@@ -130,69 +158,68 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
     el.style.height = `${el.scrollHeight}px`;
   }
 
-  // Map each distinct row value to a consecutive grid line (row 1 = headers).
-  const rowsSorted = [...new Set(cells.map((c) => c.row_index))].sort((a, b) => a - b);
-  const rowToGrid = new Map(rowsSorted.map((r, i) => [r, i + 2]));
+  // Walk the ordered list, tracking a per-depth counter to build 1./a./i. labels.
+  const ordered = [...cells].sort((a, b) => a.row_index - b.row_index);
+  const counters: number[] = [];
+  const labeled = ordered.map((cell) => {
+    counters[cell.depth] = (counters[cell.depth] || 0) + 1;
+    counters.length = cell.depth + 1; // reset deeper counters under a new parent
+    return { cell, label: nodeLabel(counters[cell.depth], cell.depth) };
+  });
 
   return (
-    <div className="flow-grid">
-      {FLOW_COLUMNS.map((col, ci) => (
+    <div className="flow-outline">
+      {labeled.length === 0 && <p className="flow-outline__empty">Empty — start typing your first point.</p>}
+      {labeled.map(({ cell, label }) => (
         <div
-          key={`h${ci}`}
-          className={`flow-col__head flow-col__head--${col.side}`}
-          style={{ gridColumn: ci + 1, gridRow: 1 }}
+          key={cell.id}
+          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""}`}
+          style={{ marginLeft: cell.depth * INDENT }}
         >
-          <span title={col.full}>{col.label}</span>
-          <button className="flow-col__add" onClick={() => appendToColumn(ci)} aria-label={`Add card to ${col.full}`}>+</button>
+          <span className="flow-node__label">{label}</span>
+          <textarea
+            className="flow-node__text"
+            value={cell.content}
+            rows={1}
+            ref={(el) => {
+              autoGrow(el);
+              if (el && focusId.current === cell.id) { el.focus(); focusId.current = null; }
+            }}
+            onChange={(e) => { setLocal(cell.id, { content: e.target.value }); autoGrow(e.target); }}
+            onKeyDown={(e) => {
+              const ta = e.target as HTMLTextAreaElement;
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                saveContent(cell.id, ta.value);
+                addSibling(cell);
+              } else if (e.key === "Tab") {
+                e.preventDefault();
+                saveContent(cell.id, ta.value);
+                reIndent(cell, e.shiftKey ? -1 : 1);
+              } else if ((e.metaKey || e.ctrlKey) && (e.key === "e" || e.key === "E")) {
+                e.preventDefault();
+                toggleHighlight(cell);
+              } else if (e.key === "Backspace" && ta.value === "" && ta.selectionStart === 0) {
+                e.preventDefault();
+                delNode(cell, true);
+              }
+            }}
+            onFocus={(e) => {
+              editingId.current = cell.id;
+              activeEl.current = e.target;
+              registerInsert(makeInsert(cell.id));
+            }}
+            onBlur={(e) => {
+              editingId.current = null;
+              saveContent(cell.id, e.target.value);
+            }}
+          />
+          <div className="flow-node__tools">
+            <button className="flow-node__btn" onClick={() => toggleHighlight(cell)} title="Highlight (Ctrl+E)" aria-label="Highlight">▤</button>
+            <button className="flow-node__btn" onClick={() => delNode(cell)} title="Delete" aria-label="Delete">×</button>
+          </div>
         </div>
       ))}
-
-      {cells.map((cell) => {
-        const side = FLOW_COLUMNS[cell.col]?.side ?? "pro";
-        const gridRow = rowToGrid.get(cell.row_index) ?? 2;
-        return (
-          <div
-            key={cell.id}
-            className={`flow-card flow-card--${side}`}
-            style={{ gridColumn: cell.col + 1, gridRow }}
-          >
-            <textarea
-              className="flow-card__text"
-              value={cell.content}
-              rows={1}
-              ref={(el) => {
-                autoGrow(el);
-                if (el && focusId.current === cell.id) { el.focus(); focusId.current = null; }
-              }}
-              onChange={(e) => { setLocal(cell.id, e.target.value); autoGrow(e.target); }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  saveCell(cell.id, (e.target as HTMLTextAreaElement).value);
-                  addBelow(cell.col, cell.row_index);
-                } else if (e.key === "Tab" && !e.shiftKey) {
-                  e.preventDefault();
-                  saveCell(cell.id, (e.target as HTMLTextAreaElement).value);
-                  respond(cell.col, cell.row_index);
-                }
-              }}
-              onFocus={(e) => {
-                editingId.current = cell.id;
-                activeEl.current = e.target;
-                registerInsert(makeInsert(cell.id));
-              }}
-              onBlur={(e) => {
-                editingId.current = null;
-                saveCell(cell.id, e.target.value);
-              }}
-            />
-            {cell.col < FLOW_COLUMNS.length - 1 && (
-              <button className="flow-card__respond" onClick={() => respond(cell.col, cell.row_index)} title="Respond (Tab)" aria-label="Respond in next column">›</button>
-            )}
-            <button className="flow-card__del" onClick={() => delCard(cell.id)} aria-label="Delete card">×</button>
-          </div>
-        );
-      })}
     </div>
   );
 }

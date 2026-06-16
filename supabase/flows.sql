@@ -32,16 +32,20 @@ create table if not exists public.flow_collaborators (
 );
 
 create table if not exists public.flow_cells (
-  id         uuid primary key default gen_random_uuid(),
-  flow_id    uuid not null references public.flows(id) on delete cascade,
-  col        smallint not null check (col between 0 and 7),
-  row_index  double precision not null default 0,  -- shared vertical axis; fractional inserts align responses
-  content    text not null default '',
-  updated_by uuid references public.profiles(id),
-  updated_at timestamptz not null default now()
+  id          uuid primary key default gen_random_uuid(),
+  flow_id     uuid not null references public.flows(id) on delete cascade,
+  col         smallint not null default 0,            -- unused by the outline; kept for back-compat
+  row_index   double precision not null default 0,    -- global vertical order; fractional inserts never renumber
+  depth       int not null default 0,                 -- outline indent level (0-based)
+  highlighted boolean not null default false,
+  content     text not null default '',
+  updated_by  uuid references public.profiles(id),
+  updated_at  timestamptz not null default now()
 );
--- If flow_cells already existed with an integer row_index, widen it:
+-- Upgrade older flow_cells in place:
 alter table public.flow_cells alter column row_index type double precision;
+alter table public.flow_cells add column if not exists depth int not null default 0;
+alter table public.flow_cells add column if not exists highlighted boolean not null default false;
 
 create table if not exists public.flow_snippets (
   id         uuid primary key default gen_random_uuid(),
@@ -207,3 +211,9 @@ do $$ begin
   alter publication supabase_realtime add table public.flows;
 exception when duplicate_object then null;
 end $$;
+
+-- DELETE events only carry the primary key by default, so the flow_id filter
+-- and RLS can't authorize them and the partner never sees a card removed.
+-- REPLICA IDENTITY FULL puts the whole old row in the delete payload.
+alter table public.flow_cells replica identity full;
+alter table public.flows      replica identity full;

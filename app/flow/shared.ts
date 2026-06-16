@@ -36,11 +36,15 @@ export interface FlowFolder {
   created_at: string;
 }
 
+// A node in the flow outline. `row_index` is the global vertical order (float,
+// so inserts never renumber) and `depth` is the indent level (0-based).
 export interface FlowCell {
   id: string;
   flow_id: string;
   col: number;
   row_index: number;
+  depth: number;
+  highlighted: boolean;
   content: string;
   updated_by: string | null;
   updated_at: string;
