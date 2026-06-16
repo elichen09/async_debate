@@ -16,8 +16,12 @@ export default function ForgotPasswordPage() {
     if (!email.trim()) { setError("Please enter your email."); return; }
 
     setLoading(true);
+    // Use the production site URL so the email link points at debate.fish, not
+    // whatever origin (e.g. localhost) the request happened to come from. Set
+    // NEXT_PUBLIC_SITE_URL to override (e.g. http://localhost:3000 for local testing).
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://debate.fish";
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${siteUrl}/reset-password`,
     });
     setLoading(false);
 
