@@ -37,6 +37,7 @@ function nodeLabel(count: number, depth: number): string {
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
 export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridProps) {
   const [cells, setCells] = useState<FlowCell[]>([]);
+  const [loadError, setLoadError] = useState("");
   const cellsRef = useRef<FlowCell[]>([]);
   const editingId = useRef<string | null>(null);
   const activeEl = useRef<HTMLTextAreaElement | null>(null);
@@ -50,7 +51,11 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
       .from("flow_cells")
       .select(SEL)
       .eq("flow_id", flowId)
-      .then(({ data }) => { if (active && data) setCells(data as FlowCell[]); });
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) { setLoadError(error.message); return; }
+        if (data) setCells(data as FlowCell[]);
+      });
 
     const channel = supabase
       .channel(`flow_cells:${flowId}`)
@@ -169,7 +174,15 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
 
   return (
     <div className="flow-outline">
-      {labeled.length === 0 && <p className="flow-outline__empty">Empty — start typing your first point.</p>}
+      {loadError && (
+        <p className="flow-outline__error">
+          ⚑ Couldn’t load the flow: {loadError}. If this mentions “depth” or
+          “highlighted”, run the flow_cells migration in Supabase.
+        </p>
+      )}
+      {!loadError && labeled.length === 0 && (
+        <button className="flow-outline__add" onClick={() => insertNode(0, 0)}>+ Add your first point</button>
+      )}
       {labeled.map(({ cell, label }) => (
         <div
           key={cell.id}
@@ -190,6 +203,8 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
               const ta = e.target as HTMLTextAreaElement;
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
+                // Enter on an empty sub-point pops back out a level (Docs-style).
+                if (ta.value === "" && cell.depth > 0) { reIndent(cell, -1); return; }
                 saveContent(cell.id, ta.value);
                 addSibling(cell);
               } else if (e.key === "Tab") {
@@ -215,6 +230,8 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
             }}
           />
           <div className="flow-node__tools">
+            <button className="flow-node__btn" onClick={() => reIndent(cell, -1)} title="Outdent (Shift+Tab)" aria-label="Outdent">←</button>
+            <button className="flow-node__btn" onClick={() => reIndent(cell, 1)} title="Indent (Tab)" aria-label="Indent">→</button>
             <button className="flow-node__btn" onClick={() => toggleHighlight(cell)} title="Highlight (Ctrl+E)" aria-label="Highlight">▤</button>
             <button className="flow-node__btn" onClick={() => delNode(cell)} title="Delete" aria-label="Delete">×</button>
           </div>
