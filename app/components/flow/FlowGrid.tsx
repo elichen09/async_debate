@@ -9,6 +9,8 @@ interface FlowGridProps {
   userId: string;
   registerInsert: (fn: EditorInsert | null) => void;
   registerAddPoints?: (fn: ((tags: string[]) => void) | null) => void;
+  // Returns the point tags for a "/trigger" (and queues the Send doc), or null.
+  resolveSlashPoints?: (trigger: string) => string[] | null;
 }
 
 const SEL = "id, flow_id, col, row_index, depth, highlighted, content, updated_by, updated_at";
@@ -36,7 +38,7 @@ function nodeLabel(count: number, depth: number): string {
 // A debate flow as a nested outline: Enter adds a sibling point, Tab indents it
 // into a response, Shift+Tab outdents, and highlighting marks key cards. Numbers
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
-export default function FlowGrid({ flowId, userId, registerInsert, registerAddPoints }: FlowGridProps) {
+export default function FlowGrid({ flowId, userId, registerInsert, registerAddPoints, resolveSlashPoints }: FlowGridProps) {
   const [cells, setCells] = useState<FlowCell[]>([]);
   const [loadError, setLoadError] = useState("");
   const cellsRef = useRef<FlowCell[]>([]);
@@ -110,6 +112,24 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
     }
   }
 
+  // Insert an extension's tags as responses at the current point: the first tag
+  // fills this point, the rest follow as siblings at the SAME indent (depth).
+  async function insertBlock(cell: FlowCell, tags: string[]) {
+    if (!tags.length) return;
+    setLocal(cell.id, { content: tags[0] });
+    saveContent(cell.id, tags[0]);
+    const list = sorted();
+    const idx = list.findIndex((c) => c.id === cell.id);
+    const next = list[idx + 1];
+    const lo = cell.row_index;
+    const hi = next ? next.row_index : cell.row_index + 1;
+    const rest = tags.slice(1);
+    for (let i = 0; i < rest.length; i++) {
+      const row = lo + ((hi - lo) * (i + 1)) / (rest.length + 1);
+      await insertNode(row, cell.depth, rest[i], false);
+    }
+  }
+
   // Append a batch of points (e.g. an extension's Heading-4 tags) at the bottom.
   async function addPoints(tags: string[]) {
     let row = cellsRef.current.length ? Math.max(...cellsRef.current.map((c) => c.row_index)) : -1;
@@ -162,6 +182,13 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
     saveMeta(cell.id, { highlighted: v });
   }
 
+  async function clearAll() {
+    if (!cellsRef.current.length) return;
+    if (!window.confirm("Clear the whole flow? This removes every point for everyone on it.")) return;
+    setCells([]);
+    await supabase.from("flow_cells").delete().eq("flow_id", flowId);
+  }
+
   async function delNode(cell: FlowCell, focusPrev = false) {
     if (focusPrev) {
       const list = sorted();
@@ -209,6 +236,11 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
       {!loadError && labeled.length === 0 && (
         <button className="flow-outline__add" onClick={() => insertNode(0, 0)}>+ Add your first point</button>
       )}
+      {labeled.length > 0 && (
+        <div className="flow-outline__bar">
+          <button className="db-btn db-btn--glass db-btn--sm" onClick={clearAll}>Clear flow</button>
+        </div>
+      )}
       {labeled.map(({ cell, label }) => (
         <div
           key={cell.id}
@@ -229,6 +261,13 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
               const ta = e.target as HTMLTextAreaElement;
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
+                // Slash command: "/topshelf" + Enter inserts the block as responses
+                // here, at this point's indent.
+                const m = /^\/(\S+)$/.exec(ta.value.trim());
+                if (m) {
+                  const tags = resolveSlashPoints?.(m[1].toLowerCase());
+                  if (tags && tags.length) { insertBlock(cell, tags); return; }
+                }
                 // Enter on an empty sub-point pops back out a level (Docs-style).
                 if (ta.value === "" && cell.depth > 0) { reIndent(cell, -1); return; }
                 saveContent(cell.id, ta.value);

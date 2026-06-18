@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { cardHtml, plainCardHtml } from "@/lib/richText";
+import { blockToHtml } from "@/lib/richText";
 import FlowGrid from "@/app/components/flow/FlowGrid";
 import FlowSpeech from "@/app/components/flow/FlowSpeech";
 import SnippetLibrary from "@/app/components/flow/SnippetLibrary";
@@ -40,15 +40,17 @@ export default function FlowWorkspace() {
 
   // Use an extension: break its Heading-4 points into new flow points (on the
   // Flow tab) and append its formatted cards to the Send doc.
+  function queueToSend(snip: FlowSnippet) {
+    setSendHtml((prev) => prev + blockToHtml(snip.label, snip.points, snip.body));
+    setSendVersion((v) => v + 1);
+  }
+
+  // Extensions "use" button: add points to the flow (when flowing) + queue Send doc.
   function runExtension(snip: FlowSnippet) {
     const pts = snip.points ?? [];
     const tags = pts.length ? pts.map((p) => p.tag) : [snip.label];
     if (tabRef.current === "flow") addPointsRef.current?.(tags);
-    const html = pts.length
-      ? pts.map((p) => cardHtml(p.tag, p.rich)).join("")
-      : plainCardHtml(snip.label, snip.body);
-    setSendHtml((prev) => prev + html);
-    setSendVersion((v) => v + 1);
+    queueToSend(snip);
   }
 
   useEffect(() => {
@@ -81,28 +83,42 @@ export default function FlowWorkspace() {
     return () => { active = false; };
   }, [flow]);
 
-  // Global keys: Alt+←/→ switches folder flows; extension shortcuts fire runExtension.
+  const findByTrigger = (trigger: string) =>
+    snippetsRef.current.find((s) => (s.shortcut ?? "").trim().toLowerCase() === trigger);
+
+  // Flow slash: return the point tags (FlowGrid inserts them at the current indent)
+  // and queue the block into the Send doc.
+  function resolveSlashPoints(trigger: string): string[] | null {
+    const snip = findByTrigger(trigger);
+    if (!snip) return null;
+    queueToSend(snip);
+    const pts = snip.points ?? [];
+    return pts.length ? pts.map((p) => p.tag) : [snip.label];
+  }
+
+  // Speech slash: just the Heading-4 tags as text (no Send doc queue).
+  function resolveSlashText(trigger: string): string | null {
+    const snip = findByTrigger(trigger);
+    if (!snip) return null;
+    const pts = snip.points ?? [];
+    return pts.length ? pts.map((p) => p.tag).join("\n") : snip.label;
+  }
+
+  // Send doc slash: the block's HTML (centered H3 title + H4 points) spliced in place.
+  function resolveSlashHtml(trigger: string): string | null {
+    const snip = findByTrigger(trigger);
+    return snip ? blockToHtml(snip.label, snip.points, snip.body) : null;
+  }
+
+  // Alt+←/→ switches between flows in the same folder.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-        if (siblings.length > 1) {
-          e.preventDefault();
-          const i = siblings.findIndex((f) => f.id === flowId);
-          const next = siblings[(i + (e.key === "ArrowRight" ? 1 : -1) + siblings.length) % siblings.length];
-          if (next && next.id !== flowId) router.push(`/flow/${next.id}`);
-        }
-        return;
+      if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight") && siblings.length > 1) {
+        e.preventDefault();
+        const i = siblings.findIndex((f) => f.id === flowId);
+        const next = siblings[(i + (e.key === "ArrowRight" ? 1 : -1) + siblings.length) % siblings.length];
+        if (next && next.id !== flowId) router.push(`/flow/${next.id}`);
       }
-      if (["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
-      if (!(e.ctrlKey || e.altKey || e.metaKey)) return;
-      const mods: string[] = [];
-      if (e.ctrlKey) mods.push("ctrl");
-      if (e.altKey) mods.push("alt");
-      if (e.metaKey) mods.push("meta");
-      if (e.shiftKey) mods.push("shift");
-      const combo = [...mods, e.key.toLowerCase()].join("+");
-      const snip = snippetsRef.current.find((s) => s.shortcut === combo);
-      if (snip) { e.preventDefault(); runExtension(snip); }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -149,13 +165,13 @@ export default function FlowWorkspace() {
       <div className="flow-work__body">
         <div className="flow-work__main">
           {tab === "flow" && (
-            <FlowGrid flowId={flowId} userId={userId} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} />
+            <FlowGrid flowId={flowId} userId={userId} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} />
           )}
           {tab === "speech" && (
-            <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} />
+            <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} />
           )}
           {tab === "send" && (
-            <SendDoc html={sendHtml} version={sendVersion} onChange={setSendHtml} />
+            <SendDoc html={sendHtml} version={sendVersion} onChange={setSendHtml} resolveSlashHtml={resolveSlashHtml} />
           )}
         </div>
 

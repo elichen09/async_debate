@@ -1,4 +1,4 @@
-import type { RichParagraph, RichRun } from "@/app/flow/shared";
+import type { ExtensionPoint, RichParagraph, RichRun } from "@/app/flow/shared";
 
 // Word's named highlight colors → CSS, so the Send doc editor shows real
 // highlighting on its white "paper" surface.
@@ -39,4 +39,13 @@ export function cardHtml(tag: string, rich: RichParagraph[]): string {
 export function plainCardHtml(tag: string, body: string): string {
   const paras = body.split(/\n{2,}/).map((p) => `<p>${esc(p.trim()) || "&nbsp;"}</p>`).join("");
   return `<h4>${esc(tag)}</h4>${paras}`;
+}
+
+// A whole block for the Send doc: the block name as a centered Heading 3, then
+// its points (each tag a Heading 4 + body).
+export function blockToHtml(label: string, points: ExtensionPoint[] | null, body: string): string {
+  const title = `<h3 style="text-align:center">${esc(label)}</h3>`;
+  if (points && points.length) return title + points.map((p) => cardHtml(p.tag, p.rich)).join("");
+  const paras = body.split(/\n{2,}/).map((p) => `<p>${esc(p.trim()) || "&nbsp;"}</p>`).join("");
+  return title + paras;
 }

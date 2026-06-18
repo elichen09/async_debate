@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { parseAtSections } from "@/lib/docxImport";
 import type { FlowSnippet, ExtensionPoint } from "@/app/flow/shared";
@@ -23,29 +24,11 @@ export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSn
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [capturingId, setCapturingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"recent" | "az">("recent");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!capturingId) return;
-    function onKey(e: KeyboardEvent) {
-      if (["Shift", "Control", "Alt", "Meta"].includes(e.key)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (!(e.ctrlKey || e.altKey || e.metaKey)) { setError("Shortcuts need Alt, Ctrl, or Cmd."); return; }
-      const mods: string[] = [];
-      if (e.ctrlKey) mods.push("ctrl");
-      if (e.altKey) mods.push("alt");
-      if (e.metaKey) mods.push("meta");
-      if (e.shiftKey) mods.push("shift");
-      saveShortcut(capturingId!, [...mods, e.key.toLowerCase()].join("+"));
-      setCapturingId(null);
-      setError("");
-    }
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [capturingId]);
+  const slug = (v: string) => v.replace(/[^a-z0-9]/gi, "").toLowerCase();
 
   async function add() {
     if (!body.trim()) return;
@@ -86,11 +69,20 @@ export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSn
     if (data) setSnippets((prev) => [...(data as FlowSnippet[]), ...prev]);
   }
 
+  const q = query.trim().toLowerCase();
+  const view = snippets
+    .filter((s) => !q || s.label.toLowerCase().includes(q) || s.body.toLowerCase().includes(q))
+    .slice()
+    .sort((a, b) => (sortBy === "az" ? a.label.localeCompare(b.label) : b.created_at.localeCompare(a.created_at)));
+
   return (
     <aside className="flow-snip">
       <div className="flow-snip__head">
         <span className="flow-panel__title">Extensions</span>
-        <button className="flow-icon-btn" onClick={onClose} aria-label="Close">×</button>
+        <div className="flow-snip__headbtns">
+          <Link className="flow-icon-btn" href="/flow/extensions" title="Open full library" aria-label="Open full library">⤢</Link>
+          <button className="flow-icon-btn" onClick={onClose} aria-label="Close">×</button>
+        </div>
       </div>
 
       <button className="flow-rail__import" onClick={() => fileRef.current?.click()} disabled={busy}>
@@ -114,11 +106,21 @@ export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSn
 
       {error && <p className="flow-snip__error">⚑ {error}</p>}
 
+      <div className="flow-snip__controls">
+        <input className="flow-snip__search" placeholder="Search extensions…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <select className="flow-snip__sortsel" value={sortBy} onChange={(e) => setSortBy(e.target.value as "recent" | "az")} title="Sort">
+          <option value="recent">Recent</option>
+          <option value="az">A–Z</option>
+        </select>
+      </div>
+
       <div className="flow-snip__list">
         {snippets.length === 0 ? (
           <p className="flow-snip__empty">No saved extensions yet.</p>
+        ) : view.length === 0 ? (
+          <p className="flow-snip__empty">No matches for “{query}”.</p>
         ) : (
-          snippets.map((s) => (
+          view.map((s) => (
             <div className="flow-snip__item" key={s.id}>
               <button className="flow-snip__insert" title={s.body} onClick={() => onUse(s)}>
                 <span className="flow-snip__label">
@@ -128,16 +130,15 @@ export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSn
                 <span className="flow-snip__preview">{s.body}</span>
               </button>
               <div className="flow-snip__row2">
-                <button
-                  className={`flow-snip__shortcut ${capturingId === s.id ? "is-capturing" : ""}`}
-                  onClick={() => setCapturingId(capturingId === s.id ? null : s.id)}
-                  title="Set keyboard shortcut"
-                >
-                  {capturingId === s.id ? "press keys…" : s.shortcut ? `⌨ ${s.shortcut}` : "⌨ set shortcut"}
-                </button>
-                {s.shortcut && capturingId !== s.id && (
-                  <button className="flow-icon-btn" onClick={() => saveShortcut(s.id, null)} title="Clear shortcut" aria-label="Clear shortcut">×</button>
-                )}
+                <span className="flow-snip__slash">/</span>
+                <input
+                  className="flow-snip__trigger"
+                  defaultValue={s.shortcut ?? ""}
+                  placeholder="trigger"
+                  title="Slash trigger — type /trigger + Enter in a flow point"
+                  onBlur={(e) => saveShortcut(s.id, slug(e.target.value) || null)}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                />
               </div>
               <button className="flow-icon-btn flow-snip__del" onClick={() => del(s.id)} aria-label="Delete">×</button>
             </div>

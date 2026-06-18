@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, HeadingLevel, TextRun, ShadingType } from "docx";
+import { Document, Packer, Paragraph, HeadingLevel, TextRun, ShadingType, AlignmentType } from "docx";
 
 // Convert a CSS color string (#rgb, #rrggbb, rgb(), or a few names) to docx's
 // bare RRGGBB hex.
@@ -61,6 +61,13 @@ function headingFor(tag: string) {
   return ([HeadingLevel.HEADING_1, HeadingLevel.HEADING_2, HeadingLevel.HEADING_3,
     HeadingLevel.HEADING_4, HeadingLevel.HEADING_5, HeadingLevel.HEADING_6])[parseInt(m[1], 10) - 1];
 }
+function alignFor(el: HTMLElement) {
+  const a = (el.style.textAlign || el.getAttribute("align") || "").toLowerCase();
+  if (a === "center") return AlignmentType.CENTER;
+  if (a === "right") return AlignmentType.RIGHT;
+  if (a === "justify") return AlignmentType.JUSTIFIED;
+  return undefined;
+}
 
 function walk(node: Node, paras: Paragraph[]) {
   node.childNodes.forEach((child) => {
@@ -76,7 +83,7 @@ function walk(node: Node, paras: Paragraph[]) {
       if (hasBlockChild(el)) { walk(el, paras); return; }
       const runs: TextRun[] = [];
       inlineRuns(el, {}, runs);
-      paras.push(new Paragraph({ children: runs, heading: headingFor(tag) }));
+      paras.push(new Paragraph({ children: runs, heading: headingFor(tag), alignment: alignFor(el) }));
     } else {
       walk(el, paras); // spans/wrappers: descend to find blocks
     }
@@ -90,7 +97,10 @@ export async function downloadHtmlAsDocx(html: string, filename = "send-doc.docx
   walk(dom.body, paras);
   if (!paras.length) paras.push(new Paragraph({ text: "" }));
 
-  const doc = new Document({ sections: [{ children: paras }] });
+  const doc = new Document({
+    styles: { default: { document: { run: { font: "Calibri", size: 22 } } } }, // Calibri 11pt default
+    sections: [{ children: paras }],
+  });
   const blob = await Packer.toBlob(doc);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
