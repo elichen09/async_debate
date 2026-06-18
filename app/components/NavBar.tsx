@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { isFlowAllowed } from "@/lib/flowAccess";
 import SceneToggle from "./SceneToggle";
 import CursorToggle from "./CursorToggle";
 
@@ -27,13 +28,15 @@ export default function TopNav() {
   const router = useRouter();
   const [elo, setElo] = useState<number | null>(null);
   const [username, setUsername] = useState<string>("");
+  const [flowOk, setFlowOk] = useState(false);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
     async function load() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { if (active) { setElo(null); setUsername(""); } return; }
+      if (!session) { if (active) { setElo(null); setUsername(""); setFlowOk(false); } return; }
+      if (active) setFlowOk(isFlowAllowed(session.user.email));
       const { data } = await supabase
         .from("profiles")
         .select("username, elo")
@@ -45,6 +48,10 @@ export default function TopNav() {
     return () => { active = false; };
   }, [pathname]);
 
+  const navLinks = NAV_LINKS.filter(l => l.href !== "/flow" || flowOk);
+
+  // Close the mobile drawer whenever the route changes.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setOpen(false); }, [pathname]);
 
   if (HIDE_ON.includes(pathname)) return null;
@@ -85,7 +92,7 @@ export default function TopNav() {
 
       {/* Vertical rail: the primary links live on the left edge, rotated 90° */}
       <nav className="gh-siderail" aria-label="Primary">
-        {NAV_LINKS.map((link, i) => (
+        {navLinks.map((link, i) => (
           <Link
             key={link.href}
             href={link.href}
@@ -106,7 +113,7 @@ export default function TopNav() {
         <Link href="/dashboard" className="gh-drawer__brand">
           debate<b>.</b>fish
         </Link>
-        {NAV_LINKS.map(link => (
+        {navLinks.map(link => (
           <Link
             key={link.href}
             href={link.href}

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { parseFlowHeadings } from "@/lib/docxImport";
 import { type Flow, type FlowFolder } from "@/app/flow/shared";
 
 // Left rail: lists the user's flows (owned + shared), organized into folders,
@@ -22,6 +23,7 @@ export default function FlowSidebar() {
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Auto-hide the site's vertical nav rail while in the flow workspace.
   useEffect(() => {
@@ -87,6 +89,42 @@ export default function FlowSidebar() {
     await supabase.from("flow_cells").insert(
       { flow_id: flow.id, col: 0, row_index: 0, content: "", updated_by: uid }
     );
+    setCreating(false);
+    router.push(`/flow/${flow.id}`);
+  }
+
+  // Import a .docx: each Heading-4 line becomes one point in a brand-new flow.
+  // The file is parsed in the browser and never stored.
+  async function importFlow(file: File) {
+    if (creating) return;
+    setError("");
+    setCreating(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const uid = user?.id;
+    if (!uid) { setError("Your session expired — sign in again."); setCreating(false); return; }
+
+    let lines: string[] = [];
+    try {
+      lines = await parseFlowHeadings(await file.arrayBuffer());
+    } catch {
+      setError("Couldn't read that .docx.");
+      setCreating(false);
+      return;
+    }
+
+    const title = file.name.replace(/\.docx$/i, "").trim() || "Imported";
+    const { data: flow, error: insErr } = await supabase
+      .from("flows")
+      .insert({ owner_id: uid, title })
+      .select("*")
+      .single();
+    if (insErr || !flow) { setError(insErr?.message ?? "Could not create flow."); setCreating(false); return; }
+
+    const rows = lines.length
+      ? lines.map((content, i) => ({ flow_id: flow.id, col: 0, row_index: i, depth: 0, content, updated_by: uid }))
+      : [{ flow_id: flow.id, col: 0, row_index: 0, content: "", updated_by: uid }];
+    await supabase.from("flow_cells").insert(rows);
+
     setCreating(false);
     router.push(`/flow/${flow.id}`);
   }
@@ -254,6 +292,16 @@ export default function FlowSidebar() {
         <button className="flow-rail__new" onClick={() => createFlow("aff")} disabled={creating}>+ aff</button>
         <button className="flow-rail__new" onClick={() => createFlow("neg")} disabled={creating}>+ neg</button>
       </div>
+      <button className="flow-rail__import" onClick={() => fileRef.current?.click()} disabled={creating}>
+        ⬆ Import .docx
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".docx"
+        hidden
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) importFlow(f); e.target.value = ""; }}
+      />
     </nav>
   );
 }

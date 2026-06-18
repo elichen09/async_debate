@@ -50,10 +50,14 @@ alter table public.flow_cells add column if not exists highlighted boolean not n
 create table if not exists public.flow_snippets (
   id         uuid primary key default gen_random_uuid(),
   owner_id   uuid not null references public.profiles(id) on delete cascade,
-  label      text not null default 'Snippet',
-  body       text not null default '',
+  label      text not null default 'Snippet',   -- the extension/section name
+  body       text not null default '',           -- plain text of the section (preview)
+  points     jsonb,                              -- [{tag, rich:[{runs}]}] Heading-4 points w/ formatting
+  shortcut   text,                               -- user-assigned key combo (e.g. "alt+f")
   created_at timestamptz not null default now()
 );
+alter table public.flow_snippets add column if not exists shortcut text;
+alter table public.flow_snippets add column if not exists points jsonb;
 
 -- Personal folders for organizing flows (owner-only). A flow's folder is set by
 -- whoever owns it; collaborators see shared flows ungrouped.

@@ -50,11 +50,37 @@ export interface FlowCell {
   updated_at: string;
 }
 
+// A formatted run/paragraph captured from a .docx so the Send doc can rebuild it
+// with its original highlight / color / font.
+export interface RichRun {
+  text: string;
+  bold?: boolean;
+  italics?: boolean;
+  underline?: boolean;
+  color?: string;      // hex RRGGBB
+  highlight?: string;  // named highlight (yellow, green, …)
+  font?: string;
+  size?: number;       // half-points
+}
+export interface RichParagraph {
+  runs: RichRun[];
+}
+
+// One Heading-4 point inside an extension: its tag (flowed) + formatted body.
+export interface ExtensionPoint {
+  tag: string;
+  rich: RichParagraph[];
+}
+
+// An extension = a header section (e.g. "Topshelf"). Using it adds each point's
+// tag as a new flow point and queues the points' cards into the Send doc.
 export interface FlowSnippet {
   id: string;
   owner_id: string;
-  label: string;
-  body: string;
+  label: string;                        // the section/extension name
+  body: string;                         // plain text of the whole section (preview)
+  points: ExtensionPoint[] | null;      // Heading-4 points; null for a manual one-liner
+  shortcut: string | null;              // user-assigned key combo, e.g. "alt+f"
   created_at: string;
 }
 

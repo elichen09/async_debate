@@ -8,6 +8,7 @@ interface FlowGridProps {
   flowId: string;
   userId: string;
   registerInsert: (fn: EditorInsert | null) => void;
+  registerAddPoints?: (fn: ((tags: string[]) => void) | null) => void;
 }
 
 const SEL = "id, flow_id, col, row_index, depth, highlighted, content, updated_by, updated_at";
@@ -35,7 +36,7 @@ function nodeLabel(count: number, depth: number): string {
 // A debate flow as a nested outline: Enter adds a sibling point, Tab indents it
 // into a response, Shift+Tab outdents, and highlighting marks key cards. Numbers
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
-export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridProps) {
+export default function FlowGrid({ flowId, userId, registerInsert, registerAddPoints }: FlowGridProps) {
   const [cells, setCells] = useState<FlowCell[]>([]);
   const [loadError, setLoadError] = useState("");
   const cellsRef = useRef<FlowCell[]>([]);
@@ -97,17 +98,33 @@ export default function FlowGrid({ flowId, userId, registerInsert }: FlowGridPro
     await supabase.from("flow_cells").update({ ...patch, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id);
   }
 
-  async function insertNode(row: number, depth: number) {
+  async function insertNode(row: number, depth: number, content = "", focus = true) {
     const { data } = await supabase
       .from("flow_cells")
-      .insert({ flow_id: flowId, col: 0, row_index: row, depth, content: "", updated_by: userId })
+      .insert({ flow_id: flowId, col: 0, row_index: row, depth, content, updated_by: userId })
       .select(SEL)
       .single();
     if (data) {
-      focusId.current = (data as FlowCell).id;
+      if (focus) focusId.current = (data as FlowCell).id;
       setCells((prev) => (prev.some((c) => c.id === data.id) ? prev : [...prev, data as FlowCell]));
     }
   }
+
+  // Append a batch of points (e.g. an extension's Heading-4 tags) at the bottom.
+  async function addPoints(tags: string[]) {
+    let row = cellsRef.current.length ? Math.max(...cellsRef.current.map((c) => c.row_index)) : -1;
+    for (const tag of tags) {
+      row += 1;
+      await insertNode(row, 0, tag, false);
+    }
+  }
+
+  // Expose addPoints to the workspace (for inserting extensions into the flow).
+  useEffect(() => {
+    registerAddPoints?.(addPoints);
+    return () => registerAddPoints?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowId]);
 
   // Enter: new sibling right below, at the same depth.
   function addSibling(cell: FlowCell) {

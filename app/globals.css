@@ -3768,7 +3768,100 @@ html.flow-route .gh-topnav__burger {
   color: var(--ink);
 }
 
+/* ---- Import buttons (sidebar + extensions panel, both on dark surfaces) ---- */
+.flow-rail__import {
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 0;
+  background: none;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+.flow-rail__import:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.4); color: #fff; }
+.flow-rail__import:disabled { opacity: 0.5; cursor: default; }
+
+/* ---- Folder tab strip (under the workspace header) ---- */
+.flow-foldertabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+  overflow-x: auto;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  flex-shrink: 0;
+}
+.flow-foldertab {
+  flex-shrink: 0;
+  max-width: 180px;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.flow-foldertab:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.flow-foldertab.is-active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-deep); }
+
+/* ---- Extensions panel extras (shortcut chip, import error) ---- */
+.flow-snip__error { font-size: 12px; color: oklch(0.8 0.13 28); margin: 0; }
+.flow-snip__row2 { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+.flow-snip__shortcut {
+  flex: 1;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  text-align: left;
+}
+.flow-snip__shortcut:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.flow-snip__shortcut.is-capturing { border-color: var(--accent); color: var(--accent); }
+
+/* ---- Send doc — full-area rich editor on a white "paper" surface ---- */
+.flow-sendedit { display: flex; flex-direction: column; height: 100%; gap: 10px; max-width: 900px; }
+.flow-sendedit__bar { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.flow-sendedit__hint { font-size: 11px; color: rgba(255, 255, 255, 0.45); }
+.flow-sendedit__doc {
+  flex: 1;
+  overflow-y: auto;
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: var(--radius);
+  padding: 26px 32px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+  outline: none;
+  box-shadow: var(--shadow-md);
+}
+.flow-sendedit__doc:empty::before {
+  content: attr(data-placeholder);
+  color: #9aa0a6;
+}
+.flow-sendedit__doc h4 { font-family: var(--font-display); font-size: 16px; font-weight: 700; margin: 16px 0 6px; color: #111; }
+.flow-sendedit__doc h4:first-child { margin-top: 0; }
+.flow-sendedit__doc p { margin: 0 0 8px; }
+html.gh-light .flow-sendedit__hint { color: var(--muted); }
+
 /* ---- Light scenes — flow text sits on light paper, so flip it to dark ink ---- */
+html.gh-light .flow-foldertab { color: var(--ink-soft); background: oklch(0.12 0.04 232 / 0.05); border-color: var(--line-strong); }
+html.gh-light .flow-foldertab:hover { background: oklch(0.12 0.04 232 / 0.12); color: var(--ink); }
+html.gh-light .flow-foldertab.is-active { color: var(--accent-ink); background: var(--accent); border-color: var(--accent-deep); }
 html.gh-light .flow-work__title { color: var(--ink); }
 html.gh-light .flow-tab { color: var(--muted); }
 html.gh-light .flow-tab:hover,
