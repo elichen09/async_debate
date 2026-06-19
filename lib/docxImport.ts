@@ -171,13 +171,28 @@ export async function parseAtSections(
 // Build flow_snippets rows from parsed sections, linking each "child" sub-block to
 // the most recent normal block via a client-generated id (so the parent->child
 // grouping survives without a second round-trip).
+// A block's OWN trigger segment, derived from its label. The label may itself hold
+// colons as separators ("January: AT: Arctic"); each colon-segment drops a leading
+// "AT", is slugged to [a-z0-9], and the non-empty ones rejoin with ":". So
+// "AT: Arctic" → "arctic", "At: Russia War" → "russiawar", and
+// "January: AT: Arctic" → "january:arctic". Full triggers chain a parent's onto
+// the child's with ":".
+export function triggerNamePart(label: string): string {
+  return label
+    .split(":")
+    .map((seg) => seg.replace(/^\s*at\b[:.\s-]*/i, "").trim()) // strip a leading "AT" within the segment
+    .filter((seg) => seg.length)                               // drop segments that were just "AT"
+    .map((seg) => seg.replace(/[^a-z0-9]/gi, "").toLowerCase())
+    .filter(Boolean)
+    .join(":");
+}
+
 export function rowsFor(
   sections: { label: string; body: string; points: ExtensionPoint[]; level: number }[],
   ownerId: string,
 ) {
   const slug = (v: string) => v.replace(/[^a-z0-9]/gi, "").toLowerCase();
-  // Each block's own trigger name drops a leading "AT" (so "AT: Arctic" → arctic).
-  const namePart = (label: string) => slug(label.replace(/^\s*at\b[:.\s-]*/i, "")) || slug(label);
+  const namePart = (label: string) => triggerNamePart(label) || slug(label);
   const idStack: string[] = [];   // most-recent block id at each level
   const trigStack: string[] = []; // most-recent full trigger at each level
   return sections.map((s) => {

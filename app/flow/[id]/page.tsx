@@ -48,6 +48,7 @@ export default function FlowWorkspace() {
   const flowId = id as string;
 
   const [userId, setUserId] = useState("");
+  const [userName, setUserName] = useState("Partner");
   const [flow, setFlow] = useState<Flow | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"flow" | "speech" | "send">("flow");
@@ -153,7 +154,7 @@ export default function FlowWorkspace() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { router.push("/login"); return; }
       const uid = session.user.id;
-      if (active) setUserId(uid);
+      if (active) { setUserId(uid); setUserName((session.user.email ?? "Partner").split("@")[0]); }
       const { data } = await supabase.from("flows").select("*").eq("id", flowId).single();
       if (!active) return;
       if (!data) { router.push("/flow"); return; }
@@ -288,7 +289,7 @@ export default function FlowWorkspace() {
       <div className="flow-work__body">
         <div className="flow-work__main">
           {tab === "flow" && (
-            <FlowGrid flowId={flowId} userId={userId} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} />
+            <FlowGrid flowId={flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} />
           )}
           {tab === "speech" && (
             <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} />

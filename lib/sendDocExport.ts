@@ -34,7 +34,7 @@ const HIGHLIGHT_BY_HEX: Record<string, Highlight> = {
   "000000": "black", FFFFFF: "white",
 };
 
-interface Fmt { bold?: boolean; italics?: boolean; underline?: boolean; color?: string; fill?: string; highlight?: Highlight; font?: string; size?: number; }
+interface Fmt { bold?: boolean; italics?: boolean; underline?: boolean; strike?: boolean; color?: string; fill?: string; highlight?: Highlight; font?: string; size?: number; }
 const BLOCK = new Set(["p", "div", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote"]);
 
 function inlineRuns(node: Node, fmt: Fmt, out: TextRun[]) {
@@ -43,7 +43,7 @@ function inlineRuns(node: Node, fmt: Fmt, out: TextRun[]) {
       const text = child.textContent ?? "";
       if (text) out.push(new TextRun({
         text, bold: fmt.bold, italics: fmt.italics, underline: fmt.underline ? {} : undefined,
-        color: fmt.color, font: fmt.font, size: fmt.size, highlight: fmt.highlight,
+        strike: fmt.strike, color: fmt.color, font: fmt.font, size: fmt.size, highlight: fmt.highlight,
         shading: fmt.fill ? { type: ShadingType.SOLID, color: "auto", fill: fmt.fill } : undefined,
       }));
       return;
@@ -55,8 +55,15 @@ function inlineRuns(node: Node, fmt: Fmt, out: TextRun[]) {
     const nf: Fmt = { ...fmt };
     if (tag === "b" || tag === "strong") nf.bold = true;
     if (tag === "i" || tag === "em") nf.italics = true;
-    if (tag === "u") nf.underline = true;
+    if (tag === "u" || tag === "ins") nf.underline = true;
+    if (tag === "s" || tag === "strike" || tag === "del") nf.strike = true;
     const st = el.style;
+    // Browsers' execCommand may emit CSS (font-style/text-decoration/font-weight)
+    // instead of <i>/<u>/<b> tags — honor both so nothing is dropped on download.
+    if (st.fontStyle === "italic" || st.fontStyle === "oblique") nf.italics = true;
+    const td = `${st.textDecorationLine || ""} ${st.textDecoration || ""}`;
+    if (td.includes("underline")) nf.underline = true;
+    if (td.includes("line-through")) nf.strike = true;
     if (st.color) nf.color = hex(st.color) ?? nf.color;
     if (st.backgroundColor) {
       const fh = hex(st.backgroundColor);

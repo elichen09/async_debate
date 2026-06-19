@@ -3645,6 +3645,19 @@ html.gh-light .flow-node.is-sel { background: oklch(0.6 0.14 250 / 0.14); }
 }
 .flow-node:hover .flow-node__tools { opacity: 1; }
 
+/* Live presence: a collaborator's name badge on the point they're editing. */
+.flow-node__editors { position: absolute; top: -8px; right: 8px; display: flex; gap: 4px; z-index: 6; pointer-events: none; }
+.flow-node__editor {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #fff;
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
 /* Slash autocomplete dropdown under a point typing "/trigger". */
 .flow-slash {
   position: absolute;

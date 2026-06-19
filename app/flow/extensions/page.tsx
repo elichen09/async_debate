@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { parseAtSections, rowsFor } from "@/lib/docxImport";
+import { parseAtSections, rowsFor, triggerNamePart } from "@/lib/docxImport";
 import type { FlowSnippet, FlowSnippetFolder, ExtensionPoint } from "@/app/flow/shared";
 
 const SEL = "id, owner_id, label, body, points, shortcut, parent_id, folder_id, sort_order, created_at";
@@ -68,15 +68,40 @@ export default function ExtensionsPage() {
     setSnippets((p) => p.filter((s) => s.id !== id));
     await supabase.from("flow_snippets").delete().eq("id", id);
   }
-  async function saveShortcut(id: string, shortcut: string | null) {
-    setSnippets((p) => p.map((s) => (s.id === id ? { ...s, shortcut } : s)));
-    await supabase.from("flow_snippets").update({ shortcut }).eq("id", id);
+  // Set a block's trigger AND re-chain every descendant's trigger under it, since
+  // triggers chain a parent's onto the child's ("arctic:russiawar"). Each child's
+  // own segment comes from its label (triggerNamePart), so renaming a parent
+  // cascades to the whole subtree.
+  function recomputeSubtree(rootId: string, rootTrigger: string) {
+    const updates: { id: string; shortcut: string | null }[] = [];
+    const walk = (nodeId: string, trig: string) => {
+      updates.push({ id: nodeId, shortcut: trig || null });
+      for (const c of snippets.filter((s) => s.parent_id === nodeId)) {
+        const own = triggerNamePart(c.label);
+        walk(c.id, trig ? (own ? `${trig}:${own}` : trig) : own);
+      }
+    };
+    walk(rootId, rootTrigger);
+    setSnippets((prev) => prev.map((s) => { const u = updates.find((x) => x.id === s.id); return u ? { ...s, shortcut: u.shortcut } : s; }));
+    Promise.all(updates.map((u) => supabase.from("flow_snippets").update({ shortcut: u.shortcut }).eq("id", u.id)));
+  }
+  // Manual trigger edit: use the typed value for this block, re-chain its subtree.
+  function saveShortcut(id: string, shortcut: string | null) {
+    recomputeSubtree(id, shortcut ?? "");
   }
   async function saveName(id: string, name: string) {
     setRenamingId(null);
     const clean = name.trim() || "Extension";
     setSnippets((p) => p.map((s) => (s.id === id ? { ...s, label: clean } : s)));
     await supabase.from("flow_snippets").update({ label: clean }).eq("id", id);
+    // Recompute this block's trigger from its new name (chained under its parent's
+    // current trigger) and cascade to all descendants.
+    const node = snippets.find((s) => s.id === id);
+    const parent = node?.parent_id ? snippets.find((s) => s.id === node.parent_id) : null;
+    const prefix = (parent?.shortcut ?? "").trim();
+    const own = triggerNamePart(clean);
+    const trig = prefix ? (own ? `${prefix}:${own}` : prefix) : own;
+    recomputeSubtree(id, trig);
   }
   async function importAt(file: File) {
     setError(""); setBusy(true);
@@ -212,6 +237,7 @@ export default function ExtensionsPage() {
         <div className="extcard__foot">
           <span className="extcard__slash">/</span>
           <input
+            key={s.shortcut ?? "none"}
             className="extcard__trigger"
             defaultValue={s.shortcut ?? ""}
             placeholder="trigger"

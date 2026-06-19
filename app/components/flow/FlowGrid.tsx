@@ -4,9 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { FlowCell, EditorInsert } from "@/app/flow/shared";
 
+// A short, stable color per collaborator (keyed off their user id) for presence.
+const PRESENCE_COLORS = ["#e0704f", "#6f9bea", "#5fbf8f", "#c98bdb", "#e0b84f", "#5fc7d6"];
+function colorFor(uid: string): string {
+  let h = 0;
+  for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0;
+  return PRESENCE_COLORS[h % PRESENCE_COLORS.length];
+}
+// What we broadcast over the presence channel: which cell we're editing + who we are.
+type PresenceMeta = { cellId: string | null; name: string; color: string };
+type RemoteEditor = { uid: string; name: string; color: string };
+
 interface FlowGridProps {
   flowId: string;
   userId: string;
+  userName?: string;          // shown to collaborators on the point you're editing
   registerInsert: (fn: EditorInsert | null) => void;
   registerAddPoints?: (fn: ((tags: string[]) => void) | null) => void;
   // Returns the point tags for a "/trigger" (or null). Does NOT queue the Send doc;
@@ -48,7 +60,7 @@ function nodeLabel(count: number, depth: number): string {
 // A debate flow as a nested outline: Enter adds a sibling point, Tab indents it
 // into a response, Shift+Tab outdents, and highlighting marks key cards. Numbers
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
-export default function FlowGrid({ flowId, userId, registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints }: FlowGridProps) {
+export default function FlowGrid({ flowId, userId, userName = "Partner", registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints }: FlowGridProps) {
   const [cells, setCells] = useState<FlowCell[]>([]);
   const [loadError, setLoadError] = useState("");
   const cellsRef = useRef<FlowCell[]>([]);
@@ -65,6 +77,9 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
   // Slash autocomplete: which cell is typing a "/trigger" and the partial text.
   const [slash, setSlash] = useState<{ id: string; query: string } | null>(null);
   const [slashActive, setSlashActive] = useState(0);
+  // Live presence: which cell each collaborator is editing (cellId -> editors).
+  const [remoteEditors, setRemoteEditors] = useState<Record<string, RemoteEditor[]>>({});
+  const presenceRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => { cellsRef.current = cells; }, [cells]);
 
@@ -121,6 +136,35 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
 
     return () => { active = false; supabase.removeChannel(channel); };
   }, [flowId]);
+
+  // Live presence: broadcast which point we're editing and show collaborators'
+  // names on the points they're editing. Ephemeral (Realtime presence) — nothing
+  // is persisted, so no schema/RLS needed.
+  useEffect(() => {
+    if (!userId) return;
+    const color = colorFor(userId);
+    const ch = supabase.channel(`flow_presence:${flowId}`, { config: { presence: { key: userId } } });
+    ch.on("presence", { event: "sync" }, () => {
+      const state = ch.presenceState<PresenceMeta>();
+      const map: Record<string, RemoteEditor[]> = {};
+      for (const key of Object.keys(state)) {
+        if (key === userId) continue; // skip ourselves
+        for (const meta of state[key]) {
+          if (!meta.cellId) continue;
+          (map[meta.cellId] ||= []).push({ uid: key, name: meta.name, color: meta.color });
+        }
+      }
+      setRemoteEditors(map);
+    });
+    ch.subscribe((status) => { if (status === "SUBSCRIBED") ch.track({ cellId: null, name: userName, color }); });
+    presenceRef.current = ch;
+    return () => { presenceRef.current = null; setRemoteEditors({}); supabase.removeChannel(ch); };
+  }, [flowId, userId, userName]);
+
+  // Tell collaborators which point we're on (null when we leave the editor).
+  function trackCell(cellId: string | null) {
+    presenceRef.current?.track({ cellId, name: userName, color: colorFor(userId) });
+  }
 
   const sorted = () => [...cellsRef.current].sort((a, b) => a.row_index - b.row_index);
 
@@ -393,8 +437,8 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
       {labeled.map(({ cell, label }) => (
         <div
           key={cell.id}
-          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""}`}
-          style={{ marginLeft: cell.depth * INDENT }}
+          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""}`}
+          style={{ marginLeft: cell.depth * INDENT, ...(remoteEditors[cell.id]?.length ? { boxShadow: `inset 0 0 0 1.5px ${remoteEditors[cell.id][0].color}` } : {}) }}
         >
           <span
             className="flow-node__label"
@@ -476,14 +520,23 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
               editingId.current = cell.id;
               activeEl.current = e.target;
               registerInsert(makeInsert(cell.id));
+              trackCell(cell.id);
             }}
             onBlur={(e) => {
               editingId.current = null;
               saveContent(cell.id, e.target.value);
+              trackCell(null);
               // Close the dropdown unless focus moved into one of its options.
               setTimeout(() => setSlash((s) => (s?.id === cell.id ? null : s)), 120);
             }}
           />
+          {remoteEditors[cell.id]?.length > 0 && (
+            <div className="flow-node__editors">
+              {remoteEditors[cell.id].map((ed) => (
+                <span key={ed.uid} className="flow-node__editor" style={{ background: ed.color }}>{ed.name}</span>
+              ))}
+            </div>
+          )}
           {slash?.id === cell.id && slashMatches.length > 0 && (
             <ul className="flow-slash" role="listbox">
               {slashMatches.map((o, i) => (
