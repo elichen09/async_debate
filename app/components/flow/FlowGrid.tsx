@@ -80,6 +80,9 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // Live presence: which cell each collaborator is editing (cellId -> editors).
   const [remoteEditors, setRemoteEditors] = useState<Record<string, RemoteEditor[]>>({});
   const presenceRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const selfNameRef = useRef(userName);     // latest name, read by track() without re-subscribing
+  const lastCellRef = useRef<string | null>(null);
+  useEffect(() => { selfNameRef.current = userName; }, [userName]);
 
   useEffect(() => { cellsRef.current = cells; }, [cells]);
 
@@ -139,7 +142,9 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
 
   // Live presence: broadcast which point we're editing and show collaborators'
   // names on the points they're editing. Ephemeral (Realtime presence) — nothing
-  // is persisted, so no schema/RLS needed.
+  // is persisted, so no schema/RLS needed. Deps are only [flowId, userId] so the
+  // channel isn't torn down when the (async-loaded) name resolves; the name is
+  // read from a ref instead.
   useEffect(() => {
     if (!userId) return;
     const color = colorFor(userId);
@@ -148,23 +153,29 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       const state = ch.presenceState<PresenceMeta>();
       const map: Record<string, RemoteEditor[]> = {};
       for (const key of Object.keys(state)) {
-        if (key === userId) continue; // skip ourselves
-        for (const meta of state[key]) {
-          if (!meta.cellId) continue;
-          (map[meta.cellId] ||= []).push({ uid: key, name: meta.name, color: meta.color });
-        }
+        if (key === userId) continue;            // skip ourselves
+        const metas = state[key];
+        const meta = metas[metas.length - 1];    // a key can hold stale refs — use the latest only
+        if (!meta?.cellId) continue;
+        (map[meta.cellId] ||= []).push({ uid: key, name: meta.name, color: meta.color });
       }
       setRemoteEditors(map);
     });
-    ch.subscribe((status) => { if (status === "SUBSCRIBED") ch.track({ cellId: null, name: userName, color }); });
+    ch.subscribe((status) => { if (status === "SUBSCRIBED") ch.track({ cellId: lastCellRef.current, name: selfNameRef.current, color }); });
     presenceRef.current = ch;
-    return () => { presenceRef.current = null; setRemoteEditors({}); supabase.removeChannel(ch); };
-  }, [flowId, userId, userName]);
+    return () => { presenceRef.current = null; setRemoteEditors({}); ch.untrack(); supabase.removeChannel(ch); };
+  }, [flowId, userId]);
 
   // Tell collaborators which point we're on (null when we leave the editor).
   function trackCell(cellId: string | null) {
-    presenceRef.current?.track({ cellId, name: userName, color: colorFor(userId) });
+    lastCellRef.current = cellId;
+    presenceRef.current?.track({ cellId, name: selfNameRef.current, color: colorFor(userId) });
   }
+
+  // When the name resolves (async), re-broadcast it without re-subscribing.
+  useEffect(() => {
+    presenceRef.current?.track({ cellId: lastCellRef.current, name: userName, color: colorFor(userId) });
+  }, [userName, userId]);
 
   const sorted = () => [...cellsRef.current].sort((a, b) => a.row_index - b.row_index);
 
