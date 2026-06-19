@@ -81,6 +81,7 @@ export interface FlowSnippet {
   body: string;                         // plain text of the whole section (preview)
   points: ExtensionPoint[] | null;      // Heading-4 points; null for a manual one-liner
   shortcut: string | null;              // user-assigned key combo, e.g. "alt+f"
+  parent_id: string | null;             // groups "---AT: X" sub-blocks under their parent block
   created_at: string;
 }
 

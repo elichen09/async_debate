@@ -12,38 +12,68 @@ interface FlowSpeechProps {
 }
 
 // One shared speech-writing doc per flow, bound to flows.speech_body. Both
-// partners edit it; saved on blur, streamed via the flows row UPDATE event.
+// partners edit it: changes autosave ~0.4s after the last keystroke and stream via
+// the flows row UPDATE event, so neither side has to refresh. We re-read the latest
+// body on mount (initialBody goes stale once you tab away and back) and ignore
+// incoming events for ~1.5s after your own typing so the cursor never jumps.
 export default function FlowSpeech({ flowId, initialBody, registerInsert, resolveSlashText }: FlowSpeechProps) {
   const [body, setBody] = useState(initialBody);
-  const editing = useRef(false);
+  const lastTyped = useRef(0);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef(initialBody);     // newest text, for flush-on-unmount
+  const dirty = useRef(false);            // unsaved local edits pending
   const elRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
+    let active = true;
+    // Re-pull the current body — initialBody can be stale after a tab switch.
+    supabase.from("flows").select("speech_body").eq("id", flowId).single().then(({ data }) => {
+      if (!active || !data) return;
+      if (Date.now() - lastTyped.current < 1500) return;
+      const next = (data as { speech_body: string }).speech_body ?? "";
+      setBody((prev) => (prev === next ? prev : next));
+    });
+
     const channel = supabase
       .channel(`flow_speech:${flowId}`)
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "flows", filter: `id=eq.${flowId}` },
         (payload) => {
-          if (editing.current) return; // don't overwrite an in-progress edit
+          if (Date.now() - lastTyped.current < 1500) return; // don't clobber a live edit
           const next = (payload.new as { speech_body: string }).speech_body;
           setBody((prev) => (prev === next ? prev : next));
         }
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      active = false;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (dirty.current) supabase.from("flows").update({ speech_body: latest.current }).eq("id", flowId).then(() => {}); // flush (then() to actually send)
+      supabase.removeChannel(channel);
+    };
   }, [flowId]);
 
   async function save(text: string) {
+    if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
+    dirty.current = false;
     await supabase.from("flows").update({ speech_body: text }).eq("id", flowId);
+  }
+
+  // Mark a local edit and autosave shortly after typing stops.
+  function edit(text: string) {
+    setBody(text);
+    latest.current = text;
+    dirty.current = true;
+    lastTyped.current = Date.now();
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => save(text), 400);
   }
 
   function insert(text: string) {
     const el = elRef.current;
     const pos = el ? (el.selectionStart ?? body.length) : body.length;
-    const next = body.slice(0, pos) + text + body.slice(pos);
-    setBody(next);
-    save(next);
+    edit(body.slice(0, pos) + text + body.slice(pos));
   }
 
   function clearSpeech() {
@@ -63,9 +93,9 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
         className="flow-speech__text"
         value={body}
         placeholder="Write your speech here — your partner can edit it too."
-        onChange={(e) => setBody(e.target.value)}
+        onChange={(e) => edit(e.target.value)}
         onKeyDown={(e) => {
-          // Slash command: "/topshelf" alone on a line + Enter runs that extension.
+          // Slash command: "/topshelf" alone on a line + Enter inserts its tags.
           if (e.key === "Enter" && !e.shiftKey) {
             const ta = e.target as HTMLTextAreaElement;
             const pos = ta.selectionStart ?? 0;
@@ -75,15 +105,13 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
               const text = resolveSlashText?.(m[1].toLowerCase());
               if (text != null) {
                 e.preventDefault();
-                const next = ta.value.slice(0, lineStart) + text + ta.value.slice(pos);
-                setBody(next);
-                save(next);
+                edit(ta.value.slice(0, lineStart) + text + ta.value.slice(pos));
               }
             }
           }
         }}
-        onFocus={() => { editing.current = true; registerInsert(insert); }}
-        onBlur={(e) => { editing.current = false; save(e.target.value); }}
+        onFocus={() => { registerInsert(insert); }}
+        onBlur={(e) => { save(e.target.value); }}
       />
     </div>
   );

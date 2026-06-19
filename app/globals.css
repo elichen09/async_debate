@@ -3567,7 +3567,9 @@ html.flow-route .gh-topnav__burger {
 }
 .flow-outline__add:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.4); }
 .flow-outline__error { margin: 8px 4px; font-size: 13px; color: oklch(0.78 0.13 28); line-height: 1.5; }
-.flow-outline__bar { display: flex; justify-content: flex-end; margin: 0 0 10px; }
+.flow-outline__bar { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.flow-outline__bar-hint { flex: 1; font-size: 11px; color: rgba(255, 255, 255, 0.4); }
+html.gh-light .flow-outline__bar-hint { color: var(--muted); }
 .flow-node {
   position: relative;
   display: flex;
@@ -3588,7 +3590,10 @@ html.flow-route .gh-topnav__burger {
   font-size: 16px;
   font-weight: 700;
   user-select: none;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
 }
+.flow-node__label:hover { opacity: 0.7; }
 .flow-node__text {
   flex: 1;
   min-width: 0;
@@ -3621,6 +3626,11 @@ html.flow-route .gh-topnav__burger {
   border-radius: 2px;
 }
 .flow-node--hl .flow-node__label { color: oklch(0.8 0.15 80); }
+
+/* Selected rows (for copy/paste of multiple lines) */
+.flow-node.is-sel { background: oklch(0.7 0.14 250 / 0.18); border-left-color: var(--accent); }
+.flow-node.is-sel .flow-node__label { background: var(--accent); color: #fff; }
+html.gh-light .flow-node.is-sel { background: oklch(0.6 0.14 250 / 0.14); }
 
 .flow-node__tools {
   display: flex;
@@ -3745,6 +3755,27 @@ html.flow-route .gh-topnav__burger {
 }
 .flow-snip__del { position: absolute; top: 6px; right: 5px; }
 
+/* Grouped sub-blocks (an "---AT: X" nested under its parent block) */
+.flow-snip__chev {
+  display: inline-flex;
+  margin-right: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+}
+.flow-snip__chev:hover { color: #fff; }
+.flow-snip__children {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 6px 0 2px 12px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+.flow-snip__item--child .flow-snip__insert { background: rgba(255, 255, 255, 0.03); }
+html.gh-light .flow-snip__chev { color: var(--muted); }
+html.gh-light .flow-snip__children { border-left-color: var(--line); }
+
 /* ---- Share modal ---- */
 .flow-modal-backdrop {
   position: fixed;
@@ -3858,11 +3889,11 @@ html.flow-route .gh-topnav__burger {
   content: attr(data-placeholder);
   color: #9aa0a6;
 }
-.flow-sendedit__doc h4 { font-family: inherit; font-size: 16px; font-weight: 700; margin: 16px 0 6px; color: #111; }
+.flow-sendedit__doc h4 { font-family: inherit; font-size: 13pt; font-weight: 700; margin: 16px 0 6px; color: #111; }
 .flow-sendedit__doc h4:first-child { margin-top: 0; }
 .flow-sendedit__doc h1 { font-family: inherit; font-size: 22px; font-weight: 700; margin: 18px 0 8px; color: #111; }
-.flow-sendedit__doc h2 { font-family: inherit; font-size: 19px; font-weight: 700; margin: 16px 0 7px; color: #111; }
-.flow-sendedit__doc h3 { font-family: inherit; font-size: 17px; font-weight: 700; margin: 14px 0 6px; color: #111; }
+.flow-sendedit__doc h2 { font-family: inherit; font-size: 18pt; font-weight: 700; margin: 16px 0 7px; color: #111; }
+.flow-sendedit__doc h3 { font-family: inherit; font-size: 16pt; font-weight: 700; margin: 14px 0 6px; color: #111; }
 .flow-sendedit__doc p { margin: 0 0 8px; }
 html.gh-light .flow-sendedit__hint { color: var(--muted); }
 
@@ -3870,7 +3901,7 @@ html.gh-light .flow-sendedit__hint { color: var(--muted); }
 .flow-sendedit--full {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 300;
   max-width: none;
   padding: 16px clamp(20px, 6vw, 90px);
   background: oklch(0.09 0.03 232 / 0.98);
@@ -3878,6 +3909,11 @@ html.gh-light .flow-sendedit__hint { color: var(--muted); }
   -webkit-backdrop-filter: blur(10px);
 }
 html.gh-light .flow-sendedit--full { background: oklch(0.95 0.008 80 / 0.98); }
+/* Fullscreen Send doc covers the whole screen: hide the site chrome behind it. */
+body.flow-send-full .gh-topnav,
+body.flow-send-full .gh-siderail,
+body.flow-send-full .gh-drawer,
+body.flow-send-full .gh-drawer-backdrop { display: none !important; }
 
 /* Send doc outline pane (Google-Docs style) */
 .flow-sendedit__row { flex: 1; display: flex; min-height: 0; gap: 12px; }
@@ -3970,6 +4006,20 @@ html.gh-light .flow-sendedit__outline-item:hover { color: var(--ink); background
 .flow-fmt-btn:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
 html.gh-light .flow-fmt-btn { background: oklch(0.12 0.04 232 / 0.06); border-color: var(--line-strong); color: var(--ink-soft); }
 html.gh-light .flow-fmt-btn:hover { background: oklch(0.12 0.04 232 / 0.12); color: var(--ink); }
+.flow-fmt-sel {
+  height: 30px;
+  padding: 0 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+}
+.flow-fmt-sel option { background: oklch(0.16 0.04 235); color: #fff; }
+html.gh-light .flow-fmt-sel { background: oklch(0.12 0.04 232 / 0.06); border-color: var(--line-strong); color: var(--ink-soft); }
+html.gh-light .flow-fmt-sel option { background: #fff; color: var(--ink); }
 
 /* =========================================================================
    EXTENSIONS LIBRARY — full page (/flow/extensions)
@@ -4069,6 +4119,7 @@ html.gh-light .flow-fmt-btn:hover { background: oklch(0.12 0.04 232 / 0.12); col
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 14px;
   align-content: start;
+  align-items: start;   /* each card hugs its own height — expanding one doesn't stretch its row-mates */
 }
 .extcard {
   display: flex;
@@ -4084,6 +4135,35 @@ html.gh-light .flow-fmt-btn:hover { background: oklch(0.12 0.04 232 / 0.12); col
 }
 .extcard:hover { transform: translateY(-2px); border-color: var(--accent-ring); box-shadow: 0 12px 30px oklch(0 0 0 / 0.28); }
 .extcard__top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.extcard__chev {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 2px 0 0;
+  line-height: 1;
+}
+.extcard__count--sub { color: #fff; background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.18); }
+/* Expanded sub-blocks nested inside a parent card */
+.extcard__children {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+  padding-left: 12px;
+  border-left: 2px solid var(--accent-ring);
+}
+.extcard--child {
+  padding: 10px 12px 8px;
+  background: oklch(0.1 0.03 235 / 0.5);
+  border-radius: var(--radius);
+}
+.extcard--child:hover { transform: none; }
+.extcard--child .extcard__name { font-size: 15px; }
+html.gh-light .extcard--child { background: oklch(0.97 0.006 80 / 0.7); }
+html.gh-light .extcard__count--sub { color: var(--ink); background: oklch(0.12 0.04 232 / 0.08); border-color: var(--line); }
 .extcard__rename {
   flex: 1;
   min-width: 0;

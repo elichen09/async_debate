@@ -18,6 +18,7 @@ interface OutlineItem { text: string; level: number; }
 // (version) so typing never loses the caret.
 export default function SendDoc({ html, version, onChange, resolveSlashHtml }: SendDocProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const savedRange = useRef<Range | null>(null);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -44,9 +45,42 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml }: S
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
 
+  // In fullscreen, drop the site nav/rail so the doc has the whole screen.
+  useEffect(() => {
+    document.body.classList.toggle("flow-send-full", fullscreen);
+    return () => document.body.classList.remove("flow-send-full");
+  }, [fullscreen]);
+
   function jump(i: number) {
     const hs = ref.current?.querySelectorAll("h1,h2,h3,h4,h5,h6");
     hs?.[i]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // Wrap the current selection in a span at the chosen point size (round-trips to
+  // .docx via the export walker, which reads inline font-size). The native <select>
+  // steals focus and collapses the live selection, so we use the range captured on
+  // its mousedown.
+  function setFontSize(pt: string) {
+    const sel = window.getSelection();
+    const live = sel && sel.rangeCount > 0 && !sel.isCollapsed ? sel.getRangeAt(0) : null;
+    const range = live ?? savedRange.current;
+    if (!pt || !range || range.collapsed) return;
+    const span = document.createElement("span");
+    span.style.fontSize = `${pt}pt`;
+    try {
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      const ns = window.getSelection();
+      ns?.removeAllRanges();
+      const r = document.createRange();
+      r.selectNodeContents(span);
+      ns?.addRange(r);
+    } catch {
+      return;
+    }
+    savedRange.current = null;
+    if (ref.current) onChange(ref.current.innerHTML);
+    refreshOutline();
   }
 
   function clear() {
@@ -93,6 +127,22 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml }: S
             </button>
           ))}
         </div>
+        <select
+          className="flow-fmt-sel"
+          defaultValue=""
+          title="Font size (select text first)"
+          aria-label="Font size"
+          onMouseDown={() => {
+            const sel = window.getSelection();
+            savedRange.current = sel && sel.rangeCount > 0 && !sel.isCollapsed ? sel.getRangeAt(0).cloneRange() : null;
+          }}
+          onChange={(e) => { setFontSize(e.target.value); e.currentTarget.value = ""; }}
+        >
+          <option value="" disabled>Size</option>
+          {[9, 10, 11, 12, 13, 14, 16, 18, 20, 24].map((n) => (
+            <option key={n} value={n}>{n} pt</option>
+          ))}
+        </select>
         <span className="flow-sendedit__spacer" />
         <button className="db-btn db-btn--accent db-btn--sm" onClick={() => downloadHtmlAsDocx(ref.current?.innerHTML ?? html)}>
           ⬇ Download .docx

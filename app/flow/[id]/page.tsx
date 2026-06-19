@@ -11,8 +11,36 @@ import SendDoc from "@/app/components/flow/SendDoc";
 import ShareDialog from "@/app/components/flow/ShareDialog";
 import type { EditorInsert, Flow, FlowSnippet } from "@/app/flow/shared";
 
-const SNIP_SEL = "id, owner_id, label, body, points, shortcut, created_at";
+const SNIP_SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
 type Sibling = { id: string; title: string; folder_id: string | null };
+
+// Remove Send-doc cards tied to deleted flow points: drop each h4[data-cell] and
+// its body (siblings up to the next heading), then any block title (h3[data-block])
+// left with no cards.
+function removeSendCards(html: string, ids: string[]): string {
+  if (!html) return html;
+  try {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    let changed = false;
+    for (const id of ids) {
+      const h = doc.querySelector(`[data-cell="${id}"]`);
+      if (!h) continue;
+      changed = true;
+      let n = h.nextElementSibling;
+      while (n && !/^H[1-6]$/.test(n.tagName)) { const x = n; n = n.nextElementSibling; x.remove(); }
+      h.remove();
+    }
+    for (const t of Array.from(doc.querySelectorAll("h3[data-block]"))) {
+      let n = t.nextElementSibling;
+      let hasCard = false;
+      while (n && n.tagName !== "H3") { if ((n as HTMLElement).hasAttribute("data-cell")) { hasCard = true; break; } n = n.nextElementSibling; }
+      if (!hasCard) { t.remove(); changed = true; }
+    }
+    return changed ? doc.body.innerHTML : html;
+  } catch {
+    return html;
+  }
+}
 
 export default function FlowWorkspace() {
   const router = useRouter();
@@ -35,14 +63,61 @@ export default function FlowWorkspace() {
   const addPointsRef = useRef<((tags: string[]) => void) | null>(null);
   const snippetsRef = useRef<FlowSnippet[]>([]);
   const tabRef = useRef(tab);
+  const sendHtmlRef = useRef("");
+  const lastSendEdit = useRef(0);
+  const sendSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => { snippetsRef.current = snippets; }, [snippets]);
   useEffect(() => { tabRef.current = tab; }, [tab]);
+  useEffect(() => { sendHtmlRef.current = sendHtml; }, [sendHtml]);
 
-  // Use an extension: break its Heading-4 points into new flow points (on the
-  // Flow tab) and append its formatted cards to the Send doc.
-  function queueToSend(snip: FlowSnippet) {
-    setSendHtml((prev) => prev + blockToHtml(snip.label, snip.points, snip.body));
+  // --- Send doc persistence (shared across a folder's flows; per-flow if ungrouped) ---
+  // The doc lives on the folder row when the flow is in one, else on the flow row,
+  // so every flow in a folder opens the same Send doc. Typing autosaves; appends
+  // from other flows stream back. Inbound events are ignored for ~1.5s after a
+  // local change so the caret never jumps.
+  function sendTarget(): [string, string] | null {
+    if (!flow) return null;
+    return flow.folder_id ? ["flow_folders", flow.folder_id] : ["flows", flowId];
+  }
+  async function saveSend(html: string) {
+    const t = sendTarget();
+    if (!t) return;
+    // Must await: a PostgREST builder only sends its request when it's then()'d.
+    const { error } = await supabase.from(t[0]).update({ send_html: html }).eq("id", t[1]);
+    if (error) console.error("Send doc save failed:", error.message);
+  }
+  function scheduleSendSave(html: string) {
+    if (sendSaveTimer.current) clearTimeout(sendSaveTimer.current);
+    sendSaveTimer.current = setTimeout(() => { saveSend(html); }, 600);
+  }
+  function applyRemoteSend(html: string) {
+    sendHtmlRef.current = html;
+    setSendHtml(html);
     setSendVersion((v) => v + 1);
+  }
+  // Local change → mirror + persist. bump=true re-syncs the editor DOM (programmatic
+  // appends/removes); typing passes bump=false to preserve the caret.
+  function commitSend(html: string, bump: boolean) {
+    sendHtmlRef.current = html;
+    setSendHtml(html);
+    if (bump) setSendVersion((v) => v + 1);
+    lastSendEdit.current = Date.now();
+    scheduleSendSave(html);
+  }
+  const handleSendChange = (html: string) => commitSend(html, false);
+
+  // Append an extension's block to the Send doc. cellIds (from a flow "/trigger")
+  // tie each card to the flow point it created, so deleting that point removes it.
+  function appendBlock(snip: FlowSnippet, cellIds?: string[]) {
+    commitSend(sendHtmlRef.current + blockToHtml(snip.label, snip.points, snip.body, cellIds), true);
+  }
+  function onSlashBlock(trigger: string, cellIds: string[]) {
+    const snip = findByTrigger(trigger);
+    if (snip) appendBlock(snip, cellIds);
+  }
+  function onCellsDeleted(ids: string[]) {
+    const next = removeSendCards(sendHtmlRef.current, ids);
+    if (next !== sendHtmlRef.current) commitSend(next, true);
   }
 
   // Extensions "use" button: add points to the flow (when flowing) + queue Send doc.
@@ -50,7 +125,7 @@ export default function FlowWorkspace() {
     const pts = snip.points ?? [];
     const tags = pts.length ? pts.map((p) => p.tag) : [snip.label];
     if (tabRef.current === "flow") addPointsRef.current?.(tags);
-    queueToSend(snip);
+    appendBlock(snip);
   }
 
   useEffect(() => {
@@ -83,15 +158,44 @@ export default function FlowWorkspace() {
     return () => { active = false; };
   }, [flow]);
 
+  // Load + stream the shared Send doc for this flow's folder (or the flow itself).
+  useEffect(() => {
+    if (!flow) return;
+    const t: [string, string] = flow.folder_id ? ["flow_folders", flow.folder_id] : ["flows", flowId];
+    let active = true;
+    supabase.from(t[0]).select("send_html").eq("id", t[1]).single().then(({ data }) => {
+      if (!active || !data) return;
+      if (Date.now() - lastSendEdit.current < 1500) return;
+      applyRemoteSend((data as { send_html: string | null }).send_html ?? "");
+    });
+    const channel = supabase
+      .channel(`flow_send:${t[0]}:${t[1]}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: t[0], filter: `id=eq.${t[1]}` },
+        (payload) => {
+          if (Date.now() - lastSendEdit.current < 1500) return;
+          const next = (payload.new as { send_html?: string }).send_html ?? "";
+          if (next !== sendHtmlRef.current) applyRemoteSend(next);
+        }
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+      if (sendSaveTimer.current) clearTimeout(sendSaveTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flow?.folder_id, flowId]);
+
   const findByTrigger = (trigger: string) =>
     snippetsRef.current.find((s) => (s.shortcut ?? "").trim().toLowerCase() === trigger);
 
-  // Flow slash: return the point tags (FlowGrid inserts them at the current indent)
-  // and queue the block into the Send doc.
+  // Flow slash: return the point tags (FlowGrid inserts them at the current indent;
+  // it then calls onSlashBlock with the new cell ids to queue the Send doc).
   function resolveSlashPoints(trigger: string): string[] | null {
     const snip = findByTrigger(trigger);
     if (!snip) return null;
-    queueToSend(snip);
     const pts = snip.points ?? [];
     return pts.length ? pts.map((p) => p.tag) : [snip.label];
   }
@@ -165,13 +269,13 @@ export default function FlowWorkspace() {
       <div className="flow-work__body">
         <div className="flow-work__main">
           {tab === "flow" && (
-            <FlowGrid flowId={flowId} userId={userId} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} />
+            <FlowGrid flowId={flowId} userId={userId} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} />
           )}
           {tab === "speech" && (
             <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} />
           )}
           {tab === "send" && (
-            <SendDoc html={sendHtml} version={sendVersion} onChange={setSendHtml} resolveSlashHtml={resolveSlashHtml} />
+            <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} />
           )}
         </div>
 

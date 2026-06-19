@@ -9,8 +9,14 @@ interface FlowGridProps {
   userId: string;
   registerInsert: (fn: EditorInsert | null) => void;
   registerAddPoints?: (fn: ((tags: string[]) => void) | null) => void;
-  // Returns the point tags for a "/trigger" (and queues the Send doc), or null.
+  // Returns the point tags for a "/trigger" (or null). Does NOT queue the Send doc;
+  // onSlashBlock does that once the new cells (and their ids) exist.
   resolveSlashPoints?: (trigger: string) => string[] | null;
+  // After a "/trigger" inserts its points, queue the block into the Send doc tagged
+  // with the cell ids it created (so deleting a point can remove its card).
+  onSlashBlock?: (trigger: string, cellIds: string[]) => void;
+  // Cells were deleted — drop any Send doc cards tied to them.
+  onCellsDeleted?: (cellIds: string[]) => void;
 }
 
 const SEL = "id, flow_id, col, row_index, depth, highlighted, content, updated_by, updated_at";
@@ -38,15 +44,37 @@ function nodeLabel(count: number, depth: number): string {
 // A debate flow as a nested outline: Enter adds a sibling point, Tab indents it
 // into a response, Shift+Tab outdents, and highlighting marks key cards. Numbers
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
-export default function FlowGrid({ flowId, userId, registerInsert, registerAddPoints, resolveSlashPoints }: FlowGridProps) {
+export default function FlowGrid({ flowId, userId, registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted }: FlowGridProps) {
   const [cells, setCells] = useState<FlowCell[]>([]);
   const [loadError, setLoadError] = useState("");
   const cellsRef = useRef<FlowCell[]>([]);
   const editingId = useRef<string | null>(null);
   const activeEl = useRef<HTMLTextAreaElement | null>(null);
   const focusId = useRef<string | null>(null);
+  // Per-cell pending autosaves (debounced); flushed on unmount so switching tabs
+  // mid-type never drops what you wrote.
+  const pending = useRef<Map<string, string>>(new Map());
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Multi-line selection (click a number / Shift-click a range) for copy/paste.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const anchorRef = useRef<string | null>(null);
 
   useEffect(() => { cellsRef.current = cells; }, [cells]);
+
+  // Flush any queued saves when the component unmounts (e.g. tab switch). `pending`
+  // is the same Map throughout the component's life, so capturing it here is safe.
+  useEffect(() => {
+    const pend = pending.current;
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      for (const [id, content] of pend) {
+        // .then() so the request is actually sent (an un-awaited builder never fires).
+        supabase.from("flow_cells").update({ content, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id).then(() => {});
+      }
+      pend.clear();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -94,13 +122,26 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
   }
 
   async function saveContent(id: string, content: string) {
+    pending.current.delete(id);
     await supabase.from("flow_cells").update({ content, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id);
+  }
+
+  // Debounced autosave while typing, so a partner sees edits (and they persist)
+  // without waiting for blur.
+  function scheduleSave(id: string, content: string) {
+    pending.current.set(id, content);
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      const batch = Array.from(pending.current.entries());
+      pending.current.clear();
+      for (const [cid, c] of batch) saveContent(cid, c);
+    }, 600);
   }
   async function saveMeta(id: string, patch: { depth?: number; highlighted?: boolean }) {
     await supabase.from("flow_cells").update({ ...patch, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id);
   }
 
-  async function insertNode(row: number, depth: number, content = "", focus = true) {
+  async function insertNode(row: number, depth: number, content = "", focus = true): Promise<string | null> {
     const { data } = await supabase
       .from("flow_cells")
       .insert({ flow_id: flowId, col: 0, row_index: row, depth, content, updated_by: userId })
@@ -109,15 +150,19 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
     if (data) {
       if (focus) focusId.current = (data as FlowCell).id;
       setCells((prev) => (prev.some((c) => c.id === data.id) ? prev : [...prev, data as FlowCell]));
+      return (data as FlowCell).id;
     }
+    return null;
   }
 
   // Insert an extension's tags as responses at the current point: the first tag
   // fills this point, the rest follow as siblings at the SAME indent (depth).
-  async function insertBlock(cell: FlowCell, tags: string[]) {
-    if (!tags.length) return;
+  // Returns the ids of every cell it filled/created, in tag order.
+  async function insertBlock(cell: FlowCell, tags: string[]): Promise<string[]> {
+    if (!tags.length) return [];
     setLocal(cell.id, { content: tags[0] });
     saveContent(cell.id, tags[0]);
+    const ids = [cell.id];
     const list = sorted();
     const idx = list.findIndex((c) => c.id === cell.id);
     const next = list[idx + 1];
@@ -126,8 +171,10 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
     const rest = tags.slice(1);
     for (let i = 0; i < rest.length; i++) {
       const row = lo + ((hi - lo) * (i + 1)) / (rest.length + 1);
-      await insertNode(row, cell.depth, rest[i], false);
+      const id = await insertNode(row, cell.depth, rest[i], false);
+      if (id) ids.push(id);
     }
+    return ids;
   }
 
   // Append a batch of points (e.g. an extension's Heading-4 tags) at the bottom.
@@ -185,7 +232,9 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
   async function clearAll() {
     if (!cellsRef.current.length) return;
     if (!window.confirm("Clear the whole flow? This removes every point for everyone on it.")) return;
+    const ids = cellsRef.current.map((c) => c.id);
     setCells([]);
+    onCellsDeleted?.(ids);
     await supabase.from("flow_cells").delete().eq("flow_id", flowId);
   }
 
@@ -196,7 +245,40 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
       if (list[idx - 1]) focusId.current = list[idx - 1].id;
     }
     setCells((prev) => prev.filter((c) => c.id !== cell.id));
+    onCellsDeleted?.([cell.id]);
     await supabase.from("flow_cells").delete().eq("id", cell.id);
+  }
+
+  // Click a point's number to select it; Shift-click selects a range.
+  function selectLabel(cell: FlowCell, shift: boolean) {
+    const ids = sorted().map((c) => c.id);
+    if (shift && anchorRef.current) {
+      const a = ids.indexOf(anchorRef.current);
+      const b = ids.indexOf(cell.id);
+      if (a !== -1 && b !== -1) {
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        setSelected(new Set(ids.slice(lo, hi + 1)));
+        return;
+      }
+    }
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(cell.id)) n.delete(cell.id); else n.add(cell.id);
+      return n;
+    });
+    anchorRef.current = cell.id;
+  }
+  function clearSelection() { setSelected(new Set()); anchorRef.current = null; }
+
+  // Copy the selected points (or the whole flow if none selected) to the clipboard
+  // as tab-indented text — pastes into Docs/Word, or back into a point with Ctrl+V.
+  async function copyFlow() {
+    const list = sorted();
+    const chosen = selected.size ? list.filter((c) => selected.has(c.id)) : list;
+    if (!chosen.length) return;
+    const min = Math.min(...chosen.map((c) => c.depth));
+    const text = chosen.map((c) => "\t".repeat(c.depth - min) + c.content).join("\n");
+    try { await navigator.clipboard.writeText(text); } catch { /* blocked */ }
   }
 
   function makeInsert(id: string): EditorInsert {
@@ -238,16 +320,30 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
       )}
       {labeled.length > 0 && (
         <div className="flow-outline__bar">
+          <button className="db-btn db-btn--glass db-btn--sm" onClick={copyFlow}>
+            {selected.size ? `Copy ${selected.size}` : "Copy"}
+          </button>
+          {selected.size > 0 && (
+            <button className="db-btn db-btn--glass db-btn--sm" onClick={clearSelection}>Deselect</button>
+          )}
+          <span className="flow-outline__bar-hint">Click a number to select · Shift-click for a range</span>
           <button className="db-btn db-btn--glass db-btn--sm" onClick={clearAll}>Clear flow</button>
         </div>
       )}
       {labeled.map(({ cell, label }) => (
         <div
           key={cell.id}
-          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""}`}
+          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""}`}
           style={{ marginLeft: cell.depth * INDENT }}
         >
-          <span className="flow-node__label">{label}</span>
+          <span
+            className="flow-node__label"
+            role="button"
+            tabIndex={0}
+            title="Click to select • Shift-click for a range"
+            onClick={(e) => selectLabel(cell, e.shiftKey)}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectLabel(cell, false); } }}
+          >{label}</span>
           <textarea
             className="flow-node__text"
             value={cell.content}
@@ -256,17 +352,21 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
               autoGrow(el);
               if (el && focusId.current === cell.id) { el.focus(); focusId.current = null; }
             }}
-            onChange={(e) => { setLocal(cell.id, { content: e.target.value }); autoGrow(e.target); }}
+            onChange={(e) => { setLocal(cell.id, { content: e.target.value }); autoGrow(e.target); scheduleSave(cell.id, e.target.value); }}
             onKeyDown={(e) => {
               const ta = e.target as HTMLTextAreaElement;
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 // Slash command: "/topshelf" + Enter inserts the block as responses
-                // here, at this point's indent.
+                // here, at this point's indent, and queues its cards to the Send doc.
                 const m = /^\/(\S+)$/.exec(ta.value.trim());
                 if (m) {
-                  const tags = resolveSlashPoints?.(m[1].toLowerCase());
-                  if (tags && tags.length) { insertBlock(cell, tags); return; }
+                  const trigger = m[1].toLowerCase();
+                  const tags = resolveSlashPoints?.(trigger);
+                  if (tags && tags.length) {
+                    insertBlock(cell, tags).then((ids) => onSlashBlock?.(trigger, ids));
+                    return;
+                  }
                 }
                 // Enter on an empty sub-point pops back out a level (Docs-style).
                 if (ta.value === "" && cell.depth > 0) { reIndent(cell, -1); return; }

@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { parseAtSections } from "@/lib/docxImport";
+import { parseAtSections, rowsFor } from "@/lib/docxImport";
 import type { FlowSnippet, ExtensionPoint } from "@/app/flow/shared";
 
-const SEL = "id, owner_id, label, body, points, shortcut, created_at";
+const SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
 
 // Full-page library for managing all of a user's extensions (debate blocks):
 // search, sort, import an AT .docx, add by hand, assign shortcuts, delete.
@@ -18,6 +18,7 @@ export default function ExtensionsPage() {
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<"recent" | "az">("recent");
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState("");
   const [body, setBody] = useState("");
@@ -38,7 +39,8 @@ export default function ExtensionsPage() {
     return () => { active = false; };
   }, [router]);
 
-  const slug = (v: string) => v.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  // Triggers may contain ":" to chain sub-blocks (e.g. "arctic:topshelf").
+  const slug = (v: string) => v.replace(/[^a-z0-9:]/gi, "").toLowerCase();
 
   async function add() {
     if (!body.trim() || !userId) return;
@@ -63,20 +65,67 @@ export default function ExtensionsPage() {
   }
   async function importAt(file: File) {
     setError(""); setBusy(true);
-    let sections: { label: string; body: string; points: ExtensionPoint[] }[] = [];
+    let sections: { label: string; body: string; points: ExtensionPoint[]; level: number }[] = [];
     try { sections = await parseAtSections(await file.arrayBuffer()); }
     catch { setError("Couldn't read that .docx."); setBusy(false); return; }
     if (!sections.length) { setError("No sections found — needs Heading 1-3 titles and Heading 4 tags."); setBusy(false); return; }
-    const { data } = await supabase.from("flow_snippets").insert(sections.map((s) => ({ owner_id: userId, label: s.label, body: s.body, points: s.points }))).select(SEL);
+    const { data } = await supabase.from("flow_snippets").insert(rowsFor(sections, userId)).select(SEL);
     setBusy(false);
     if (data) setSnippets((p) => [...(data as FlowSnippet[]), ...p]);
   }
 
   const q = query.trim().toLowerCase();
-  const view = snippets
-    .filter((s) => !q || s.label.toLowerCase().includes(q) || s.body.toLowerCase().includes(q))
-    .slice()
-    .sort((a, b) => (sortBy === "az" ? a.label.localeCompare(b.label) : b.created_at.localeCompare(a.created_at)));
+  const matches = (s: FlowSnippet) => !q || s.label.toLowerCase().includes(q) || s.body.toLowerCase().includes(q);
+  const sortFn = (a: FlowSnippet, b: FlowSnippet) => (sortBy === "az" ? a.label.localeCompare(b.label) : b.created_at.localeCompare(a.created_at));
+  const byId = new Map(snippets.map((s) => [s.id, s]));
+  const isChild = (s: FlowSnippet) => !!(s.parent_id && byId.has(s.parent_id));
+  const childrenOf = (id: string) => snippets.filter((s) => s.parent_id === id).sort(sortFn);
+  // No query → hierarchy: top-level blocks, expand to reveal sub-blocks. Query → flat.
+  const list = q ? snippets.filter(matches).sort(sortFn) : snippets.filter((s) => !isChild(s)).sort(sortFn);
+
+  function toggle(id: string) {
+    setExpanded((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+
+  function card(s: FlowSnippet, child = false) {
+    const count = s.points?.length ?? 0;
+    const kids = childrenOf(s.id);
+    const open = expanded.has(s.id);
+    return (
+      <article className={`extcard ${child ? "extcard--child" : ""}`} key={s.id}>
+        <div className="extcard__top">
+          {!q && kids.length > 0 && (
+            <button className="extcard__chev" onClick={() => toggle(s.id)} aria-label={open ? "Collapse" : "Expand"}>{open ? "▾" : "▸"}</button>
+          )}
+          {renamingId === s.id ? (
+            <input className="extcard__rename" defaultValue={s.label} autoFocus onBlur={(e) => saveName(s.id, e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setRenamingId(null); }} />
+          ) : (
+            <h2 className="extcard__name" onDoubleClick={() => setRenamingId(s.id)} title="Double-click to rename">{s.label}</h2>
+          )}
+          {count > 0 && <span className="extcard__count">{count} pt{count === 1 ? "" : "s"}</span>}
+          {!q && kids.length > 0 && <span className="extcard__count extcard__count--sub">{kids.length} sub</span>}
+        </div>
+        <p className="extcard__preview">{s.body || "No text"}</p>
+        <div className="extcard__foot">
+          <span className="extcard__slash">/</span>
+          <input
+            className="extcard__trigger"
+            defaultValue={s.shortcut ?? ""}
+            placeholder="trigger"
+            title="Slash trigger — type /trigger + Enter in a flow point"
+            onBlur={(e) => saveShortcut(s.id, slug(e.target.value) || null)}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+          />
+          <span className="extcard__spacer" />
+          <button className="extcard__del" onClick={() => setRenamingId(s.id)} aria-label="Rename block">Rename</button>
+          <button className="extcard__del" onClick={() => del(s.id)} aria-label="Delete block">Delete</button>
+        </div>
+        {!q && open && kids.length > 0 && (
+          <div className="extcard__children">{kids.map((k) => card(k, true))}</div>
+        )}
+      </article>
+    );
+  }
 
   return (
     <div className="extlib">
@@ -112,49 +161,14 @@ export default function ExtensionsPage() {
 
       {error && <p className="extlib__error">⚑ {error}</p>}
 
-      {view.length === 0 ? (
+      {list.length === 0 ? (
         <div className="extlib__empty">
           <p className="extlib__empty-title">{snippets.length === 0 ? "No blocks yet" : `No matches for “${query}”`}</p>
           {snippets.length === 0 && <p className="extlib__empty-sub">Import an AT file (.docx) to turn its sections into reusable blocks, or add one by hand.</p>}
         </div>
       ) : (
         <div className="extlib__grid">
-          {view.map((s) => {
-            const count = s.points?.length ?? 0;
-            return (
-              <article className="extcard" key={s.id}>
-                <div className="extcard__top">
-                  {renamingId === s.id ? (
-                    <input
-                      className="extcard__rename"
-                      defaultValue={s.label}
-                      autoFocus
-                      onBlur={(e) => saveName(s.id, e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setRenamingId(null); }}
-                    />
-                  ) : (
-                    <h2 className="extcard__name" onDoubleClick={() => setRenamingId(s.id)} title="Double-click to rename">{s.label}</h2>
-                  )}
-                  {count > 0 && <span className="extcard__count">{count} pt{count === 1 ? "" : "s"}</span>}
-                </div>
-                <p className="extcard__preview">{s.body || "No text"}</p>
-                <div className="extcard__foot">
-                  <span className="extcard__slash">/</span>
-                  <input
-                    className="extcard__trigger"
-                    defaultValue={s.shortcut ?? ""}
-                    placeholder="trigger"
-                    title="Slash trigger — type /trigger + Enter in a flow point"
-                    onBlur={(e) => saveShortcut(s.id, slug(e.target.value) || null)}
-                    onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                  />
-                  <span className="extcard__spacer" />
-                  <button className="extcard__del" onClick={() => setRenamingId(s.id)} aria-label="Rename block">Rename</button>
-                  <button className="extcard__del" onClick={() => del(s.id)} aria-label="Delete block">Delete</button>
-                </div>
-              </article>
-            );
-          })}
+          {list.map((s) => card(s))}
         </div>
       )}
     </div>

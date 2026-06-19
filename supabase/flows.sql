@@ -54,10 +54,12 @@ create table if not exists public.flow_snippets (
   body       text not null default '',           -- plain text of the section (preview)
   points     jsonb,                              -- [{tag, rich:[{runs}]}] Heading-4 points w/ formatting
   shortcut   text,                               -- user-assigned key combo (e.g. "alt+f")
+  parent_id  uuid,                               -- groups "---AT: X" sub-blocks under their parent block
   created_at timestamptz not null default now()
 );
 alter table public.flow_snippets add column if not exists shortcut text;
 alter table public.flow_snippets add column if not exists points jsonb;
+alter table public.flow_snippets add column if not exists parent_id uuid;
 
 -- Personal folders for organizing flows (owner-only). A flow's folder is set by
 -- whoever owns it; collaborators see shared flows ungrouped.
@@ -65,11 +67,15 @@ create table if not exists public.flow_folders (
   id         uuid primary key default gen_random_uuid(),
   owner_id   uuid not null references public.profiles(id) on delete cascade,
   name       text not null default 'Folder',
+  send_html  text not null default '',           -- shared "Send doc" for every flow in this folder
   created_at timestamptz not null default now()
 );
+alter table public.flow_folders add column if not exists send_html text not null default '';
 
 alter table public.flows
   add column if not exists folder_id uuid references public.flow_folders(id) on delete set null;
+-- The Send doc lives on the folder for grouped flows, else on the flow itself.
+alter table public.flows add column if not exists send_html text not null default '';
 
 create index if not exists flows_owner_idx       on public.flows(owner_id);
 create index if not exists flows_folder_idx       on public.flows(folder_id);
@@ -215,9 +221,15 @@ do $$ begin
   alter publication supabase_realtime add table public.flows;
 exception when duplicate_object then null;
 end $$;
+-- Folders carry the shared Send doc; stream its edits between a folder's flows.
+do $$ begin
+  alter publication supabase_realtime add table public.flow_folders;
+exception when duplicate_object then null;
+end $$;
 
 -- DELETE events only carry the primary key by default, so the flow_id filter
 -- and RLS can't authorize them and the partner never sees a card removed.
 -- REPLICA IDENTITY FULL puts the whole old row in the delete payload.
-alter table public.flow_cells replica identity full;
-alter table public.flows      replica identity full;
+alter table public.flow_cells   replica identity full;
+alter table public.flows        replica identity full;
+alter table public.flow_folders replica identity full;

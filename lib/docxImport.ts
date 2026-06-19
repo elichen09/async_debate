@@ -88,15 +88,29 @@ export async function parseFlowHeadings(buf: ArrayBuffer): Promise<string[]> {
     .filter(Boolean);
 }
 
-// Split the doc into extensions at each top-level header (Heading 1-3). The
-// header text names the extension; Heading-4 paragraphs inside become its points
-// (tag + formatted body), running until the next header.
+// A section header's nesting depth is its run of leading dashes — three per level.
+// No dashes = a top-level block ("AT: Arctic"), "---" = a sub-block ("---Topshelf"),
+// "------" = a sub-sub-block ("------AT: Pabst Evid"), and so on.
+function dashLevel(text: string): number {
+  const d = /^-+/.exec(text)?.[0].length ?? 0;
+  return d === 0 ? 0 : Math.ceil(d / 3);
+}
+// Strip the leading dashes (and tidy any inner ones) for a readable label.
+function cleanLabel(text: string): string {
+  return text.replace(/^-+\s*/, "").replace(/-{2,}/g, " ").replace(/\s+/g, " ").trim() || text;
+}
+
+// Split the doc into extensions at each header (Heading 1-3). The header text names
+// the block; Heading-4 paragraphs inside become its points (tag + formatted body),
+// running until the next header. The number of leading dashes gives the block's
+// nesting level, so "AT: Arctic" → "---Topshelf" → "------AT: Pabst Evid" form a
+// three-deep tree that the importer reconstructs via parent_id.
 export async function parseAtSections(
   buf: ArrayBuffer,
-): Promise<{ label: string; body: string; points: ExtensionPoint[] }[]> {
+): Promise<{ label: string; body: string; points: ExtensionPoint[]; level: number }[]> {
   const { paragraphs, headingLevel } = await load(buf);
-  const sections: { label: string; points: ExtensionPoint[] }[] = [];
-  let sec: (typeof sections)[number] | null = null;
+  const all: { label: string; points: ExtensionPoint[]; level: number }[] = [];
+  let sec: (typeof all)[number] | null = null;
   let point: ExtensionPoint | null = null;
 
   for (const p of paragraphs) {
@@ -105,11 +119,14 @@ export async function parseAtSections(
     const text = clean(runs.map((r) => r.text).join(""));
 
     if (lvl >= 1 && lvl <= 3) {
-      sec = { label: text, points: [] };
-      sections.push(sec);
+      if (!text) continue; // skip blank heading lines (spacing/layout, not real blocks)
+      const level = dashLevel(text);
+      sec = { label: level > 0 ? cleanLabel(text) : text, points: [], level };
+      all.push(sec);
       point = null;
     } else if (lvl === 4) {
-      if (!sec) { sec = { label: "", points: [] }; sections.push(sec); }
+      if (!text) continue;
+      if (!sec) { sec = { label: text.slice(0, 40), points: [], level: 0 }; all.push(sec); }
       point = { tag: text, rich: [] };
       sec.points.push(point);
     } else if (point && runs.length) {
@@ -117,13 +134,50 @@ export async function parseAtSections(
     }
   }
 
-  return sections
-    .filter((s) => s.points.length)
+  // Keep a block only if it (or one of its descendants) actually has cards. This
+  // keeps real grouping titles like "AT: Arctic" while dropping empty subtrees, so
+  // no blank "Extension" blocks slip through.
+  const subtreeHasCards = (i: number): boolean => {
+    if (all[i].points.length > 0) return true;
+    for (let j = i + 1; j < all.length && all[j].level > all[i].level; j++) {
+      if (all[j].points.length > 0) return true;
+    }
+    return false;
+  };
+  return all
+    .filter((_, i) => subtreeHasCards(i))
     .map((s) => ({
-      label: s.label || s.points[0].tag.slice(0, 40) || "Extension",
+      label: s.label || "Extension",
       body: s.points.map((pt) => pt.tag).join("\n"),
       points: s.points,
+      level: s.level,
     }));
+}
+
+// Build flow_snippets rows from parsed sections, linking each "child" sub-block to
+// the most recent normal block via a client-generated id (so the parent->child
+// grouping survives without a second round-trip).
+export function rowsFor(
+  sections: { label: string; body: string; points: ExtensionPoint[]; level: number }[],
+  ownerId: string,
+) {
+  const slug = (v: string) => v.replace(/[^a-z0-9]/gi, "").toLowerCase();
+  // Each block's own trigger name drops a leading "AT" (so "AT: Arctic" → arctic).
+  const namePart = (label: string) => slug(label.replace(/^\s*at\b[:.\s-]*/i, "")) || slug(label);
+  const idStack: string[] = [];   // most-recent block id at each level
+  const trigStack: string[] = []; // most-recent full trigger at each level
+  return sections.map((s) => {
+    const id = crypto.randomUUID();
+    const level = Math.max(0, s.level);
+    const parent_id = level > 0 ? (idStack[level - 1] ?? null) : null;
+    // Sub-block triggers chain onto the parent's: "/arctic:topshelf:pabst".
+    const parentTrig = level > 0 ? (trigStack[level - 1] ?? "") : "";
+    const own = namePart(s.label);
+    const trigger = parentTrig ? `${parentTrig}:${own}` : own;
+    idStack[level] = id; idStack.length = level + 1;
+    trigStack[level] = trigger; trigStack.length = level + 1;
+    return { id, owner_id: ownerId, label: s.label, body: s.body, points: s.points, shortcut: trigger || null, parent_id };
+  });
 }
 
 export { richToText };
