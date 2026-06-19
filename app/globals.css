@@ -3614,10 +3614,13 @@ html.gh-light .flow-outline__bar-hint { color: var(--muted); }
 .flow-node__text::placeholder { color: rgba(255, 255, 255, 0.3); }
 
 /* Alternating two-color levels (coral / light, echoing red-black flowing) */
-.flow-node--c0 { border-left-color: oklch(0.72 0.17 30 / 0.45); }
-.flow-node--c0 .flow-node__label, .flow-node--c0 .flow-node__text { color: oklch(0.76 0.17 32); }
-.flow-node--c1 { border-left-color: oklch(0.85 0.02 240 / 0.32); }
-.flow-node--c1 .flow-node__label, .flow-node--c1 .flow-node__text { color: oklch(0.94 0.015 240); }
+/* Two colors alternate by indent depth. Fixed hexes (not theme tokens) so they
+   read on both themes AND match exactly what the Copy action writes to the
+   clipboard, keeping the color-coding when a flow is pasted into the speech. */
+.flow-node--c0 { border-left-color: #d35f3f88; }
+.flow-node--c0 .flow-node__label, .flow-node--c0 .flow-node__text { color: #e0704f; }
+.flow-node--c1 { border-left-color: #4f7fd688; }
+.flow-node--c1 .flow-node__label, .flow-node--c1 .flow-node__text { color: #6f9bea; }
 
 /* Highlighter */
 .flow-node--hl .flow-node__text {
@@ -3640,6 +3643,45 @@ html.gh-light .flow-node.is-sel { background: oklch(0.6 0.14 250 / 0.14); }
   transition: opacity 0.15s ease;
 }
 .flow-node:hover .flow-node__tools { opacity: 1; }
+
+/* Slash autocomplete dropdown under a point typing "/trigger". */
+.flow-slash {
+  position: absolute;
+  top: 100%;
+  left: 40px;
+  z-index: 40;
+  margin: 2px 0 0;
+  padding: 4px;
+  list-style: none;
+  min-width: 220px;
+  max-width: 360px;
+  background: oklch(0.18 0.02 240);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+html.gh-light .flow-slash { background: #fff; border-color: var(--border); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12); }
+/* Speech tab places the dropdown at the caret with fixed positioning. */
+.flow-slash--fixed { position: fixed; top: auto; left: auto; margin: 0; }
+.flow-slash__opt {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.92);
+}
+.flow-slash__opt:hover, .flow-slash__opt.is-active { background: var(--accent); color: #fff; }
+.flow-slash__opt.is-active .flow-slash__label, .flow-slash__opt:hover .flow-slash__label { color: rgba(255, 255, 255, 0.85); }
+.flow-slash__trig { font-family: var(--font-mono, monospace); font-size: 12px; font-weight: 600; flex-shrink: 0; color: inherit; }
+.flow-slash__label { font-size: 12px; color: rgba(255, 255, 255, 0.55); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html.gh-light .flow-slash__opt { color: var(--ink); }
+html.gh-light .flow-slash__label { color: var(--muted); }
 .flow-node__btn {
   width: 20px;
   height: 20px;
@@ -3677,9 +3719,13 @@ html.gh-light .flow-node.is-sel { background: oklch(0.6 0.14 250 / 0.14); }
   color: rgba(255, 255, 255, 0.94);
   resize: none;
   outline: none;
+  overflow-y: auto;
+  white-space: pre-wrap;
 }
 .flow-speech__text:focus { border-color: var(--accent); }
 .flow-speech__text::placeholder { color: rgba(255, 255, 255, 0.32); }
+.flow-speech__text:empty:before { content: attr(data-placeholder); color: rgba(255, 255, 255, 0.32); pointer-events: none; }
+html.gh-light .flow-speech__text:empty:before { color: var(--muted); }
 
 /* ---- Snippet (extensions) panel ---- */
 .flow-snip {
@@ -4004,6 +4050,9 @@ html.gh-light .flow-sendedit__outline-item:hover { color: var(--ink); background
   transition: background 0.15s ease, color 0.15s ease;
 }
 .flow-fmt-btn:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.flow-fmt-btn--bold { font-weight: 800; }
+.flow-fmt-btn--italic { font-style: italic; font-family: Georgia, serif; }
+.flow-fmt-btn--underline { text-decoration: underline; }
 html.gh-light .flow-fmt-btn { background: oklch(0.12 0.04 232 / 0.06); border-color: var(--line-strong); color: var(--ink-soft); }
 html.gh-light .flow-fmt-btn:hover { background: oklch(0.12 0.04 232 / 0.12); color: var(--ink); }
 .flow-fmt-sel {
@@ -4135,6 +4184,28 @@ html.gh-light .flow-fmt-sel option { background: #fff; color: var(--ink); }
 }
 .extcard:hover { transform: translateY(-2px); border-color: var(--accent-ring); box-shadow: 0 12px 30px oklch(0 0 0 / 0.28); }
 .extcard__top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.extcard__grip { flex-shrink: 0; cursor: grab; color: rgba(255, 255, 255, 0.35); font-size: 13px; line-height: 1; user-select: none; }
+html.gh-light .extcard__grip { color: var(--muted); }
+.extcard.is-drag { opacity: 0.4; }
+.extcard.is-drop-reorder { box-shadow: 0 3px 0 -1px var(--accent); border-color: var(--accent); }
+.extcard.is-drop-group { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+
+/* Block folders */
+.extlib__folders { margin-top: 22px; display: flex; flex-direction: column; gap: 18px; }
+.extfolder { border: 1px dashed transparent; border-radius: var(--radius-lg); padding: 4px; transition: border-color 0.15s ease, background 0.15s ease; }
+.extfolder.is-drop { border-color: var(--accent); background: var(--accent-soft, oklch(0.7 0.14 250 / 0.08)); }
+.extfolder__head { display: flex; align-items: center; gap: 8px; padding: 4px 6px; }
+.extfolder__chev { background: none; border: none; color: var(--accent); font-size: 13px; cursor: pointer; padding: 0 2px; line-height: 1; }
+.extfolder__icon { font-size: 14px; }
+.extfolder__name { font-size: 16px; font-weight: 700; margin: 0; cursor: pointer; color: rgba(255, 255, 255, 0.92); }
+.extfolder__count { font-size: 12px; color: rgba(255, 255, 255, 0.6); background: rgba(255, 255, 255, 0.08); border-radius: 999px; padding: 1px 8px; }
+.extfolder__tools { margin-left: auto; display: flex; gap: 6px; }
+.extfolder__empty { color: rgba(255, 255, 255, 0.5); font-size: 13px; padding: 10px 8px; font-style: italic; }
+.extfolder .extlib__grid { margin-top: 8px; }
+.extlib__hint { margin-top: 6px; font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+html.gh-light .extfolder__name { color: var(--ink); }
+html.gh-light .extfolder__count { color: var(--muted); background: oklch(0.12 0.04 232 / 0.06); }
+html.gh-light .extfolder__empty, html.gh-light .extlib__hint { color: var(--muted); }
 .extcard__chev {
   flex-shrink: 0;
   background: none;
@@ -4269,10 +4340,8 @@ html.gh-light .flow-outline__error { color: var(--loss); }
 html.gh-light .flow-node:hover { background: oklch(0.12 0.04 232 / 0.05); }
 html.gh-light .flow-node__text:focus { background: oklch(0.12 0.04 232 / 0.07); }
 html.gh-light .flow-node__text::placeholder { color: var(--muted); }
-html.gh-light .flow-node--c0 .flow-node__label, html.gh-light .flow-node--c0 .flow-node__text { color: oklch(0.55 0.18 32); }
-html.gh-light .flow-node--c1 .flow-node__label, html.gh-light .flow-node--c1 .flow-node__text { color: var(--ink); }
-html.gh-light .flow-node--c0 { border-left-color: oklch(0.6 0.16 32 / 0.4); }
-html.gh-light .flow-node--c1 { border-left-color: oklch(0.3 0.04 238 / 0.25); }
+html.gh-light .flow-node--c0 .flow-node__label, html.gh-light .flow-node--c0 .flow-node__text { color: #c0492b; }
+html.gh-light .flow-node--c1 .flow-node__label, html.gh-light .flow-node--c1 .flow-node__text { color: #2f5fc0; }
 html.gh-light .flow-node__btn { color: oklch(0.3 0.04 238 / 0.55); }
 html.gh-light .flow-node__btn:hover { color: var(--ink); background: oklch(0.12 0.04 232 / 0.1); }
 html.gh-light .flow-node__btn--sub { color: var(--accent-deep); }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { blockToHtml } from "@/lib/richText";
+import { blockToHtml, cardHtml } from "@/lib/richText";
 import FlowGrid from "@/app/components/flow/FlowGrid";
 import FlowSpeech from "@/app/components/flow/FlowSpeech";
 import SnippetLibrary from "@/app/components/flow/SnippetLibrary";
@@ -119,6 +119,25 @@ export default function FlowWorkspace() {
     const next = removeSendCards(sendHtmlRef.current, ids);
     if (next !== sendHtmlRef.current) commitSend(next, true);
   }
+
+  // "/send" from the flow: append each point to the Send doc as a Heading-4 card,
+  // tied to its cell id so deleting the point removes the card (and it isn't added
+  // twice).
+  function sendPointsToSend(cells: { id: string; content: string }[]) {
+    let html = sendHtmlRef.current;
+    let added = false;
+    for (const c of cells) {
+      if (html.includes(`data-cell="${c.id}"`)) continue;
+      html += cardHtml(c.content.trim() || "(untitled point)", [], c.id);
+      added = true;
+    }
+    if (added) commitSend(html, true);
+  }
+
+  // The "/trigger" options available for the flow's slash autocomplete.
+  const slashOptions = snippets
+    .filter((s) => (s.shortcut ?? "").trim())
+    .map((s) => ({ trigger: (s.shortcut as string).trim().toLowerCase(), label: s.label }));
 
   // Extensions "use" button: add points to the flow (when flowing) + queue Send doc.
   function runExtension(snip: FlowSnippet) {
@@ -269,10 +288,10 @@ export default function FlowWorkspace() {
       <div className="flow-work__body">
         <div className="flow-work__main">
           {tab === "flow" && (
-            <FlowGrid flowId={flowId} userId={userId} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} />
+            <FlowGrid flowId={flowId} userId={userId} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} />
           )}
           {tab === "speech" && (
-            <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} />
+            <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} />
           )}
           {tab === "send" && (
             <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} />

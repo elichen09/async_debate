@@ -104,6 +104,13 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml }: S
     if (ref.current) onChange(ref.current.innerHTML);
   }
 
+  // Toggle bold/italic/underline on the current selection.
+  function style(cmd: string) {
+    ref.current?.focus();
+    document.execCommand(cmd, false);
+    if (ref.current) onChange(ref.current.innerHTML);
+  }
+
   return (
     <div className={`flow-sendedit ${fullscreen ? "flow-sendedit--full" : ""}`}>
       <div className="flow-sendedit__bar">
@@ -117,6 +124,13 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml }: S
               title={`Format as ${lbl}`}
             >
               {lbl}
+            </button>
+          ))}
+        </div>
+        <div className="flow-sendedit__fmt" role="group" aria-label="Style">
+          {([["bold", "B", "Bold (Ctrl+B)"], ["italic", "I", "Italic (Ctrl+I)"], ["underline", "U", "Underline (Ctrl+U)"]] as const).map(([cmd, glyph, lbl]) => (
+            <button key={cmd} className={`flow-fmt-btn flow-fmt-btn--${cmd}`} onMouseDown={(e) => e.preventDefault()} onClick={() => style(cmd)} title={lbl} aria-label={lbl}>
+              {glyph}
             </button>
           ))}
         </div>

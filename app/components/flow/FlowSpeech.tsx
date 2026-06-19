@@ -9,29 +9,56 @@ interface FlowSpeechProps {
   initialBody: string;
   registerInsert: (fn: EditorInsert | null) => void;
   resolveSlashText?: (trigger: string) => string | null;
+  slashOptions?: { trigger: string; label: string }[];
 }
 
-// One shared speech-writing doc per flow, bound to flows.speech_body. Both
-// partners edit it: changes autosave ~0.4s after the last keystroke and stream via
-// the flows row UPDATE event, so neither side has to refresh. We re-read the latest
-// body on mount (initialBody goes stale once you tab away and back) and ignore
-// incoming events for ~1.5s after your own typing so the cursor never jumps.
-export default function FlowSpeech({ flowId, initialBody, registerInsert, resolveSlashText }: FlowSpeechProps) {
-  const [body, setBody] = useState(initialBody);
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+// Stored speech bodies used to be plain text; render those as HTML (newlines →
+// <br>) so old speeches still show. Anything already containing a tag is HTML.
+function toHtml(stored: string): string {
+  if (!stored) return "";
+  return /<[a-z!/][\s\S]*>/i.test(stored) ? stored : escapeHtml(stored).replace(/\n/g, "<br>");
+}
+
+// One shared speech-writing doc per flow, bound to flows.speech_body. It's a rich
+// contentEditable so a flow pasted from the Flow tab keeps its indent colors, and
+// pasted cards keep their formatting. Both partners edit it: changes autosave
+// ~0.4s after the last keystroke and stream via the flows row UPDATE event, so
+// neither side has to refresh. Uncontrolled (innerHTML set only on external
+// updates) so typing never loses the caret; incoming events are ignored for ~1.5s
+// after your own typing.
+export default function FlowSpeech({ flowId, initialBody, registerInsert, resolveSlashText, slashOptions = [] }: FlowSpeechProps) {
+  const ref = useRef<HTMLDivElement>(null);
   const lastTyped = useRef(0);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const latest = useRef(initialBody);     // newest text, for flush-on-unmount
-  const dirty = useRef(false);            // unsaved local edits pending
-  const elRef = useRef<HTMLTextAreaElement | null>(null);
+  const latest = useRef("");      // newest HTML, for flush-on-unmount
+  const dirty = useRef(false);    // unsaved local edits pending
+  // Slash autocomplete: the partial "/trigger" being typed at the caret + its
+  // screen position, mirroring the Flow outline's dropdown.
+  const [slash, setSlash] = useState<{ query: string; top: number; left: number } | null>(null);
+  const [slashActive, setSlashActive] = useState(0);
+
+  // Apply a body that came from the server, unless it matches what's shown.
+  function applyExternal(stored: string) {
+    const el = ref.current;
+    if (!el) return;
+    const html = toHtml(stored);
+    if (el.innerHTML === html) return;
+    el.innerHTML = html;
+    latest.current = html;
+  }
 
   useEffect(() => {
+    const el = ref.current;
+    if (el) { el.innerHTML = toHtml(initialBody); latest.current = el.innerHTML; }
     let active = true;
     // Re-pull the current body — initialBody can be stale after a tab switch.
     supabase.from("flows").select("speech_body").eq("id", flowId).single().then(({ data }) => {
       if (!active || !data) return;
       if (Date.now() - lastTyped.current < 1500) return;
-      const next = (data as { speech_body: string }).speech_body ?? "";
-      setBody((prev) => (prev === next ? prev : next));
+      applyExternal((data as { speech_body: string }).speech_body ?? "");
     });
 
     const channel = supabase
@@ -41,78 +68,158 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
         { event: "UPDATE", schema: "public", table: "flows", filter: `id=eq.${flowId}` },
         (payload) => {
           if (Date.now() - lastTyped.current < 1500) return; // don't clobber a live edit
-          const next = (payload.new as { speech_body: string }).speech_body;
-          setBody((prev) => (prev === next ? prev : next));
+          applyExternal((payload.new as { speech_body: string }).speech_body ?? "");
         }
       )
       .subscribe();
     return () => {
       active = false;
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      if (dirty.current) supabase.from("flows").update({ speech_body: latest.current }).eq("id", flowId).then(() => {}); // flush (then() to actually send)
+      if (dirty.current) supabase.from("flows").update({ speech_body: latest.current }).eq("id", flowId).then(() => {}); // flush
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowId]);
 
-  async function save(text: string) {
+  async function save(html: string) {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     dirty.current = false;
-    await supabase.from("flows").update({ speech_body: text }).eq("id", flowId);
+    await supabase.from("flows").update({ speech_body: html }).eq("id", flowId);
   }
 
   // Mark a local edit and autosave shortly after typing stops.
-  function edit(text: string) {
-    setBody(text);
-    latest.current = text;
+  function onInput() {
+    const html = ref.current?.innerHTML ?? "";
+    latest.current = html;
     dirty.current = true;
     lastTyped.current = Date.now();
     if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => save(text), 400);
+    saveTimer.current = setTimeout(() => save(html), 400);
   }
 
   function insert(text: string) {
-    const el = elRef.current;
-    const pos = el ? (el.selectionStart ?? body.length) : body.length;
-    edit(body.slice(0, pos) + text + body.slice(pos));
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    document.execCommand("insertText", false, text);
+    onInput();
+  }
+
+  // After a keystroke, see if the caret sits at the end of a "/partial" token; if
+  // so, show the dropdown at the caret, else hide it.
+  function updateSlash() {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed) { setSlash(null); return; }
+    const node = sel.anchorNode;
+    if (!node || node.nodeType !== Node.TEXT_NODE) { setSlash(null); return; }
+    const before = (node.textContent ?? "").slice(0, sel.anchorOffset);
+    const m = /(^|\s)\/(\S*)$/.exec(before);
+    if (!m) { setSlash(null); return; }
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    setSlash({ query: m[2].toLowerCase(), top: rect.bottom || rect.top, left: rect.left });
+    setSlashActive(0);
+  }
+
+  // Replace the "/partial" token before the caret with the full "/trigger" (the
+  // user then presses Enter to expand it, as in the Flow outline).
+  function completeSlash(trigger: string) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const node = sel.anchorNode;
+    if (!node || node.nodeType !== Node.TEXT_NODE) return;
+    const offset = sel.anchorOffset;
+    const before = (node.textContent ?? "").slice(0, offset);
+    const m = /\/(\S*)$/.exec(before);
+    if (!m) return;
+    const start = offset - m[0].length;
+    const range = document.createRange();
+    range.setStart(node, start);
+    range.setEnd(node, offset);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand("insertText", false, `/${trigger}`);
+    setSlash(null);
+    onInput();
   }
 
   function clearSpeech() {
-    if (!body.trim()) return;
+    if (!ref.current?.textContent?.trim()) return;
     if (!window.confirm("Clear the speech for everyone on this flow?")) return;
-    setBody("");
+    if (ref.current) ref.current.innerHTML = "";
+    latest.current = "";
     save("");
   }
+
+  const slashMatches = slash ? slashOptions.filter((o) => o.trigger.startsWith(slash.query)).slice(0, 6) : [];
+  const dropOpen = !!slash && slashMatches.length > 0;
 
   return (
     <div className="flow-speech">
       <div className="flow-speech__bar">
         <button className="db-btn db-btn--glass db-btn--sm" onClick={clearSpeech}>Clear speech</button>
       </div>
-      <textarea
-        ref={elRef}
+      <div
+        ref={ref}
         className="flow-speech__text"
-        value={body}
-        placeholder="Write your speech here — your partner can edit it too."
-        onChange={(e) => edit(e.target.value)}
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck={false}
+        data-placeholder="Write your speech here — your partner can edit it too."
+        onInput={onInput}
         onKeyDown={(e) => {
-          // Slash command: "/topshelf" alone on a line + Enter inserts its tags.
-          if (e.key === "Enter" && !e.shiftKey) {
-            const ta = e.target as HTMLTextAreaElement;
-            const pos = ta.selectionStart ?? 0;
-            const lineStart = ta.value.lastIndexOf("\n", pos - 1) + 1;
-            const m = /^\/(\S+)$/.exec(ta.value.slice(lineStart, pos).trim());
-            if (m) {
-              const text = resolveSlashText?.(m[1].toLowerCase());
-              if (text != null) {
-                e.preventDefault();
-                edit(ta.value.slice(0, lineStart) + text + ta.value.slice(pos));
-              }
+          // Trigger autocomplete navigation while the dropdown is open.
+          if (dropOpen) {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              setSlashActive((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + slashMatches.length) % slashMatches.length);
+              return;
+            }
+            if (e.key === "Escape") { e.preventDefault(); setSlash(null); return; }
+            if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+              e.preventDefault();
+              completeSlash(slashMatches[slashActive]?.trigger ?? slashMatches[0].trigger);
+              return;
             }
           }
+          // Slash command: "/topshelf" alone on a line + Enter inserts its tags.
+          if (e.key !== "Enter" || e.shiftKey) return;
+          const sel = window.getSelection();
+          const an = sel?.anchorNode;
+          if (!an || an.nodeType !== Node.TEXT_NODE) return;
+          const m = /^\/(\S+)$/.exec((an.textContent ?? "").trim());
+          if (!m) return;
+          const text = resolveSlashText?.(m[1].toLowerCase());
+          if (text == null) return;
+          e.preventDefault();
+          const range = document.createRange();
+          range.selectNodeContents(an);
+          sel!.removeAllRanges();
+          sel!.addRange(range);
+          document.execCommand("insertHTML", false, escapeHtml(text).replace(/\n/g, "<br>"));
+          setSlash(null);
+          onInput();
         }}
+        onKeyUp={(e) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(e.key)) updateSlash(); }}
+        onMouseUp={() => updateSlash()}
         onFocus={() => { registerInsert(insert); }}
-        onBlur={(e) => { save(e.target.value); }}
+        onBlur={() => { save(latest.current); setTimeout(() => setSlash(null), 120); }}
       />
+      {dropOpen && slash && (
+        <ul className="flow-slash flow-slash--fixed" role="listbox" style={{ top: slash.top + 4, left: slash.left }}>
+          {slashMatches.map((o, i) => (
+            <li key={o.trigger} role="option" aria-selected={i === slashActive}>
+              <button
+                type="button"
+                className={`flow-slash__opt ${i === slashActive ? "is-active" : ""}`}
+                onMouseDown={(e) => { e.preventDefault(); completeSlash(o.trigger); }}
+              >
+                <span className="flow-slash__trig">/{o.trigger}</span>
+                <span className="flow-slash__label">{o.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

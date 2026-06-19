@@ -17,6 +17,10 @@ interface FlowGridProps {
   onSlashBlock?: (trigger: string, cellIds: string[]) => void;
   // Cells were deleted — drop any Send doc cards tied to them.
   onCellsDeleted?: (cellIds: string[]) => void;
+  // Available "/trigger" options, for the slash autocomplete dropdown.
+  slashOptions?: { trigger: string; label: string }[];
+  // Send one or more flow points to the Send doc as Heading-4 cards (via "/send").
+  onSendPoints?: (cells: { id: string; content: string }[]) => void;
 }
 
 const SEL = "id, flow_id, col, row_index, depth, highlighted, content, updated_by, updated_at";
@@ -44,7 +48,7 @@ function nodeLabel(count: number, depth: number): string {
 // A debate flow as a nested outline: Enter adds a sibling point, Tab indents it
 // into a response, Shift+Tab outdents, and highlighting marks key cards. Numbers
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
-export default function FlowGrid({ flowId, userId, registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted }: FlowGridProps) {
+export default function FlowGrid({ flowId, userId, registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints }: FlowGridProps) {
   const [cells, setCells] = useState<FlowCell[]>([]);
   const [loadError, setLoadError] = useState("");
   const cellsRef = useRef<FlowCell[]>([]);
@@ -58,6 +62,9 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
   // Multi-line selection (click a number / Shift-click a range) for copy/paste.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const anchorRef = useRef<string | null>(null);
+  // Slash autocomplete: which cell is typing a "/trigger" and the partial text.
+  const [slash, setSlash] = useState<{ id: string; query: string } | null>(null);
+  const [slashActive, setSlashActive] = useState(0);
 
   useEffect(() => { cellsRef.current = cells; }, [cells]);
 
@@ -270,15 +277,63 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
   }
   function clearSelection() { setSelected(new Set()); anchorRef.current = null; }
 
-  // Copy the selected points (or the whole flow if none selected) to the clipboard
-  // as tab-indented text — pastes into Docs/Word, or back into a point with Ctrl+V.
+  // Copy the selected points (or the whole flow if none selected) to the clipboard.
+  // We write BOTH plain text (tab-indented, for Docs/Word) and rich HTML whose
+  // lines carry the same two indent colors as the outline — so pasting into the
+  // (rich) Speech tab keeps the color-coding. DEPTH_COLORS mirrors --c0/--c1 CSS.
   async function copyFlow() {
     const list = sorted();
     const chosen = selected.size ? list.filter((c) => selected.has(c.id)) : list;
     if (!chosen.length) return;
     const min = Math.min(...chosen.map((c) => c.depth));
     const text = chosen.map((c) => "\t".repeat(c.depth - min) + c.content).join("\n");
-    try { await navigator.clipboard.writeText(text); } catch { /* blocked */ }
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const DEPTH_COLORS = ["#e0704f", "#6f9bea"];
+    const html = chosen
+      .map((c) => {
+        const color = DEPTH_COLORS[c.depth % 2];
+        const indent = (c.depth - min) * 24;
+        return `<div style="margin-left:${indent}px;color:${color}">${esc(c.content) || "<br>"}</div>`;
+      })
+      .join("");
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        }),
+      ]);
+    } catch {
+      try { await navigator.clipboard.writeText(text); } catch { /* blocked */ }
+    }
+  }
+
+  // "/send" (typed at the end of a point, e.g. "China econ /send") sends to the
+  // Send doc as Heading-4 cards. `base` is the line's text with the "/send" command
+  // stripped off. Targets: every selected point PLUS the line you typed it on (with
+  // its base text); if nothing's selected, just this line. The "/send" command is
+  // then removed from the line, leaving its real text behind.
+  function runSend(cell: FlowCell, base: string) {
+    const list = sorted();
+    const ids = new Set(selected);
+    if (base) ids.add(cell.id);
+    const targets = list
+      .filter((c) => ids.has(c.id))
+      .map((c) => ({ id: c.id, content: c.id === cell.id ? base : c.content }));
+    if (targets.length) onSendPoints?.(targets);
+    setLocal(cell.id, { content: base });
+    saveContent(cell.id, base);
+    setSlash(null);
+    clearSelection();
+  }
+
+  // Finish a "/trigger" from the autocomplete: fill the point with the full trigger
+  // (the user then presses Enter to fire it) and close the dropdown.
+  function completeSlash(cell: FlowCell, trigger: string) {
+    const val = `/${trigger}`;
+    setLocal(cell.id, { content: val });
+    saveContent(cell.id, val);
+    setSlash(null);
   }
 
   function makeInsert(id: string): EditorInsert {
@@ -297,6 +352,11 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   }
+
+  // Triggers matching what's typed after "/" (dedup, capped) for the dropdown.
+  const slashMatches = slash
+    ? slashOptions.filter((o) => o.trigger.startsWith(slash.query)).slice(0, 6)
+    : [];
 
   // Walk the ordered list, tracking a per-depth counter to build 1./a./i. labels.
   const ordered = [...cells].sort((a, b) => a.row_index - b.row_index);
@@ -352,27 +412,55 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
               autoGrow(el);
               if (el && focusId.current === cell.id) { el.focus(); focusId.current = null; }
             }}
-            onChange={(e) => { setLocal(cell.id, { content: e.target.value }); autoGrow(e.target); scheduleSave(cell.id, e.target.value); }}
+            onChange={(e) => {
+              const v = e.target.value;
+              setLocal(cell.id, { content: v });
+              autoGrow(e.target);
+              scheduleSave(cell.id, v);
+              // Show the trigger dropdown while the whole point is a "/partial".
+              const sm = /^\/(\S*)$/.exec(v);
+              if (sm) { setSlash({ id: cell.id, query: sm[1].toLowerCase() }); setSlashActive(0); }
+              else if (slash) setSlash(null);
+            }}
             onKeyDown={(e) => {
               const ta = e.target as HTMLTextAreaElement;
+              const dropOpen = slash?.id === cell.id && slashMatches.length > 0;
+              if (dropOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                e.preventDefault();
+                setSlashActive((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + slashMatches.length) % slashMatches.length);
+                return;
+              }
+              if (dropOpen && e.key === "Escape") { e.preventDefault(); setSlash(null); return; }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
+                // "/send" at the end of the line (or alone) → push this line (and any
+                // selected points) to the Send doc; strip the command off the line.
+                if (/(^|\s)\/send\s*$/i.test(ta.value)) {
+                  runSend(cell, ta.value.replace(/(^|\s)\/send\s*$/i, "").trim());
+                  return;
+                }
+                const m = /^\/(\S+)$/.exec(ta.value.trim());
+                const trigger = m?.[1].toLowerCase();
                 // Slash command: "/topshelf" + Enter inserts the block as responses
                 // here, at this point's indent, and queues its cards to the Send doc.
-                const m = /^\/(\S+)$/.exec(ta.value.trim());
-                if (m) {
-                  const trigger = m[1].toLowerCase();
+                if (m && trigger) {
                   const tags = resolveSlashPoints?.(trigger);
                   if (tags && tags.length) {
+                    setSlash(null);
                     insertBlock(cell, tags).then((ids) => onSlashBlock?.(trigger, ids));
                     return;
                   }
                 }
+                // Not yet a complete trigger but the dropdown is open → autocomplete
+                // to the highlighted suggestion instead of making a new point.
+                if (dropOpen) { completeSlash(cell, slashMatches[slashActive]?.trigger ?? slashMatches[0].trigger); return; }
                 // Enter on an empty sub-point pops back out a level (Docs-style).
                 if (ta.value === "" && cell.depth > 0) { reIndent(cell, -1); return; }
                 saveContent(cell.id, ta.value);
                 addSibling(cell);
               } else if (e.key === "Tab") {
+                // Tab completes the highlighted suggestion when the dropdown is open.
+                if (dropOpen) { e.preventDefault(); completeSlash(cell, slashMatches[slashActive]?.trigger ?? slashMatches[0].trigger); return; }
                 e.preventDefault();
                 saveContent(cell.id, ta.value);
                 reIndent(cell, e.shiftKey ? -1 : 1);
@@ -392,8 +480,26 @@ export default function FlowGrid({ flowId, userId, registerInsert, registerAddPo
             onBlur={(e) => {
               editingId.current = null;
               saveContent(cell.id, e.target.value);
+              // Close the dropdown unless focus moved into one of its options.
+              setTimeout(() => setSlash((s) => (s?.id === cell.id ? null : s)), 120);
             }}
           />
+          {slash?.id === cell.id && slashMatches.length > 0 && (
+            <ul className="flow-slash" role="listbox">
+              {slashMatches.map((o, i) => (
+                <li key={o.trigger} role="option" aria-selected={i === slashActive}>
+                  <button
+                    type="button"
+                    className={`flow-slash__opt ${i === slashActive ? "is-active" : ""}`}
+                    onMouseDown={(e) => { e.preventDefault(); completeSlash(cell, o.trigger); }}
+                  >
+                    <span className="flow-slash__trig">/{o.trigger}</span>
+                    <span className="flow-slash__label">{o.label}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="flow-node__tools">
             <button className="flow-node__btn flow-node__btn--sub" onClick={() => addChild(cell)} title="Add sub-point inside" aria-label="Add sub-point">↳+</button>
             <button className="flow-node__btn" onClick={() => reIndent(cell, -1)} title="Outdent (Shift+Tab)" aria-label="Outdent">←</button>

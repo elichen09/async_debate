@@ -82,6 +82,17 @@ export interface FlowSnippet {
   points: ExtensionPoint[] | null;      // Heading-4 points; null for a manual one-liner
   shortcut: string | null;              // user-assigned key combo, e.g. "alt+f"
   parent_id: string | null;             // groups "---AT: X" sub-blocks under their parent block
+  folder_id?: string | null;            // optional library folder this block lives in
+  sort_order?: number | null;           // manual drag order among siblings
+  created_at: string;
+}
+
+// A user folder for organizing blocks in the Extensions library.
+export interface FlowSnippetFolder {
+  id: string;
+  owner_id: string;
+  name: string;
+  sort_order: number;
   created_at: string;
 }
 

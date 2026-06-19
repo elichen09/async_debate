@@ -102,13 +102,27 @@ function cleanLabel(text: string): string {
 
 // Split the doc into extensions at each header (Heading 1-3). The header text names
 // the block; Heading-4 paragraphs inside become its points (tag + formatted body),
-// running until the next header. The number of leading dashes gives the block's
-// nesting level, so "AT: Arctic" → "---Topshelf" → "------AT: Pabst Evid" form a
-// three-deep tree that the importer reconstructs via parent_id.
+// running until the next header. A block's nesting level comes from TWO sources,
+// added together: (a) its heading level — the shallowest heading used is tier 0,
+// the next deeper is tier 1, etc., so a doc that uses Heading 2 for "AT: Arctic"
+// and Heading 3 for "AT: Propping up Russia" nests the latter under the former;
+// and (b) its run of leading dashes (three per level). A doc that uses one heading
+// level throughout still nests purely by dashes, exactly as before.
 export async function parseAtSections(
   buf: ArrayBuffer,
 ): Promise<{ label: string; body: string; points: ExtensionPoint[]; level: number }[]> {
   const { paragraphs, headingLevel } = await load(buf);
+
+  // Map each heading level that's actually used as a section title to a contiguous
+  // tier: shallowest → 0, next → 1, … (so H2/H3 → 0/1, but H3-only → 0).
+  const used = new Set<number>();
+  for (const p of paragraphs) {
+    const lvl = headingLevel(p);
+    if (lvl >= 1 && lvl <= 3 && clean(p.textContent || "")) used.add(lvl);
+  }
+  const tierOf = new Map<number, number>();
+  [...used].sort((a, b) => a - b).forEach((lvl, i) => tierOf.set(lvl, i));
+
   const all: { label: string; points: ExtensionPoint[]; level: number }[] = [];
   let sec: (typeof all)[number] | null = null;
   let point: ExtensionPoint | null = null;
@@ -120,8 +134,8 @@ export async function parseAtSections(
 
     if (lvl >= 1 && lvl <= 3) {
       if (!text) continue; // skip blank heading lines (spacing/layout, not real blocks)
-      const level = dashLevel(text);
-      sec = { label: level > 0 ? cleanLabel(text) : text, points: [], level };
+      const level = (tierOf.get(lvl) ?? 0) + dashLevel(text);
+      sec = { label: cleanLabel(text), points: [], level };
       all.push(sec);
       point = null;
     } else if (lvl === 4) {
