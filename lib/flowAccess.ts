@@ -3,7 +3,8 @@
 // used to hide the nav link — this is a soft gate for testing, not hard security.
 export const FLOW_ALLOWED_EMAILS: string[] = [
   "elichen314@gmail.com",
-  "bchen2010@gmail.com"
+  "bchen2010@gmail.com",
+  "rahulranilinc@gmail.com"
 ];
 
 export function isFlowAllowed(email: string | null | undefined): boolean {
