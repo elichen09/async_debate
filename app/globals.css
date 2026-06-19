@@ -3618,10 +3618,10 @@ html.gh-light .flow-outline__bar-hint { color: var(--muted); }
 /* Two colors alternate by indent depth. Fixed hexes (not theme tokens) so they
    read on both themes AND match exactly what the Copy action writes to the
    clipboard, keeping the color-coding when a flow is pasted into the speech. */
-.flow-node--c0 { border-left-color: #d35f3f88; }
-.flow-node--c0 .flow-node__label, .flow-node--c0 .flow-node__text { color: #e0704f; }
-.flow-node--c1 { border-left-color: #4f7fd688; }
-.flow-node--c1 .flow-node__label, .flow-node--c1 .flow-node__text { color: #6f9bea; }
+.flow-node--c0 { border-left-color: #ff8a64aa; }
+.flow-node--c0 .flow-node__label, .flow-node--c0 .flow-node__text { color: #ffa987; }
+.flow-node--c1 { border-left-color: #6f9beaaa; }
+.flow-node--c1 .flow-node__label, .flow-node--c1 .flow-node__text { color: #9cc3ff; }
 
 /* Highlighter */
 .flow-node--hl .flow-node__text {
@@ -3669,6 +3669,8 @@ html.gh-light .flow-node.is-sel { background: oklch(0.6 0.14 250 / 0.14); }
   list-style: none;
   min-width: 220px;
   max-width: 360px;
+  max-height: 240px;
+  overflow-y: auto;
   background: oklch(0.18 0.02 240);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-sm);

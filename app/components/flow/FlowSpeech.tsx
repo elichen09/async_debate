@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { fuzzyRank } from "@/lib/fuzzy";
 import type { EditorInsert } from "@/app/flow/shared";
 
 interface FlowSpeechProps {
@@ -150,7 +151,7 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
     save("");
   }
 
-  const slashMatches = slash ? slashOptions.filter((o) => o.trigger.startsWith(slash.query)).slice(0, 6) : [];
+  const slashMatches = slash ? fuzzyRank(slash.query, slashOptions).slice(0, 50) : [];
   const dropOpen = !!slash && slashMatches.length > 0;
 
   return (
@@ -210,6 +211,7 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
             <li key={o.trigger} role="option" aria-selected={i === slashActive}>
               <button
                 type="button"
+                ref={i === slashActive ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
                 className={`flow-slash__opt ${i === slashActive ? "is-active" : ""}`}
                 onMouseDown={(e) => { e.preventDefault(); completeSlash(o.trigger); }}
               >

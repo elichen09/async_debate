@@ -42,6 +42,34 @@ function removeSendCards(html: string, ids: string[]): string {
   }
 }
 
+// Insert a block's HTML into the Send doc before the card of the first following
+// flow point that already has one (so doc order mirrors the outline). If none of
+// them have a card yet, append at the end. We insert before that card's block
+// title (h3[data-block]) when it's part of a block, else before the card itself.
+function insertSendBlock(html: string, blockHtml: string, afterIds: string[]): string {
+  if (!afterIds.length) return html + blockHtml;
+  try {
+    const doc = new DOMParser().parseFromString(html || "", "text/html");
+    let anchor: Element | null = null;
+    for (const id of afterIds) {
+      anchor = doc.querySelector(`[data-block="${id}"]`) || doc.querySelector(`[data-cell="${id}"]`);
+      if (anchor) break;
+    }
+    if (!anchor) return html + blockHtml;
+    // If the anchor is a card inside a block, back up to that block's title.
+    if (!anchor.hasAttribute("data-block")) {
+      let p = anchor.previousElementSibling;
+      while (p && !/^H[1-3]$/.test(p.tagName)) p = p.previousElementSibling;
+      if (p && p.hasAttribute("data-block")) anchor = p;
+    }
+    const frag = new DOMParser().parseFromString(blockHtml, "text/html").body;
+    while (frag.firstChild) anchor.parentNode!.insertBefore(frag.firstChild, anchor);
+    return doc.body.innerHTML;
+  } catch {
+    return html + blockHtml;
+  }
+}
+
 export default function FlowWorkspace() {
   const router = useRouter();
   const { id } = useParams();
@@ -112,9 +140,11 @@ export default function FlowWorkspace() {
   function appendBlock(snip: FlowSnippet, cellIds?: string[]) {
     commitSend(sendHtmlRef.current + blockToHtml(snip.label, snip.points, snip.body, cellIds), true);
   }
-  function onSlashBlock(trigger: string, cellIds: string[]) {
+  function onSlashBlock(trigger: string, cellIds: string[], afterIds: string[] = []) {
     const snip = findByTrigger(trigger);
-    if (snip) appendBlock(snip, cellIds);
+    if (!snip) return;
+    const blockHtml = blockToHtml(snip.label, snip.points, snip.body, cellIds);
+    commitSend(insertSendBlock(sendHtmlRef.current, blockHtml, afterIds), true);
   }
   function onCellsDeleted(ids: string[]) {
     const next = removeSendCards(sendHtmlRef.current, ids);

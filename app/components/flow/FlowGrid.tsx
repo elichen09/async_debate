@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { fuzzyRank } from "@/lib/fuzzy";
 import type { FlowCell, EditorInsert } from "@/app/flow/shared";
 
 // A short, stable color per collaborator (keyed off their user id) for presence.
@@ -29,7 +30,9 @@ interface FlowGridProps {
   resolveSlashPoints?: (trigger: string) => string[] | null;
   // After a "/trigger" inserts its points, queue the block into the Send doc tagged
   // with the cell ids it created (so deleting a point can remove its card).
-  onSlashBlock?: (trigger: string, cellIds: string[]) => void;
+  // afterIds = the flow points following the insertion, so the Send doc can place
+  // the new block before the first of those that already has a card (matching order).
+  onSlashBlock?: (trigger: string, cellIds: string[], afterIds: string[]) => void;
   // Cells were deleted — drop any Send doc cards tied to them.
   onCellsDeleted?: (cellIds: string[]) => void;
   // Available "/trigger" options, for the slash autocomplete dropdown.
@@ -89,6 +92,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // uid -> last-known {cell, name, color, when}. Pruned by TTL so a partner that
   // navigates away (or disconnects) clears even if we miss their "leave".
   const editorsRef = useRef<Map<string, { cellId: string; name: string; color: string; ts: number }>>(new Map());
+  const editorsSigRef = useRef("");          // last rendered presence signature, to skip no-op re-renders
   useEffect(() => { selfNameRef.current = userName; }, [userName]);
 
   useEffect(() => { cellsRef.current = cells; }, [cells]);
@@ -156,6 +160,11 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       if (e.ts < cutoff) { editorsRef.current.delete(uid); continue; }
       (map[e.cellId] ||= []).push({ uid, name: e.name, color: e.color });
     }
+    // Skip the state update (and the re-render it triggers) when nothing changed,
+    // so the 2s heartbeat doesn't re-run every textarea's auto-grow and jolt scroll.
+    const sig = Object.keys(map).sort().map((k) => `${k}:${map[k].map((e) => e.uid).sort().join(",")}`).join("|");
+    if (sig === editorsSigRef.current) return;
+    editorsSigRef.current = sig;
     setRemoteEditors(map);
   }
 
@@ -371,7 +380,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const min = Math.min(...chosen.map((c) => c.depth));
     const text = chosen.map((c) => "\t".repeat(c.depth - min) + c.content).join("\n");
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const DEPTH_COLORS = ["#e0704f", "#6f9bea"];
+    const DEPTH_COLORS = ["#ffa987", "#9cc3ff"];
     const html = chosen
       .map((c) => {
         const color = DEPTH_COLORS[c.depth % 2];
@@ -437,9 +446,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   }
 
   // Triggers matching what's typed after "/" (dedup, capped) for the dropdown.
-  const slashMatches = slash
-    ? slashOptions.filter((o) => o.trigger.startsWith(slash.query)).slice(0, 6)
-    : [];
+  const slashMatches = slash ? fuzzyRank(slash.query, slashOptions).slice(0, 50) : [];
 
   // Walk the ordered list, tracking a per-depth counter to build 1./a./i. labels.
   const ordered = [...cells].sort((a, b) => a.row_index - b.row_index);
@@ -530,7 +537,13 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
                   const tags = resolveSlashPoints?.(trigger);
                   if (tags && tags.length) {
                     setSlash(null);
-                    insertBlock(cell, tags).then((ids) => onSlashBlock?.(trigger, ids));
+                    // Points that follow this one (in flow order) — the Send doc
+                    // inserts the new block before the first of these that already
+                    // has a card, so the doc order mirrors the outline order.
+                    const list = sorted();
+                    const idx = list.findIndex((c) => c.id === cell.id);
+                    const afterIds = list.slice(idx + 1).map((c) => c.id);
+                    insertBlock(cell, tags).then((ids) => onSlashBlock?.(trigger, ids, afterIds));
                     return;
                   }
                 }
@@ -582,6 +595,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
                 <li key={o.trigger} role="option" aria-selected={i === slashActive}>
                   <button
                     type="button"
+                    ref={i === slashActive ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
                     className={`flow-slash__opt ${i === slashActive ? "is-active" : ""}`}
                     onMouseDown={(e) => { e.preventDefault(); completeSlash(cell, o.trigger); }}
                   >
