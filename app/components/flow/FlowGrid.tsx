@@ -11,8 +11,10 @@ function colorFor(uid: string): string {
   for (let i = 0; i < uid.length; i++) h = (h * 31 + uid.charCodeAt(i)) >>> 0;
   return PRESENCE_COLORS[h % PRESENCE_COLORS.length];
 }
-// What we broadcast over the presence channel: which cell we're editing + who we are.
-type PresenceMeta = { cellId: string | null; name: string; color: string };
+// What we broadcast over the presence channel: which cell we're editing + who we
+// are + when (ts lets the receiver pick a user's NEWEST entry, ignoring any stale
+// or leaked presence refs that would otherwise pin them to an old point).
+type PresenceMeta = { cellId: string | null; name: string; color: string; ts: number };
 type RemoteEditor = { uid: string; name: string; color: string };
 
 interface FlowGridProps {
@@ -82,6 +84,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   const presenceRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const selfNameRef = useRef(userName);     // latest name, read by track() without re-subscribing
   const lastCellRef = useRef<string | null>(null);
+  const tickRef = useRef(0);                // monotonic stamp so the receiver picks our newest update
   useEffect(() => { selfNameRef.current = userName; }, [userName]);
 
   useEffect(() => { cellsRef.current = cells; }, [cells]);
@@ -149,19 +152,26 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     if (!userId) return;
     const color = colorFor(userId);
     const ch = supabase.channel(`flow_presence:${flowId}`, { config: { presence: { key: userId } } });
-    ch.on("presence", { event: "sync" }, () => {
+    const recompute = () => {
       const state = ch.presenceState<PresenceMeta>();
       const map: Record<string, RemoteEditor[]> = {};
       for (const key of Object.keys(state)) {
         if (key === userId) continue;            // skip ourselves
         const metas = state[key];
-        const meta = metas[metas.length - 1];    // a key can hold stale refs — use the latest only
-        if (!meta?.cellId) continue;
+        if (!metas.length) continue;
+        // A key can hold stale/leaked refs — keep only the most recently updated.
+        const meta = metas.reduce((a, b) => ((b.ts ?? 0) >= (a.ts ?? 0) ? b : a));
+        if (!meta.cellId) continue;
         (map[meta.cellId] ||= []).push({ uid: key, name: meta.name, color: meta.color });
       }
       setRemoteEditors(map);
-    });
-    ch.subscribe((status) => { if (status === "SUBSCRIBED") ch.track({ cellId: lastCellRef.current, name: selfNameRef.current, color }); });
+    };
+    // Recompute on every presence change — a partner moving points arrives as a
+    // diff (join/leave of presence refs) as well as a full sync.
+    ch.on("presence", { event: "sync" }, recompute);
+    ch.on("presence", { event: "join" }, recompute);
+    ch.on("presence", { event: "leave" }, recompute);
+    ch.subscribe((status) => { if (status === "SUBSCRIBED") ch.track({ cellId: lastCellRef.current, name: selfNameRef.current, color, ts: (tickRef.current += 1) }); });
     presenceRef.current = ch;
     return () => { presenceRef.current = null; setRemoteEditors({}); ch.untrack(); supabase.removeChannel(ch); };
   }, [flowId, userId]);
@@ -169,12 +179,12 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // Tell collaborators which point we're on (null when we leave the editor).
   function trackCell(cellId: string | null) {
     lastCellRef.current = cellId;
-    presenceRef.current?.track({ cellId, name: selfNameRef.current, color: colorFor(userId) });
+    presenceRef.current?.track({ cellId, name: selfNameRef.current, color: colorFor(userId), ts: (tickRef.current += 1) });
   }
 
   // When the name resolves (async), re-broadcast it without re-subscribing.
   useEffect(() => {
-    presenceRef.current?.track({ cellId: lastCellRef.current, name: userName, color: colorFor(userId) });
+    presenceRef.current?.track({ cellId: lastCellRef.current, name: userName, color: colorFor(userId), ts: (tickRef.current += 1) });
   }, [userName, userId]);
 
   const sorted = () => [...cellsRef.current].sort((a, b) => a.row_index - b.row_index);
