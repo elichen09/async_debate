@@ -61,7 +61,6 @@ export default function DashboardPage() {
   const [active, setActive] = useState<Round[]>([]);
   const [publicRounds, setPublicRounds] = useState<Round[]>([]);
   const [staleRounds, setStaleRounds] = useState<Round[]>([]);
-  const [lastSpeechMap, setLastSpeechMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [acceptPick, setAcceptPick] = useState<Record<string, string>>({});
 
@@ -137,27 +136,8 @@ export default function DashboardPage() {
       setOutgoing(allRounds.filter(r => r.challenger_id === id && r.status === "pending"));
       setActive(activeRounds);
 
-      const speechMap: Record<string, string> = {};
-      if (activeRounds.length > 0) {
-        const { data: lastSpeeches } = await supabase
-          .from("speeches")
-          .select("round_id, submitted_at")
-          .in("round_id", activeRounds.map(r => r.id))
-          .order("submitted_at", { ascending: false });
-        for (const s of lastSpeeches || []) {
-          if (!speechMap[s.round_id]) speechMap[s.round_id] = s.submitted_at;
-        }
-      }
-      setLastSpeechMap(speechMap);
-
-      // Only warn the debater who actually owes the next speech. The player
-      // who is waiting on their opponent gets no countdown alarm.
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      setStaleRounds(activeRounds.filter(r => {
-        if (!isMyTurnIn(r, id)) return false;
-        const lastActivity = speechMap[r.id] || r.created_at;
-        return lastActivity < oneDayAgo;
-      }));
+      // Stale-round warning disabled: no "speech is due" banner / row highlight.
+      setStaleRounds([]);
 
       const { data: pubRounds } = await supabase
         .from("rounds")
@@ -329,29 +309,6 @@ export default function DashboardPage() {
           Challenge →
         </button>
       </div>
-
-      {/* Stale alerts */}
-      {staleRounds.length > 0 && (
-        <div style={{ padding: "8px 20px 0", display: "flex", flexDirection: "column", gap: 8 }}>
-          {staleRounds.map(r => {
-            const myRole = r.pro_id === userId ? "pro" : "con";
-            const opponent = myRole === "pro" ? r.con : r.pro;
-            const lastActivity = lastSpeechMap[r.id] || r.created_at;
-            const hoursLeft = Math.max(0, 48 - Math.floor((Date.now() - new Date(lastActivity).getTime()) / (1000 * 60 * 60)));
-            return (
-              <div key={r.id} className="db-stale-alert">
-                <div>
-                  <p className="db-stale-alert__title">Your speech is due · {hoursLeft}h left</p>
-                  <p className="db-stale-alert__sub">{r.topic} · vs @{opponent?.username}</p>
-                </div>
-                <button onClick={() => router.push(`/round/${r.id}`)} className="db-btn db-btn--sm db-btn--accent" style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
-                  Submit now →
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {/* Freeform canvas */}
       <div className="gh-dash__canvas">
