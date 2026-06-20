@@ -13,6 +13,8 @@ import type { EditorInsert, Flow, FlowSnippet } from "@/app/flow/shared";
 
 const SNIP_SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
 type Sibling = { id: string; title: string; folder_id: string | null };
+type ViewKind = "flow" | "speech" | "send";
+type Pane = { key: string; view: ViewKind; flowId: string };
 
 // Remove Send-doc cards tied to deleted flow points: drop each h4[data-cell] and
 // its body (siblings up to the next heading), then any block title (h3[data-block])
@@ -79,25 +81,77 @@ export default function FlowWorkspace() {
   const [userName, setUserName] = useState("Partner");
   const [flow, setFlow] = useState<Flow | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"flow" | "speech" | "send">("flow");
+  // Split view: any number of side-by-side panes. Each is a view of a flow; the
+  // Speech/Send panes always target the URL flow, Flow panes can be any sibling.
+  const [panes, setPanes] = useState<Pane[]>([{ key: "p0", view: "flow", flowId }]);
   const [showSnippets, setShowSnippets] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const [snippets, setSnippets] = useState<FlowSnippet[]>([]);
   const [sendHtml, setSendHtml] = useState("");
   const [sendVersion, setSendVersion] = useState(0);
   const [siblings, setSiblings] = useState<Sibling[]>([]);
 
+  // The App Router reuses this component when navigating between flows in the same
+  // route, so reset the split back to a single pane for the new flow.
+  const [prevFlowId, setPrevFlowId] = useState(flowId);
+  if (prevFlowId !== flowId) {
+    setPrevFlowId(flowId);
+    setPanes([{ key: `main-${flowId}`, view: "flow", flowId }]);
+  }
+
   const activeInsert = useRef<EditorInsert | null>(null);
   const registerInsert = (fn: EditorInsert | null) => { activeInsert.current = fn; };
   const addPointsRef = useRef<((tags: string[]) => void) | null>(null);
   const snippetsRef = useRef<FlowSnippet[]>([]);
-  const tabRef = useRef(tab);
+  const panesRef = useRef(panes);
+  const paneSeq = useRef(1);
+  const savedFlowPanesRef = useRef<Pane[]>(panes);   // last flow-pane arrangement, restored by the Flow tab
   const sendHtmlRef = useRef("");
   const lastSendEdit = useRef(0);
   const sendSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => { snippetsRef.current = snippets; }, [snippets]);
-  useEffect(() => { tabRef.current = tab; }, [tab]);
+  useEffect(() => { panesRef.current = panes; }, [panes]);
   useEffect(() => { sendHtmlRef.current = sendHtml; }, [sendHtml]);
+  // Remember the flow-pane layout (so the Flow tab can restore a 2-flow split after
+  // you visit Speech/Send).
+  useEffect(() => {
+    const fp = panes.filter((p) => p.view === "flow");
+    if (fp.length) savedFlowPanesRef.current = fp;
+  }, [panes]);
+
+  // Fullscreen workspace: hide the site nav/rail so panes fill the whole screen.
+  useEffect(() => {
+    document.body.classList.toggle("flow-work-full", fullscreen);
+    return () => document.body.classList.remove("flow-work-full");
+  }, [fullscreen]);
+
+  // --- View / split controls ---
+  // A tab SWITCHES the workspace's view (no automatic splitting). The Flow tab
+  // restores your last flow arrangement — so a 2-flow split survives a trip to
+  // Speech/Send and back. Speech/Send are always a single pane for the URL flow.
+  function setView(view: ViewKind) {
+    if (view === "flow") {
+      const restore = savedFlowPanesRef.current.length ? savedFlowPanesRef.current : [{ key: `p${paneSeq.current++}`, view: "flow" as ViewKind, flowId }];
+      setPanes(restore);
+    } else {
+      setPanes([{ key: `p${paneSeq.current++}`, view, flowId }]);
+    }
+  }
+  const showingFlow = panes.length > 0 && panes.every((p) => p.view === "flow");
+  const isSoloView = (view: ViewKind) => (view === "flow" ? showingFlow : panes.length === 1 && panes[0].view === view);
+  // Split EXPLICITLY: add a view (for the URL flow) or another flow as a new pane.
+  function addPane(view: ViewKind, fid: string = flowId) {
+    const key = `p${paneSeq.current++}`;
+    setPanes((prev) => (prev.some((p) => p.view === view && p.flowId === fid) ? prev : [...prev, { key, view, flowId: fid }]));
+  }
+  function onSplit(value: string) {
+    if (value.startsWith("view:")) addPane(value.slice(5) as ViewKind);
+    else if (value.startsWith("flow:")) addPane("flow", value.slice(5));
+  }
+  function closePane(key: string) {
+    setPanes((prev) => (prev.length > 1 ? prev.filter((p) => p.key !== key) : prev));
+  }
 
   // --- Send doc persistence (shared across a folder's flows; per-flow if ungrouped) ---
   // The doc lives on the folder row when the flow is in one, else on the flow row,
@@ -174,7 +228,7 @@ export default function FlowWorkspace() {
   function runExtension(snip: FlowSnippet) {
     const pts = snip.points ?? [];
     const tags = pts.length ? pts.map((p) => p.tag) : [snip.label];
-    if (tabRef.current === "flow") addPointsRef.current?.(tags);
+    if (panesRef.current.some((p) => p.view === "flow")) addPointsRef.current?.(tags);
     appendBlock(snip);
   }
 
@@ -287,15 +341,36 @@ export default function FlowWorkspace() {
   }
 
   return (
-    <div className="flow-work">
+    <div className={`flow-work ${fullscreen ? "flow-work--full" : ""}`}>
       <header className="flow-work__head">
         <h1 className="flow-work__title">{flow.title}</h1>
-        <div className="flow-work__tabs">
-          <button className={`flow-tab ${tab === "flow" ? "is-active" : ""}`} onClick={() => setTab("flow")}>Flow</button>
-          <button className={`flow-tab ${tab === "speech" ? "is-active" : ""}`} onClick={() => setTab("speech")}>Speech</button>
-          <button className={`flow-tab ${tab === "send" ? "is-active" : ""}`} onClick={() => setTab("send")}>Send doc</button>
+        <div className="flow-work__tabs" role="group" aria-label="View">
+          <button className={`flow-tab ${isSoloView("flow") ? "is-active" : ""}`} onClick={() => setView("flow")}>Flow</button>
+          <button className={`flow-tab ${isSoloView("speech") ? "is-active" : ""}`} onClick={() => setView("speech")}>Speech</button>
+          <button className={`flow-tab ${isSoloView("send") ? "is-active" : ""}`} onClick={() => setView("send")}>Send doc</button>
         </div>
+        <select
+          className="flow-addflow"
+          value=""
+          title="Open another view or flow side-by-side"
+          onChange={(e) => { onSplit(e.target.value); e.currentTarget.value = ""; }}
+        >
+          <option value="" disabled>＋ Split…</option>
+          <optgroup label="Add view">
+            <option value="view:flow">Flow</option>
+            <option value="view:speech">Speech</option>
+            <option value="view:send">Send doc</option>
+          </optgroup>
+          {siblings.filter((s) => !panes.some((p) => p.view === "flow" && p.flowId === s.id)).length > 0 && (
+            <optgroup label="Add flow">
+              {siblings.filter((s) => !panes.some((p) => p.view === "flow" && p.flowId === s.id)).map((s) => (
+                <option key={s.id} value={`flow:${s.id}`}>{s.title}</option>
+              ))}
+            </optgroup>
+          )}
+        </select>
         <div className="flow-work__actions">
+          <button className="flow-pill" onClick={() => setFullscreen((f) => !f)} title="Toggle fullscreen">{fullscreen ? "⤡ Exit" : "⤢ Fullscreen"}</button>
           <button className={`flow-pill ${showSnippets ? "is-active" : ""}`} onClick={() => setShowSnippets((s) => !s)}>Extensions</button>
           <button className="flow-pill" onClick={() => setShowShare(true)}>Share</button>
         </div>
@@ -317,16 +392,34 @@ export default function FlowWorkspace() {
       )}
 
       <div className="flow-work__body">
-        <div className="flow-work__main">
-          {tab === "flow" && (
-            <FlowGrid flowId={flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} />
-          )}
-          {tab === "speech" && (
-            <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} />
-          )}
-          {tab === "send" && (
-            <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} />
-          )}
+        <div className="flow-work__panes">
+          {panes.map((pane) => {
+            const title =
+              pane.view === "speech" ? "Speech" :
+              pane.view === "send" ? "Send doc" :
+              (pane.flowId === flowId ? flow.title : siblings.find((s) => s.id === pane.flowId)?.title ?? "Flow");
+            return (
+              <section className="flow-pane" key={pane.key}>
+                {panes.length > 1 && (
+                  <div className="flow-pane__head">
+                    <span className="flow-pane__title" title={title}>{title}</span>
+                    <button className="flow-pane__close" onClick={() => closePane(pane.key)} aria-label="Close pane" title="Close pane">×</button>
+                  </div>
+                )}
+                <div className="flow-pane__body">
+                  {pane.view === "flow" && (
+                    <FlowGrid flowId={pane.flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} />
+                  )}
+                  {pane.view === "speech" && (
+                    <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} />
+                  )}
+                  {pane.view === "send" && (
+                    <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} />
+                  )}
+                </div>
+              </section>
+            );
+          })}
         </div>
 
         {showSnippets && (

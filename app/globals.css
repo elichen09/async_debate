@@ -3551,6 +3551,78 @@ html.flow-route .gh-topnav__burger {
 .flow-work__body { flex: 1; display: flex; min-height: 0; position: relative; }
 .flow-work__main { flex: 1; min-width: 0; overflow: auto; padding: 8px 12px 60px; }
 
+/* Fullscreen workspace: cover the screen and hide the site chrome behind it. */
+.flow-work--full {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  height: 100vh;
+  background: oklch(0.09 0.03 232 / 0.98);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+html.gh-light .flow-work--full { background: oklch(0.96 0.008 80 / 0.98); }
+body.flow-work-full .gh-topnav,
+body.flow-work-full .gh-siderail,
+body.flow-work-full .gh-drawer,
+body.flow-work-full .gh-drawer-backdrop { display: none !important; }
+
+/* Split view: side-by-side panes, each independently scrollable. */
+.flow-work__panes { flex: 1; min-width: 0; display: flex; min-height: 0; overflow-x: auto; }
+.flow-pane {
+  flex: 1 1 0;
+  min-width: 360px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.07);
+}
+.flow-pane:first-child { border-left: none; }
+.flow-pane__head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+}
+.flow-pane__title {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flow-pane__close { background: none; border: none; color: rgba(255, 255, 255, 0.4); font-size: 16px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.flow-pane__close:hover { color: #fff; }
+.flow-pane__body { flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 8px 12px 60px; }
+.flow-addflow {
+  height: 28px;
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+}
+html.gh-light .flow-pane__head { background: oklch(0.12 0.04 232 / 0.03); border-bottom-color: var(--line); }
+html.gh-light .flow-pane { border-left-color: var(--line); }
+html.gh-light .flow-pane__title { color: var(--muted); }
+html.gh-light .flow-pane__close { color: var(--muted); }
+html.gh-light .flow-pane__close:hover { color: var(--ink); }
+html.gh-light .flow-addflow { background: oklch(0.12 0.04 232 / 0.06); border-color: var(--line-strong); color: var(--ink-soft); }
+/* The native drop-down popup is white, so force readable dark options/labels. */
+.flow-addflow option, .flow-addflow optgroup { color: #15171c; background: #fff; font-weight: 600; }
+
 /* ---- Outline — nested debate flow (1./a./i. levels, alternating colors) ---- */
 /* The Flow tab renders in Calibri (debaters' house font); children inherit it. */
 .flow-outline { max-width: 920px; padding: 4px 4px 80px; font-family: var(--font-calibri); }
