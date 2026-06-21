@@ -40,7 +40,17 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
   const [focused, setFocused] = useState(false);
   const [myCaret, setMyCaret] = useState<number | null>(null);
   const others = usePanePresence(flowId, "speech", userId, userName, focused, focused ? myCaret : null);
-  const trackCaret = () => { if (ref.current) setMyCaret(caretOffsetIn(ref.current)); };
+  const trackCaret = () => { const el = ref.current; if (!el) return; const off = caretOffsetIn(el); setMyCaret((prev) => (off === prev ? prev : off)); };
+
+  // Track the caret reliably while focused (selectionchange fires for typing,
+  // arrows, and clicks — onFocus alone can run before the caret is placed).
+  useEffect(() => {
+    if (!focused) return;
+    const read = () => { const el = ref.current; if (!el) return; const off = caretOffsetIn(el); setMyCaret((prev) => (off === prev ? prev : off)); };
+    read();
+    document.addEventListener("selectionchange", read);
+    return () => document.removeEventListener("selectionchange", read);
+  }, [focused]);
   const lastTyped = useRef(0);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef("");      // newest HTML, for flush-on-unmount

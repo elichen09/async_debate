@@ -395,21 +395,19 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     }
     if (moveSet.has(targetId)) return; // can't drop the group into itself
     const moving = list.filter((c) => moveSet.has(c.id)); // document order
-    const minDepth = Math.min(...moving.map((c) => c.depth));
-    const depthDelta = target.depth - minDepth;
     const ti = list.findIndex((c) => c.id === targetId);
     let hi = target.row_index + 1;
     for (let i = ti + 1; i < list.length; i++) { if (!moveSet.has(list[i].id)) { hi = list[i].row_index; break; } }
     const lo = target.row_index;
     const n = moving.length;
+    // Only reposition (row_index) — points keep their own indentation level.
     const updates = moving.map((c, k) => ({
       id: c.id,
       row_index: lo + ((hi - lo) * (k + 1)) / (n + 1),
-      depth: Math.max(0, c.depth + depthDelta),
     }));
-    setCells((prev) => prev.map((c) => { const u = updates.find((x) => x.id === c.id); return u ? { ...c, row_index: u.row_index, depth: u.depth } : c; }));
+    setCells((prev) => prev.map((c) => { const u = updates.find((x) => x.id === c.id); return u ? { ...c, row_index: u.row_index } : c; }));
     for (const u of updates) {
-      supabase.from("flow_cells").update({ row_index: u.row_index, depth: u.depth, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", u.id).then(() => {});
+      supabase.from("flow_cells").update({ row_index: u.row_index, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", u.id).then(() => {});
     }
     // Tell the Send doc the new top-to-bottom point order so its cards reflow to match.
     const newOrder = list
