@@ -8,6 +8,7 @@ import FlowGrid from "@/app/components/flow/FlowGrid";
 import FlowSpeech from "@/app/components/flow/FlowSpeech";
 import SnippetLibrary from "@/app/components/flow/SnippetLibrary";
 import SendDoc from "@/app/components/flow/SendDoc";
+import FlowTimers from "@/app/components/flow/FlowTimers";
 import ShareDialog from "@/app/components/flow/ShareDialog";
 import type { EditorInsert, Flow, FlowSnippet } from "@/app/flow/shared";
 
@@ -72,6 +73,39 @@ function insertSendBlock(html: string, blockHtml: string, afterIds: string[]): s
   }
 }
 
+// Reorder the Send doc's card segments to match a new flow point order. The doc is
+// a flat sequence of heading-led segments; each segment keyed by its heading's
+// data-block/data-cell. We sort the KEYED segments by the flow order and slot them
+// back into the positions keyed segments occupied, leaving free text in place.
+function reorderSendDoc(html: string, orderedIds: string[]): string {
+  if (!html) return html;
+  try {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    const children = Array.from(doc.body.children);
+    if (!children.length) return html;
+    type Seg = { nodes: Element[]; key: string | null };
+    const segs: Seg[] = [];
+    for (const el of children) {
+      if (/^H[1-6]$/.test(el.tagName) || !segs.length) {
+        const key = el.getAttribute("data-block") || el.getAttribute("data-cell");
+        segs.push({ nodes: [el], key });
+      } else {
+        segs[segs.length - 1].nodes.push(el);
+      }
+    }
+    const idx = new Map(orderedIds.map((id, i) => [id, i]));
+    const keyed = segs.filter((s) => s.key && idx.has(s.key));
+    if (keyed.length < 2) return html;
+    const sorted = [...keyed].sort((a, b) => (idx.get(a.key!) ?? 0) - (idx.get(b.key!) ?? 0));
+    let k = 0;
+    const ordered = segs.map((s) => (s.key && idx.has(s.key) ? sorted[k++] : s));
+    const out = ordered.flatMap((s) => s.nodes).map((n) => n.outerHTML).join("");
+    return out || html;
+  } catch {
+    return html;
+  }
+}
+
 export default function FlowWorkspace() {
   const router = useRouter();
   const { id } = useParams();
@@ -87,6 +121,7 @@ export default function FlowWorkspace() {
   const [showSnippets, setShowSnippets] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [showTimers, setShowTimers] = useState(false);
   const [snippets, setSnippets] = useState<FlowSnippet[]>([]);
   const [sendHtml, setSendHtml] = useState("");
   const [sendVersion, setSendVersion] = useState(0);
@@ -202,6 +237,12 @@ export default function FlowWorkspace() {
   }
   function onCellsDeleted(ids: string[]) {
     const next = removeSendCards(sendHtmlRef.current, ids);
+    if (next !== sendHtmlRef.current) commitSend(next, true);
+  }
+
+  // Flow points were dragged into a new order — reflow the Send doc cards to match.
+  function onReorder(orderedIds: string[]) {
+    const next = reorderSendDoc(sendHtmlRef.current, orderedIds);
     if (next !== sendHtmlRef.current) commitSend(next, true);
   }
 
@@ -370,11 +411,14 @@ export default function FlowWorkspace() {
           )}
         </select>
         <div className="flow-work__actions">
+          <button className={`flow-pill ${showTimers ? "is-active" : ""}`} onClick={() => setShowTimers((s) => !s)} title="Toggle timers">⏱ Timers</button>
           <button className="flow-pill" onClick={() => setFullscreen((f) => !f)} title="Toggle fullscreen">{fullscreen ? "⤡ Exit" : "⤢ Fullscreen"}</button>
           <button className={`flow-pill ${showSnippets ? "is-active" : ""}`} onClick={() => setShowSnippets((s) => !s)}>Extensions</button>
           <button className="flow-pill" onClick={() => setShowShare(true)}>Share</button>
         </div>
       </header>
+
+      {showTimers && <FlowTimers flowId={flowId} />}
 
       {siblings.length > 1 && (
         <div className="flow-foldertabs" role="tablist" aria-label="Flows in this folder">
@@ -408,13 +452,13 @@ export default function FlowWorkspace() {
                 )}
                 <div className="flow-pane__body">
                   {pane.view === "flow" && (
-                    <FlowGrid flowId={pane.flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} />
+                    <FlowGrid flowId={pane.flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} onReorder={onReorder} />
                   )}
                   {pane.view === "speech" && (
-                    <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} />
+                    <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} userId={userId} userName={userName} />
                   )}
                   {pane.view === "send" && (
-                    <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} />
+                    <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} flowId={flowId} userId={userId} userName={userName} />
                   )}
                 </div>
               </section>

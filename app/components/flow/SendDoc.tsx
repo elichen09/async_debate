@@ -2,12 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { downloadHtmlAsDocx } from "@/lib/sendDocExport";
+import { usePanePresence } from "@/lib/presence";
 
 interface SendDocProps {
   html: string;
   version: number;          // bumped when an extension appends, to re-sync the DOM
   onChange: (html: string) => void;
   resolveSlashHtml?: (trigger: string) => string | null;
+  flowId?: string;
+  userId?: string;
+  userName?: string;
 }
 
 interface OutlineItem { text: string; level: number; }
@@ -16,11 +20,13 @@ interface OutlineItem { text: string; level: number; }
 // contentEditable renders card formatting, accepts pasted rich text, and exports
 // the live HTML to .docx. Uncontrolled: innerHTML is set only on external appends
 // (version) so typing never loses the caret.
-export default function SendDoc({ html, version, onChange, resolveSlashHtml }: SendDocProps) {
+export default function SendDoc({ html, version, onChange, resolveSlashHtml, flowId = "", userId = "", userName = "Partner" }: SendDocProps) {
   const ref = useRef<HTMLDivElement>(null);
   const savedRange = useRef<Range | null>(null);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const others = usePanePresence(flowId, "send", userId, userName, focused);
 
   function refreshOutline() {
     const el = ref.current;
@@ -158,6 +164,11 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml }: S
           ))}
         </select>
         <span className="flow-sendedit__spacer" />
+        {others.length > 0 && (
+          <div className="flow-pane-presence">
+            {others.map((e) => <span key={e.uid} className="flow-pane-presence__badge" style={{ background: e.color }}>{e.name}</span>)}
+          </div>
+        )}
         <button className="db-btn db-btn--accent db-btn--sm" onClick={() => downloadHtmlAsDocx(ref.current?.innerHTML ?? html)}>
           ⬇ Download .docx
         </button>
@@ -213,6 +224,8 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml }: S
             refreshOutline();
           }}
           onInput={(e) => { onChange((e.target as HTMLDivElement).innerHTML); refreshOutline(); }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
           data-placeholder="Use an extension while flowing, paste cards, or type here…"
         />
       </div>

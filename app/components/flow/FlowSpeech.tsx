@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { fuzzyRank } from "@/lib/fuzzy";
+import { usePanePresence } from "@/lib/presence";
 import type { EditorInsert } from "@/app/flow/shared";
 
 interface FlowSpeechProps {
@@ -11,6 +12,8 @@ interface FlowSpeechProps {
   registerInsert: (fn: EditorInsert | null) => void;
   resolveSlashText?: (trigger: string) => string | null;
   slashOptions?: { trigger: string; label: string }[];
+  userId?: string;
+  userName?: string;
 }
 
 function escapeHtml(s: string): string {
@@ -30,8 +33,10 @@ function toHtml(stored: string): string {
 // neither side has to refresh. Uncontrolled (innerHTML set only on external
 // updates) so typing never loses the caret; incoming events are ignored for ~1.5s
 // after your own typing.
-export default function FlowSpeech({ flowId, initialBody, registerInsert, resolveSlashText, slashOptions = [] }: FlowSpeechProps) {
+export default function FlowSpeech({ flowId, initialBody, registerInsert, resolveSlashText, slashOptions = [], userId = "", userName = "Partner" }: FlowSpeechProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const [focused, setFocused] = useState(false);
+  const others = usePanePresence(flowId, "speech", userId, userName, focused);
   const lastTyped = useRef(0);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef("");      // newest HTML, for flush-on-unmount
@@ -158,6 +163,11 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
     <div className="flow-speech">
       <div className="flow-speech__bar">
         <button className="db-btn db-btn--glass db-btn--sm" onClick={clearSpeech}>Clear speech</button>
+        {others.length > 0 && (
+          <div className="flow-pane-presence">
+            {others.map((e) => <span key={e.uid} className="flow-pane-presence__badge" style={{ background: e.color }}>{e.name}</span>)}
+          </div>
+        )}
       </div>
       <div
         ref={ref}
@@ -202,8 +212,8 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
         }}
         onKeyUp={(e) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(e.key)) updateSlash(); }}
         onMouseUp={() => updateSlash()}
-        onFocus={() => { registerInsert(insert); }}
-        onBlur={() => { save(latest.current); setTimeout(() => setSlash(null), 120); }}
+        onFocus={() => { registerInsert(insert); setFocused(true); }}
+        onBlur={() => { save(latest.current); setFocused(false); setTimeout(() => setSlash(null), 120); }}
       />
       {dropOpen && slash && (
         <ul className="flow-slash flow-slash--fixed" role="listbox" style={{ top: slash.top + 4, left: slash.left }}>

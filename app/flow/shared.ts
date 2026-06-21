@@ -46,6 +46,7 @@ export interface FlowCell {
   depth: number;
   highlighted: boolean;
   content: string;
+  status?: string | null;   // dropped | extended | turn | answered | conceded
   updated_by: string | null;
   updated_at: string;
 }

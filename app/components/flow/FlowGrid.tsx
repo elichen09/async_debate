@@ -39,10 +39,15 @@ interface FlowGridProps {
   slashOptions?: { trigger: string; label: string }[];
   // Send one or more flow points to the Send doc as Heading-4 cards (via "/send").
   onSendPoints?: (cells: { id: string; content: string }[]) => void;
+  // Points were reordered (drag) — reflow the Send doc cards to match this order.
+  onReorder?: (orderedCellIds: string[]) => void;
 }
 
-const SEL = "id, flow_id, col, row_index, depth, highlighted, content, updated_by, updated_at";
+const SEL = "id, flow_id, col, row_index, depth, highlighted, content, status, updated_by, updated_at";
 const INDENT = 26; // px per outline level
+
+// Flag — the one status mark. Set manually (⚑ button) or with "/flag".
+const FLAG_COLOR = "#ef6f6f";
 
 function toAlpha(n: number): string {
   let s = "";
@@ -66,7 +71,7 @@ function nodeLabel(count: number, depth: number): string {
 // A debate flow as a nested outline: Enter adds a sibling point, Tab indents it
 // into a response, Shift+Tab outdents, and highlighting marks key cards. Numbers
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
-export default function FlowGrid({ flowId, userId, userName = "Partner", registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints }: FlowGridProps) {
+export default function FlowGrid({ flowId, userId, userName = "Partner", registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints, onReorder }: FlowGridProps) {
   const [cells, setCells] = useState<FlowCell[]>([]);
   const [loadError, setLoadError] = useState("");
   const cellsRef = useRef<FlowCell[]>([]);
@@ -80,6 +85,11 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // Multi-line selection (click a number / Shift-click a range) for copy/paste.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const anchorRef = useRef<string | null>(null);
+  // Collapsed subtrees (local view state), status filter, and drag-reorder.
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [flaggedOnly, setFlaggedOnly] = useState(false);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dropId, setDropId] = useState<string | null>(null);
   // Slash autocomplete: which cell is typing a "/trigger" and the partial text.
   const [slash, setSlash] = useState<{ id: string; query: string } | null>(null);
   const [slashActive, setSlashActive] = useState(0);
@@ -236,8 +246,16 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       for (const [cid, c] of batch) saveContent(cid, c);
     }, 600);
   }
-  async function saveMeta(id: string, patch: { depth?: number; highlighted?: boolean }) {
+  async function saveMeta(id: string, patch: { depth?: number; highlighted?: boolean; status?: string | null }) {
     await supabase.from("flow_cells").update({ ...patch, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id);
+  }
+
+  function setStatus(id: string, status: string | null) {
+    setLocal(id, { status });
+    saveMeta(id, { status });
+  }
+  function toggleFlag(cell: FlowCell) {
+    setStatus(cell.id, cell.status === "flag" ? null : "flag");
   }
 
   async function insertNode(row: number, depth: number, content = "", focus = true): Promise<string | null> {
@@ -348,6 +366,48 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     await supabase.from("flow_cells").delete().eq("id", cell.id);
   }
 
+  function toggleCollapse(id: string) {
+    setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  }
+
+  // Drag a point (and its whole subtree of deeper points) to drop it as a sibling
+  // right after the target, re-flowing row_index and shifting depths together.
+  function moveSubtree(draggedId: string, targetId: string) {
+    if (draggedId === targetId) return;
+    const list = sorted();
+    const di = list.findIndex((c) => c.id === draggedId);
+    if (di < 0) return;
+    const dragged = list[di];
+    let end = di + 1;
+    while (end < list.length && list[end].depth > dragged.depth) end++;
+    const subtree = list.slice(di, end);
+    const subIds = new Set(subtree.map((c) => c.id));
+    if (subIds.has(targetId)) return; // can't drop a subtree into itself
+    const target = list.find((c) => c.id === targetId);
+    if (!target) return;
+    const depthDelta = target.depth - dragged.depth;
+    const ti = list.findIndex((c) => c.id === targetId);
+    let hi = target.row_index + 1;
+    for (let i = ti + 1; i < list.length; i++) { if (!subIds.has(list[i].id)) { hi = list[i].row_index; break; } }
+    const lo = target.row_index;
+    const n = subtree.length;
+    const updates = subtree.map((c, k) => ({
+      id: c.id,
+      row_index: lo + ((hi - lo) * (k + 1)) / (n + 1),
+      depth: Math.max(0, c.depth + depthDelta),
+    }));
+    setCells((prev) => prev.map((c) => { const u = updates.find((x) => x.id === c.id); return u ? { ...c, row_index: u.row_index, depth: u.depth } : c; }));
+    for (const u of updates) {
+      supabase.from("flow_cells").update({ row_index: u.row_index, depth: u.depth, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", u.id).then(() => {});
+    }
+    // Tell the Send doc the new top-to-bottom point order so its cards reflow to match.
+    const newOrder = list
+      .map((c) => { const u = updates.find((x) => x.id === c.id); return u ? { id: c.id, row_index: u.row_index } : { id: c.id, row_index: c.row_index }; })
+      .sort((a, b) => a.row_index - b.row_index)
+      .map((c) => c.id);
+    onReorder?.(newOrder);
+  }
+
   // Click a point's number to select it; Shift-click selects a range.
   function selectLabel(cell: FlowCell, shift: boolean) {
     const ids = sorted().map((c) => c.id);
@@ -419,6 +479,18 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     clearSelection();
   }
 
+  // "/flag" (typed at the end of a point) flags it — plus any selected points —
+  // then strips the command, leaving the text. `base` is the line without "/flag".
+  function runFlag(cell: FlowCell, base: string) {
+    const ids = new Set(selected);
+    ids.add(cell.id);
+    for (const id of ids) setStatus(id, "flag");
+    setLocal(cell.id, { content: base });
+    saveContent(cell.id, base);
+    setSlash(null);
+    clearSelection();
+  }
+
   // Finish a "/trigger" from the autocomplete: fill the point with the full trigger
   // (the user then presses Enter to fire it) and close the dropdown.
   function completeSlash(cell: FlowCell, trigger: string) {
@@ -451,18 +523,32 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // Walk the ordered list, tracking a per-depth counter to build 1./a./i. labels.
   const ordered = [...cells].sort((a, b) => a.row_index - b.row_index);
   const counters: number[] = [];
-  const labeled = ordered.map((cell) => {
+  const labeled = ordered.map((cell, i) => {
     counters[cell.depth] = (counters[cell.depth] || 0) + 1;
     counters.length = cell.depth + 1; // reset deeper counters under a new parent
-    return { cell, label: nodeLabel(counters[cell.depth], cell.depth) };
+    const hasKids = i + 1 < ordered.length && ordered[i + 1].depth > cell.depth;
+    return { cell, label: nodeLabel(counters[cell.depth], cell.depth), hasKids };
   });
+
+  // Hide points inside a collapsed parent, then apply the status filter.
+  const hidden = new Set<string>();
+  let hideUnder = -1;
+  for (let i = 0; i < ordered.length; i++) {
+    const cell = ordered[i];
+    if (hideUnder >= 0 && cell.depth > hideUnder) { hidden.add(cell.id); continue; }
+    hideUnder = -1;
+    if (collapsed.has(cell.id) && labeled[i].hasKids) hideUnder = cell.depth;
+  }
+  const visible = labeled.filter(({ cell }) => !hidden.has(cell.id) && (!flaggedOnly || cell.status === "flag"));
+  const anyCollapsed = collapsed.size > 0;
 
   return (
     <div className="flow-outline">
       {loadError && (
         <p className="flow-outline__error">
-          ⚑ Couldn’t load the flow: {loadError}. If this mentions “depth” or
-          “highlighted”, run the flow_cells migration in Supabase.
+          ⚑ Couldn’t load the flow: {loadError}. If this mentions “depth”,
+          “highlighted”, or “status”, run the flow_cells migrations in Supabase
+          (flows.sql and flow_cell_status.sql).
         </p>
       )}
       {!loadError && labeled.length === 0 && (
@@ -476,16 +562,36 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
           {selected.size > 0 && (
             <button className="db-btn db-btn--glass db-btn--sm" onClick={clearSelection}>Deselect</button>
           )}
-          <span className="flow-outline__bar-hint">Click a number to select · Shift-click for a range</span>
+          <button className={`db-btn db-btn--glass db-btn--sm ${flaggedOnly ? "is-active" : ""}`} onClick={() => setFlaggedOnly((f) => !f)} title="Show only flagged points">
+            ⚑ {flaggedOnly ? "Showing flagged" : "Only flagged"}
+          </button>
+          <button className="db-btn db-btn--glass db-btn--sm" onClick={() => (anyCollapsed ? setCollapsed(new Set()) : setCollapsed(new Set(labeled.filter((l) => l.hasKids).map((l) => l.cell.id))))}>
+            {anyCollapsed ? "Expand all" : "Collapse all"}
+          </button>
+          <span className="flow-outline__bar-hint">Drag ⠿ to move · click a number to select</span>
           <button className="db-btn db-btn--glass db-btn--sm" onClick={clearAll}>Clear flow</button>
         </div>
       )}
-      {labeled.map(({ cell, label }) => (
+      {visible.map(({ cell, label, hasKids }) => (
         <div
           key={cell.id}
-          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""}`}
-          style={{ marginLeft: cell.depth * INDENT, ...(remoteEditors[cell.id]?.length ? { boxShadow: `inset 0 0 0 1.5px ${remoteEditors[cell.id][0].color}` } : {}) }}
+          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${dropId === cell.id ? "is-drop" : ""}`}
+          style={{ marginLeft: cell.depth * INDENT, ...(remoteEditors[cell.id]?.length ? { boxShadow: `inset 0 0 0 1.5px ${remoteEditors[cell.id][0].color}` } : cell.status === "flag" ? { boxShadow: `inset 3px 0 0 ${FLAG_COLOR}` } : {}) }}
+          onDragOver={(e) => { if (dragId && dragId !== cell.id) { e.preventDefault(); setDropId(cell.id); } }}
+          onDrop={(e) => { e.preventDefault(); if (dragId) moveSubtree(dragId, cell.id); setDragId(null); setDropId(null); }}
         >
+          <span
+            className="flow-node__drag"
+            draggable
+            title="Drag to move this point (and its sub-points)"
+            onDragStart={(e) => { setDragId(cell.id); e.dataTransfer.effectAllowed = "move"; }}
+            onDragEnd={() => { setDragId(null); setDropId(null); }}
+          >⠿</span>
+          {hasKids ? (
+            <button className="flow-node__fold" onClick={() => toggleCollapse(cell.id)} aria-label={collapsed.has(cell.id) ? "Expand" : "Collapse"} title={collapsed.has(cell.id) ? "Expand" : "Collapse"}>{collapsed.has(cell.id) ? "▸" : "▾"}</button>
+          ) : (
+            <span className="flow-node__fold flow-node__fold--leaf" />
+          )}
           <span
             className="flow-node__label"
             role="button"
@@ -494,6 +600,9 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             onClick={(e) => selectLabel(cell, e.shiftKey)}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectLabel(cell, false); } }}
           >{label}</span>
+          {cell.status === "flag" && (
+            <span className="flow-node__statustag" style={{ background: FLAG_COLOR }}>⚑</span>
+          )}
           <textarea
             className="flow-node__text"
             value={cell.content}
@@ -527,6 +636,11 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
                 // selected points) to the Send doc; strip the command off the line.
                 if (/(^|\s)\/send\s*$/i.test(ta.value)) {
                   runSend(cell, ta.value.replace(/(^|\s)\/send\s*$/i, "").trim());
+                  return;
+                }
+                // "/flag" → flag this line (and any selected points), strip the command.
+                if (/(^|\s)\/flag\s*$/i.test(ta.value)) {
+                  runFlag(cell, ta.value.replace(/(^|\s)\/flag\s*$/i, "").trim());
                   return;
                 }
                 const m = /^\/(\S+)$/.exec(ta.value.trim());
@@ -607,6 +721,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             </ul>
           )}
           <div className="flow-node__tools">
+            <button className={`flow-node__btn ${cell.status === "flag" ? "is-flag" : ""}`} onClick={() => toggleFlag(cell)} title="Flag (or type /flag)" aria-label="Flag">⚑</button>
             <button className="flow-node__btn flow-node__btn--sub" onClick={() => addChild(cell)} title="Add sub-point inside" aria-label="Add sub-point">↳+</button>
             <button className="flow-node__btn" onClick={() => reIndent(cell, -1)} title="Outdent (Shift+Tab)" aria-label="Outdent">←</button>
             <button className="flow-node__btn" onClick={() => reIndent(cell, 1)} title="Indent (Tab)" aria-label="Indent">→</button>
