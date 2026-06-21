@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { downloadHtmlAsDocx } from "@/lib/sendDocExport";
 import { usePanePresence } from "@/lib/presence";
+import { caretOffsetIn } from "@/lib/caret";
+import RemoteCarets from "@/app/components/flow/RemoteCarets";
 
 interface SendDocProps {
   html: string;
@@ -26,7 +28,9 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, flo
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
   const [focused, setFocused] = useState(false);
-  const others = usePanePresence(flowId, "send", userId, userName, focused);
+  const [myCaret, setMyCaret] = useState<number | null>(null);
+  const others = usePanePresence(flowId, "send", userId, userName, focused, focused ? myCaret : null);
+  const trackCaret = () => { if (ref.current) setMyCaret(caretOffsetIn(ref.current)); };
 
   function refreshOutline() {
     const el = ref.current;
@@ -198,6 +202,7 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, flo
           )}
         </nav>
 
+        <div className="flow-sendedit__docwrap">
         <div
           ref={ref}
           className="flow-sendedit__doc"
@@ -223,11 +228,15 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, flo
             if (ref.current) onChange(ref.current.innerHTML);
             refreshOutline();
           }}
-          onInput={(e) => { onChange((e.target as HTMLDivElement).innerHTML); refreshOutline(); }}
-          onFocus={() => setFocused(true)}
+          onInput={(e) => { onChange((e.target as HTMLDivElement).innerHTML); refreshOutline(); trackCaret(); }}
+          onKeyUp={() => trackCaret()}
+          onMouseUp={() => trackCaret()}
+          onFocus={() => { setFocused(true); trackCaret(); }}
           onBlur={() => setFocused(false)}
           data-placeholder="Use an extension while flowing, paste cards, or type here…"
         />
+        <RemoteCarets editorRef={ref} editors={others} />
+        </div>
       </div>
     </div>
   );

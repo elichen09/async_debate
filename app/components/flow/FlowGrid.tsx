@@ -370,28 +370,39 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     setCollapsed((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }
 
-  // Drag a point (and its whole subtree of deeper points) to drop it as a sibling
-  // right after the target, re-flowing row_index and shifting depths together.
+  // Drag to drop point(s) as siblings right after the target, re-flowing row_index
+  // and shifting depths together. Moves the dragged point's whole subtree — OR, if
+  // you drag a point that's part of a multi-selection, the entire selection (each
+  // with its subtree) is grouped and moved together.
   function moveSubtree(draggedId: string, targetId: string) {
     if (draggedId === targetId) return;
     const list = sorted();
-    const di = list.findIndex((c) => c.id === draggedId);
-    if (di < 0) return;
-    const dragged = list[di];
-    let end = di + 1;
-    while (end < list.length && list[end].depth > dragged.depth) end++;
-    const subtree = list.slice(di, end);
-    const subIds = new Set(subtree.map((c) => c.id));
-    if (subIds.has(targetId)) return; // can't drop a subtree into itself
+    if (!list.some((c) => c.id === draggedId)) return;
     const target = list.find((c) => c.id === targetId);
     if (!target) return;
-    const depthDelta = target.depth - dragged.depth;
+    // Roots to move: the whole selection (if dragging a selected point), else just
+    // the dragged point. Expand each root to include its subtree.
+    const rootIds = selected.size > 1 && selected.has(draggedId)
+      ? list.filter((c) => selected.has(c.id)).map((c) => c.id)
+      : [draggedId];
+    const moveSet = new Set<string>();
+    for (const rid of rootIds) {
+      const ri = list.findIndex((c) => c.id === rid);
+      if (ri < 0) continue;
+      const rd = list[ri].depth;
+      moveSet.add(rid);
+      for (let i = ri + 1; i < list.length && list[i].depth > rd; i++) moveSet.add(list[i].id);
+    }
+    if (moveSet.has(targetId)) return; // can't drop the group into itself
+    const moving = list.filter((c) => moveSet.has(c.id)); // document order
+    const minDepth = Math.min(...moving.map((c) => c.depth));
+    const depthDelta = target.depth - minDepth;
     const ti = list.findIndex((c) => c.id === targetId);
     let hi = target.row_index + 1;
-    for (let i = ti + 1; i < list.length; i++) { if (!subIds.has(list[i].id)) { hi = list[i].row_index; break; } }
+    for (let i = ti + 1; i < list.length; i++) { if (!moveSet.has(list[i].id)) { hi = list[i].row_index; break; } }
     const lo = target.row_index;
-    const n = subtree.length;
-    const updates = subtree.map((c, k) => ({
+    const n = moving.length;
+    const updates = moving.map((c, k) => ({
       id: c.id,
       row_index: lo + ((hi - lo) * (k + 1)) / (n + 1),
       depth: Math.max(0, c.depth + depthDelta),
@@ -406,6 +417,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       .sort((a, b) => a.row_index - b.row_index)
       .map((c) => c.id);
     onReorder?.(newOrder);
+    if (rootIds.length > 1) clearSelection();
   }
 
   // Click a point's number to select it; Shift-click selects a range.
@@ -568,14 +580,14 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
           <button className="db-btn db-btn--glass db-btn--sm" onClick={() => (anyCollapsed ? setCollapsed(new Set()) : setCollapsed(new Set(labeled.filter((l) => l.hasKids).map((l) => l.cell.id))))}>
             {anyCollapsed ? "Expand all" : "Collapse all"}
           </button>
-          <span className="flow-outline__bar-hint">Drag ⠿ to move · click a number to select</span>
+          <span className="flow-outline__bar-hint">Select numbers, then drag ⠿ to move them as a group</span>
           <button className="db-btn db-btn--glass db-btn--sm" onClick={clearAll}>Clear flow</button>
         </div>
       )}
       {visible.map(({ cell, label, hasKids }) => (
         <div
           key={cell.id}
-          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${dropId === cell.id ? "is-drop" : ""}`}
+          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${dropId === cell.id ? "is-drop" : ""} ${dragId === cell.id || (dragId && selected.size > 1 && selected.has(dragId) && selected.has(cell.id)) ? "is-drag" : ""}`}
           style={{ marginLeft: cell.depth * INDENT, ...(remoteEditors[cell.id]?.length ? { boxShadow: `inset 0 0 0 1.5px ${remoteEditors[cell.id][0].color}` } : cell.status === "flag" ? { boxShadow: `inset 3px 0 0 ${FLAG_COLOR}` } : {}) }}
           onDragOver={(e) => { if (dragId && dragId !== cell.id) { e.preventDefault(); setDropId(cell.id); } }}
           onDrop={(e) => { e.preventDefault(); if (dragId) moveSubtree(dragId, cell.id); setDragId(null); setDropId(null); }}

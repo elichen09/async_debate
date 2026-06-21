@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { fuzzyRank } from "@/lib/fuzzy";
 import { usePanePresence } from "@/lib/presence";
+import { caretOffsetIn } from "@/lib/caret";
+import RemoteCarets from "@/app/components/flow/RemoteCarets";
 import type { EditorInsert } from "@/app/flow/shared";
 
 interface FlowSpeechProps {
@@ -36,7 +38,9 @@ function toHtml(stored: string): string {
 export default function FlowSpeech({ flowId, initialBody, registerInsert, resolveSlashText, slashOptions = [], userId = "", userName = "Partner" }: FlowSpeechProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
-  const others = usePanePresence(flowId, "speech", userId, userName, focused);
+  const [myCaret, setMyCaret] = useState<number | null>(null);
+  const others = usePanePresence(flowId, "speech", userId, userName, focused, focused ? myCaret : null);
+  const trackCaret = () => { if (ref.current) setMyCaret(caretOffsetIn(ref.current)); };
   const lastTyped = useRef(0);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latest = useRef("");      // newest HTML, for flush-on-unmount
@@ -169,6 +173,7 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
           </div>
         )}
       </div>
+      <div className="flow-speech__editwrap">
       <div
         ref={ref}
         className="flow-speech__text"
@@ -176,7 +181,7 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
         suppressContentEditableWarning
         spellCheck={false}
         data-placeholder="Write your speech here — your partner can edit it too."
-        onInput={onInput}
+        onInput={() => { onInput(); trackCaret(); }}
         onKeyDown={(e) => {
           // Trigger autocomplete navigation while the dropdown is open.
           if (dropOpen) {
@@ -210,11 +215,13 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
           setSlash(null);
           onInput();
         }}
-        onKeyUp={(e) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(e.key)) updateSlash(); }}
-        onMouseUp={() => updateSlash()}
-        onFocus={() => { registerInsert(insert); setFocused(true); }}
+        onKeyUp={(e) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(e.key)) updateSlash(); trackCaret(); }}
+        onMouseUp={() => { updateSlash(); trackCaret(); }}
+        onFocus={() => { registerInsert(insert); setFocused(true); trackCaret(); }}
         onBlur={() => { save(latest.current); setFocused(false); setTimeout(() => setSlash(null), 120); }}
       />
+      <RemoteCarets editorRef={ref} editors={others} />
+      </div>
       {dropOpen && slash && (
         <ul className="flow-slash flow-slash--fixed" role="listbox" style={{ top: slash.top + 4, left: slash.left }}>
           {slashMatches.map((o, i) => (
