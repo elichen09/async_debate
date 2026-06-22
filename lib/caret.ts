@@ -27,9 +27,13 @@ export function rectForOffset(el: HTMLElement, offset: number): { left: number; 
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
   let node: Text | null = null;
   let localOff = 0;
+  let lastNode: Text | null = null;
+  let lastLen = 0;
   let n: Node | null;
   while ((n = walker.nextNode())) {
     const len = (n.textContent ?? "").length;
+    lastNode = n as Text;
+    lastLen = len;
     if (remaining <= len) { node = n as Text; localOff = remaining; break; }
     remaining -= len;
   }
@@ -47,6 +51,11 @@ export function rectForOffset(el: HTMLElement, offset: number): { left: number; 
     const len = (node.textContent ?? "").length;
     if (localOff > 0) { const m = measure(node, localOff - 1, localOff, "right"); if (m) return m; }
     if (len > 0) { const m = measure(node, Math.min(localOff, len - 1), Math.min(localOff + 1, len), "left"); if (m) return m; }
+  } else if (lastNode && lastLen > 0) {
+    // Offset is past the rendered text (content hasn't synced yet) — clamp to the
+    // end of what's there instead of snapping to the top-left corner.
+    const m = measure(lastNode, lastLen - 1, lastLen, "right");
+    if (m) return m;
   }
   // Empty editor / no text — anchor at the content start.
   return { left: 2, top: 2, height: lineH };

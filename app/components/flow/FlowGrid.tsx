@@ -254,8 +254,19 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     setLocal(id, { status });
     saveMeta(id, { status });
   }
+  // A point's id plus all of its deeper descendants (the subtree under it).
+  function subtreeIds(id: string): string[] {
+    const list = sorted();
+    const i = list.findIndex((c) => c.id === id);
+    if (i < 0) return [id];
+    const out = [id];
+    for (let j = i + 1; j < list.length && list[j].depth > list[i].depth; j++) out.push(list[j].id);
+    return out;
+  }
+  // Flagging a point flags its whole subtree (sub-points) too; unflag clears them.
   function toggleFlag(cell: FlowCell) {
-    setStatus(cell.id, cell.status === "flag" ? null : "flag");
+    const v = cell.status === "flag" ? null : "flag";
+    for (const id of subtreeIds(cell.id)) setStatus(id, v);
   }
 
   async function insertNode(row: number, depth: number, content = "", focus = true): Promise<string | null> {
@@ -492,8 +503,9 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // "/flag" (typed at the end of a point) flags it — plus any selected points —
   // then strips the command, leaving the text. `base` is the line without "/flag".
   function runFlag(cell: FlowCell, base: string) {
-    const ids = new Set(selected);
-    ids.add(cell.id);
+    const ids = new Set<string>();
+    for (const sid of selected) for (const d of subtreeIds(sid)) ids.add(d);
+    for (const d of subtreeIds(cell.id)) ids.add(d);
     for (const id of ids) setStatus(id, "flag");
     setLocal(cell.id, { content: base });
     saveContent(cell.id, base);
