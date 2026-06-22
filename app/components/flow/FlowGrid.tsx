@@ -235,16 +235,17 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     await supabase.from("flow_cells").update({ content, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id);
   }
 
-  // Debounced autosave while typing, so a partner sees edits (and they persist)
-  // without waiting for blur.
+  // Throttled autosave while typing (flush every ~250ms), so a partner sees edits
+  // stream in — not only after you pause.
   function scheduleSave(id: string, content: string) {
     pending.current.set(id, content);
-    if (saveTimer.current) clearTimeout(saveTimer.current);
+    if (saveTimer.current) return;
     saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
       const batch = Array.from(pending.current.entries());
       pending.current.clear();
       for (const [cid, c] of batch) saveContent(cid, c);
-    }, 600);
+    }, 250);
   }
   async function saveMeta(id: string, patch: { depth?: number; highlighted?: boolean; status?: string | null }) {
     await supabase.from("flow_cells").update({ ...patch, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id);

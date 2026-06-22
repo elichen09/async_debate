@@ -107,14 +107,15 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
     await supabase.from("flows").update({ speech_body: html }).eq("id", flowId);
   }
 
-  // Mark a local edit and autosave shortly after typing stops.
+  // Mark a local edit and autosave on a steady cadence *while* typing (throttle, not
+  // debounce) so a partner sees text stream in — not just after you pause.
   function onInput() {
     const html = ref.current?.innerHTML ?? "";
     latest.current = html;
     dirty.current = true;
     lastTyped.current = Date.now();
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => save(html), 400);
+    if (saveTimer.current) return;
+    saveTimer.current = setTimeout(() => { saveTimer.current = null; save(latest.current); }, 200);
   }
 
   function insert(text: string) {

@@ -204,9 +204,11 @@ export default function FlowWorkspace() {
     const { error } = await supabase.from(t[0]).update({ send_html: html }).eq("id", t[1]);
     if (error) console.error("Send doc save failed:", error.message);
   }
-  function scheduleSendSave(html: string) {
-    if (sendSaveTimer.current) clearTimeout(sendSaveTimer.current);
-    sendSaveTimer.current = setTimeout(() => { saveSend(html); }, 600);
+  function scheduleSendSave() {
+    // Throttle (not debounce) so collaborators see Send-doc edits stream in; the
+    // timer saves the latest html (from the ref) when it fires.
+    if (sendSaveTimer.current) return;
+    sendSaveTimer.current = setTimeout(() => { sendSaveTimer.current = null; saveSend(sendHtmlRef.current); }, 300);
   }
   function applyRemoteSend(html: string) {
     sendHtmlRef.current = html;
@@ -220,7 +222,7 @@ export default function FlowWorkspace() {
     setSendHtml(html);
     if (bump) setSendVersion((v) => v + 1);
     lastSendEdit.current = Date.now();
-    scheduleSendSave(html);
+    scheduleSendSave();
   }
   const handleSendChange = (html: string) => commitSend(html, false);
 
