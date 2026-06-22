@@ -57,6 +57,7 @@ export function rectForOffset(el: HTMLElement, offset: number): { left: number; 
     const m = measure(lastNode, lastLen - 1, lastLen, "right");
     if (m) return m;
   }
-  // Empty editor / no text — anchor at the content start.
-  return { left: 2, top: 2, height: lineH };
+  // No measurable position (empty editor / unresolved) — hide the cursor rather
+  // than parking it in the top-left corner (which looks broken).
+  return null;
 }

@@ -208,7 +208,7 @@ export default function FlowWorkspace() {
     // Throttle (not debounce) so collaborators see Send-doc edits stream in; the
     // timer saves the latest html (from the ref) when it fires.
     if (sendSaveTimer.current) return;
-    sendSaveTimer.current = setTimeout(() => { sendSaveTimer.current = null; saveSend(sendHtmlRef.current); }, 300);
+    sendSaveTimer.current = setTimeout(() => { sendSaveTimer.current = null; saveSend(sendHtmlRef.current); }, 600);
   }
   function applyRemoteSend(html: string) {
     sendHtmlRef.current = html;

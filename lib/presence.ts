@@ -95,7 +95,7 @@ export function usePanePresence(flowId: string, scope: string, userId: string, u
     sendTimer.current = setTimeout(() => {
       sendTimer.current = null;
       chRef.current?.send({ type: "broadcast", event: "here", payload: { uid: userId, name: nameRef.current, color: colorFor(userId), scope, caret: caretRef.current } as PaneMsg });
-    }, 90);
+    }, 175);
   }, [active, caret, userId, scope]);
 
   return editors;
