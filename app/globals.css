@@ -3288,6 +3288,9 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
 /* The site's vertical nav rail stays hidden here; expose the ☰ menu instead so
    the full nav drawer is reachable on desktop too. */
 html.flow-route .gh-siderail { display: none; }
+/* Full-bleed workspace: the rail is hidden here, so reclaim the side padding
+   .db-main reserves for it (otherwise a dead strip sits on the right). */
+html.flow-route .db-main { padding-left: 0 !important; padding-right: 0 !important; }
 html.flow-route .gh-topnav__burger {
   display: flex;
   align-items: center;
@@ -4644,6 +4647,21 @@ html.gh-light .flow-foldertab.is-active { background: var(--accent); border-colo
 .flow-pane__resizer::before { content: ""; width: 3px; height: 38px; border-radius: 2px; background: rgba(70, 45, 20, 0.2); transition: background 0.15s ease, height 0.15s ease; }
 .flow-pane__resizer:hover::before, .flow-pane__resizer.is-active::before { background: var(--accent); height: 72px; }
 body.flow-resizing { cursor: col-resize; user-select: none; }
+
+/* Split panes: editors fill their pane so the canvas uses the whole width and you
+   can stretch a pane wider for more room. */
+.flow-pane .flow-sendedit,
+.flow-pane .flow-speech,
+.flow-pane .flow-outline { max-width: none; width: 100%; }
+
+/* Single (un-split) view: the pane itself becomes a centered, document-width column
+   on the bare paper canvas — no full-width white sheet, no big empty margins. The
+   Send doc gets more room for its outline + page. */
+.flow-pane--solo,
+html.gh-light .flow-pane--solo { background: transparent; border-color: transparent; box-shadow: none; }
+.flow-pane--solo { flex: 0 1 auto; width: 100%; margin-left: auto; margin-right: auto; }
+.flow-pane--solo[data-view="flow"], .flow-pane--solo[data-view="speech"] { max-width: 880px; }
+.flow-pane--solo[data-view="send"] { max-width: 1040px; }
 
 /* Send doc adapts to a narrow split pane: smaller type, tighter padding, the
    outline collapses so the document never looks smooshed. */

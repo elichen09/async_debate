@@ -493,7 +493,7 @@ export default function FlowWorkspace() {
                   onPointerDown={(e) => startResize(e, panes[i - 1].key, pane.key)}
                 />
               )}
-              <section className="flow-pane" style={{ flexGrow: flexes[pane.key] ?? 1 }}>
+              <section className={`flow-pane ${panes.length === 1 ? "flow-pane--solo" : ""}`} data-view={pane.view} style={{ flexGrow: panes.length === 1 ? undefined : (flexes[pane.key] ?? 1) }}>
                 {panes.length > 1 && (
                   <div className="flow-pane__head">
                     <span className="flow-pane__title" title={title}>{title}</span>
