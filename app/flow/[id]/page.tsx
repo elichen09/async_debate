@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { blockToHtml, cardHtml } from "@/lib/richText";
@@ -118,6 +118,7 @@ export default function FlowWorkspace() {
   // Split view: any number of side-by-side panes. Each is a view of a flow; the
   // Speech/Send panes always target the URL flow, Flow panes can be any sibling.
   const [panes, setPanes] = useState<Pane[]>([{ key: "p0", view: "flow", flowId }]);
+  const [flexes, setFlexes] = useState<Record<string, number>>({});  // per-pane flex-grow weights (drag to resize)
   const [showSnippets, setShowSnippets] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -133,6 +134,7 @@ export default function FlowWorkspace() {
   if (prevFlowId !== flowId) {
     setPrevFlowId(flowId);
     setPanes([{ key: `main-${flowId}`, view: "flow", flowId }]);
+    setFlexes({});
   }
 
   const activeInsert = useRef<EditorInsert | null>(null);
@@ -141,6 +143,8 @@ export default function FlowWorkspace() {
   const snippetsRef = useRef<FlowSnippet[]>([]);
   const panesRef = useRef(panes);
   const paneSeq = useRef(1);
+  const flexesRef = useRef(flexes);
+  useEffect(() => { flexesRef.current = flexes; }, [flexes]);
   const savedFlowPanesRef = useRef<Pane[]>(panes);   // last flow-pane arrangement, restored by the Flow tab
   const sendHtmlRef = useRef("");
   const lastSendEdit = useRef(0);
@@ -166,6 +170,7 @@ export default function FlowWorkspace() {
   // restores your last flow arrangement — so a 2-flow split survives a trip to
   // Speech/Send and back. Speech/Send are always a single pane for the URL flow.
   function setView(view: ViewKind) {
+    setFlexes({});
     if (view === "flow") {
       const restore = savedFlowPanesRef.current.length ? savedFlowPanesRef.current : [{ key: `p${paneSeq.current++}`, view: "flow" as ViewKind, flowId }];
       setPanes(restore);
@@ -178,6 +183,7 @@ export default function FlowWorkspace() {
   // Split EXPLICITLY: add a view (for the URL flow) or another flow as a new pane.
   function addPane(view: ViewKind, fid: string = flowId) {
     const key = `p${paneSeq.current++}`;
+    setFlexes({});  // reset to equal widths when the set of panes changes
     setPanes((prev) => (prev.some((p) => p.view === view && p.flowId === fid) ? prev : [...prev, { key, view, flowId: fid }]));
   }
   function onSplit(value: string) {
@@ -185,7 +191,37 @@ export default function FlowWorkspace() {
     else if (value.startsWith("flow:")) addPane("flow", value.slice(5));
   }
   function closePane(key: string) {
+    setFlexes({});
     setPanes((prev) => (prev.length > 1 ? prev.filter((p) => p.key !== key) : prev));
+  }
+  // Drag a divider to stretch/shrink the two panes on either side. Conserves the
+  // pair's combined width, so other panes stay put. flex-grow ratios = width ratios
+  // (panes have flex-basis 0).
+  function startResize(e: React.PointerEvent, leftKey: string, rightKey: string) {
+    e.preventDefault();
+    const resizer = e.currentTarget as HTMLElement;
+    const leftEl = resizer.previousElementSibling as HTMLElement | null;
+    const rightEl = resizer.nextElementSibling as HTMLElement | null;
+    if (!leftEl || !rightEl) return;
+    const leftW0 = leftEl.offsetWidth;
+    const pairPx = leftW0 + rightEl.offsetWidth;
+    const startX = e.clientX;
+    const combined = (flexesRef.current[leftKey] ?? 1) + (flexesRef.current[rightKey] ?? 1);
+    resizer.classList.add("is-active");
+    const onMove = (ev: PointerEvent) => {
+      const nl = leftW0 + (ev.clientX - startX);
+      const ratio = Math.max(0.12, Math.min(0.88, nl / pairPx));
+      setFlexes((prev) => ({ ...prev, [leftKey]: combined * ratio, [rightKey]: combined * (1 - ratio) }));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      resizer.classList.remove("is-active");
+      document.body.classList.remove("flow-resizing");
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    document.body.classList.add("flow-resizing");
   }
 
   // --- Send doc persistence (shared across a folder's flows; per-flow if ungrouped) ---
@@ -387,6 +423,31 @@ export default function FlowWorkspace() {
     <div className={`flow-work ${fullscreen ? "flow-work--full" : ""}`}>
       <header className="flow-work__head">
         <h1 className="flow-work__title">{flow.title}</h1>
+        {siblings.length > 1 && (
+          <div className="flow-foldertabs" role="tablist" aria-label="Flows in this folder">
+            {siblings.map((s) => (
+              <button
+                key={s.id}
+                className={`flow-foldertab ${s.id === flowId ? "is-active" : ""}`}
+                onClick={() => s.id !== flowId && router.push(`/flow/${s.id}`)}
+                title={s.title}
+              >
+                {s.title}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flow-work__actions">
+          <button className={`flow-pill ${showTimers ? "is-active" : ""}`} onClick={() => setShowTimers((s) => !s)} title="Toggle timers">⏱ Timers</button>
+          <button className="flow-pill" onClick={() => setFullscreen((f) => !f)} title="Toggle fullscreen">{fullscreen ? "⤡ Exit" : "⤢ Fullscreen"}</button>
+          <button className={`flow-pill ${showSnippets ? "is-active" : ""}`} onClick={() => setShowSnippets((s) => !s)}>Extensions</button>
+          <button className="flow-pill" onClick={() => setShowShare(true)}>Share</button>
+        </div>
+      </header>
+
+      {showTimers && <FlowTimers flowId={flowId} />}
+
+      <div className="flow-viewbar">
         <div className="flow-work__tabs" role="group" aria-label="View">
           <button className={`flow-tab ${isSoloView("flow") ? "is-active" : ""}`} onClick={() => setView("flow")}>Flow</button>
           <button className={`flow-tab ${isSoloView("speech") ? "is-active" : ""}`} onClick={() => setView("speech")}>Speech</button>
@@ -412,40 +473,27 @@ export default function FlowWorkspace() {
             </optgroup>
           )}
         </select>
-        <div className="flow-work__actions">
-          <button className={`flow-pill ${showTimers ? "is-active" : ""}`} onClick={() => setShowTimers((s) => !s)} title="Toggle timers">⏱ Timers</button>
-          <button className="flow-pill" onClick={() => setFullscreen((f) => !f)} title="Toggle fullscreen">{fullscreen ? "⤡ Exit" : "⤢ Fullscreen"}</button>
-          <button className={`flow-pill ${showSnippets ? "is-active" : ""}`} onClick={() => setShowSnippets((s) => !s)}>Extensions</button>
-          <button className="flow-pill" onClick={() => setShowShare(true)}>Share</button>
-        </div>
-      </header>
-
-      {showTimers && <FlowTimers flowId={flowId} />}
-
-      {siblings.length > 1 && (
-        <div className="flow-foldertabs" role="tablist" aria-label="Flows in this folder">
-          {siblings.map((s) => (
-            <button
-              key={s.id}
-              className={`flow-foldertab ${s.id === flowId ? "is-active" : ""}`}
-              onClick={() => s.id !== flowId && router.push(`/flow/${s.id}`)}
-              title={s.title}
-            >
-              {s.title}
-            </button>
-          ))}
-        </div>
-      )}
+      </div>
 
       <div className="flow-work__body">
         <div className="flow-work__panes">
-          {panes.map((pane) => {
+          {panes.map((pane, i) => {
             const title =
               pane.view === "speech" ? "Speech" :
               pane.view === "send" ? "Send doc" :
               (pane.flowId === flowId ? flow.title : siblings.find((s) => s.id === pane.flowId)?.title ?? "Flow");
             return (
-              <section className="flow-pane" key={pane.key}>
+              <Fragment key={pane.key}>
+              {i > 0 && (
+                <div
+                  className="flow-pane__resizer"
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="Resize panes"
+                  onPointerDown={(e) => startResize(e, panes[i - 1].key, pane.key)}
+                />
+              )}
+              <section className="flow-pane" style={{ flexGrow: flexes[pane.key] ?? 1 }}>
                 {panes.length > 1 && (
                   <div className="flow-pane__head">
                     <span className="flow-pane__title" title={title}>{title}</span>
@@ -464,6 +512,7 @@ export default function FlowWorkspace() {
                   )}
                 </div>
               </section>
+              </Fragment>
             );
           })}
         </div>

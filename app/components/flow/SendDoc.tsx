@@ -177,11 +177,6 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, flo
           ))}
         </select>
         <span className="flow-sendedit__spacer" />
-        {others.length > 0 && (
-          <div className="flow-pane-presence">
-            {others.map((e) => <span key={e.uid} className="flow-pane-presence__badge" style={{ background: e.color }}>{e.name}</span>)}
-          </div>
-        )}
         <button className="db-btn db-btn--accent db-btn--sm" onClick={() => downloadHtmlAsDocx(ref.current?.innerHTML ?? html)}>
           ⬇ Download .docx
         </button>

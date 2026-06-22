@@ -178,11 +178,6 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
     <div className="flow-speech">
       <div className="flow-speech__bar">
         <button className="db-btn db-btn--glass db-btn--sm" onClick={clearSpeech}>Clear speech</button>
-        {others.length > 0 && (
-          <div className="flow-pane-presence">
-            {others.map((e) => <span key={e.uid} className="flow-pane-presence__badge" style={{ background: e.color }}>{e.name}</span>)}
-          </div>
-        )}
       </div>
       <div className="flow-speech__editwrap">
       <div
