@@ -72,10 +72,12 @@ const TAG_CAL_LEN = avgWordLen(TAG_POOL.join(" "));
 
 // Reading slows on (a) longer words and (b) long stretches (fatigue).
 const WORDLEN_ALPHA = 0.6;     // how strongly word length matters (0 = not at all)
-const FRESH_SEC = 30;          // the first 30s read at the fresh, calibrated pace
-const FATIGUE_STEP_SEC = 10;   // after that, every 15s of reading...
-const FATIGUE_PER_STEP = 0.01; // ...adds 1.5% time
-const MAX_FATIGUE = 1.3;       // cap the fatigue penalty at +50%
+// Tuned for PF, where the longest speech is 4 min: the log curve does its work
+// inside that window (≈+12% by the 4-min mark) rather than ramping over 15+ min.
+const FRESH_SEC = 20;       // the first 30s read at the fresh, calibrated pace
+const FATIGUE_COEF = 0.06;  // strength of the slow-down — fatigue grows logarithmically
+const FATIGUE_SCALE = 35;   // seconds; how quickly the log curve ramps in
+const MAX_FATIGUE = 1.15;   // cap the fatigue penalty at +15%
 
 // WPM multiplier for word length: <1 when the doc's words run longer than the
 // calibration words. Dampened (^alpha) and clamped so it can't run away.
@@ -84,14 +86,16 @@ function lenFactor(docLen: number, calLen: number): number {
   return Math.min(1.2, Math.max(0.6, Math.pow(calLen / docLen, WORDLEN_ALPHA)));
 }
 
-// Estimated read time (seconds): apply each calibrated rate, adjusted for the
-// doc's word length, then inflate the whole thing for fatigue on long reads.
+// Estimated read time (seconds): apply each calibrated rate, adjusted for word
+// length. Fatigue (driven by total time on feet) then inflates ONLY the card
+// text — tags/cites are read deliberately for clarity and don't fatigue.
 function estimateSeconds(bodyWords: number, tagWords: number, bodyLen: number, tagLen: number, rates: Rates): number {
   const cardRate = rates.cardWpm * lenFactor(bodyLen, CARD_CAL_LEN);
   const tagRate = rates.tagWpm * lenFactor(tagLen, TAG_CAL_LEN);
-  const base = (cardRate ? bodyWords / cardRate : 0) * 60 + (tagRate ? tagWords / tagRate : 0) * 60;
-  const fatigue = Math.min(MAX_FATIGUE, 1 + FATIGUE_PER_STEP * (Math.max(0, base - FRESH_SEC) / FATIGUE_STEP_SEC));
-  return base * fatigue;
+  const baseCard = cardRate ? bodyWords / cardRate * 60 : 0;
+  const baseTag = tagRate ? tagWords / tagRate * 60 : 0;
+  const fatigue = Math.min(MAX_FATIGUE, 1 + FATIGUE_COEF * Math.log(1 + Math.max(0, baseCard + baseTag - FRESH_SEC) / FATIGUE_SCALE));
+  return baseCard * fatigue + baseTag;
 }
 
 // Count the read-doc words you read slowly (tags + cites) vs at card pace (body),
