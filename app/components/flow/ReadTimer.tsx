@@ -71,11 +71,11 @@ const CARD_CAL_LEN = avgWordLen(CARD_POOL.join(" "));
 const TAG_CAL_LEN = avgWordLen(TAG_POOL.join(" "));
 
 // Reading slows on (a) longer words and (b) long stretches (fatigue).
-const WORDLEN_ALPHA = 0.7;     // how strongly word length matters (0 = not at all)
+const WORDLEN_ALPHA = 0.6;     // how strongly word length matters (0 = not at all)
 const FRESH_SEC = 30;          // the first 30s read at the fresh, calibrated pace
-const FATIGUE_STEP_SEC = 10;   // after that, every 10s of reading...
-const FATIGUE_PER_STEP = 0.015; // ...adds 1% time
-const MAX_FATIGUE = 1.5;       // cap the fatigue penalty at +50%
+const FATIGUE_STEP_SEC = 10;   // after that, every 15s of reading...
+const FATIGUE_PER_STEP = 0.01; // ...adds 1.5% time
+const MAX_FATIGUE = 1.3;       // cap the fatigue penalty at +50%
 
 // WPM multiplier for word length: <1 when the doc's words run longer than the
 // calibration words. Dampened (^alpha) and clamped so it can't run away.
