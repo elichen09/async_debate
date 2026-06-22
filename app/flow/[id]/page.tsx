@@ -437,17 +437,6 @@ export default function FlowWorkspace() {
             ))}
           </div>
         )}
-        <div className="flow-work__actions">
-          <button className={`flow-pill ${showTimers ? "is-active" : ""}`} onClick={() => setShowTimers((s) => !s)} title="Toggle timers">⏱ Timers</button>
-          <button className="flow-pill" onClick={() => setFullscreen((f) => !f)} title="Toggle fullscreen">{fullscreen ? "⤡ Exit" : "⤢ Fullscreen"}</button>
-          <button className={`flow-pill ${showSnippets ? "is-active" : ""}`} onClick={() => setShowSnippets((s) => !s)}>Extensions</button>
-          <button className="flow-pill" onClick={() => setShowShare(true)}>Share</button>
-        </div>
-      </header>
-
-      {showTimers && <FlowTimers flowId={flowId} />}
-
-      <div className="flow-viewbar">
         <div className="flow-work__tabs" role="group" aria-label="View">
           <button className={`flow-tab ${isSoloView("flow") ? "is-active" : ""}`} onClick={() => setView("flow")}>Flow</button>
           <button className={`flow-tab ${isSoloView("speech") ? "is-active" : ""}`} onClick={() => setView("speech")}>Speech</button>
@@ -473,7 +462,15 @@ export default function FlowWorkspace() {
             </optgroup>
           )}
         </select>
-      </div>
+        <div className="flow-work__actions">
+          <button className={`flow-pill ${showTimers ? "is-active" : ""}`} onClick={() => setShowTimers((s) => !s)} title="Toggle timers">⏱ Timers</button>
+          <button className="flow-pill" onClick={() => setFullscreen((f) => !f)} title="Toggle fullscreen">{fullscreen ? "⤡ Exit" : "⤢ Fullscreen"}</button>
+          <button className={`flow-pill ${showSnippets ? "is-active" : ""}`} onClick={() => setShowSnippets((s) => !s)}>Extensions</button>
+          <button className="flow-pill" onClick={() => setShowShare(true)}>Share</button>
+        </div>
+      </header>
+
+      {showTimers && <FlowTimers flowId={flowId} />}
 
       <div className="flow-work__body">
         <div className="flow-work__panes">

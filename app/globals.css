@@ -4597,20 +4597,15 @@ html.gh-light .flow-pill, html.gh-light .flow-addflow { background: #fffdf8; bor
 html.gh-light .flow-pill:hover, html.gh-light .flow-addflow:hover { color: var(--ink); border-color: rgba(70, 45, 20, 0.22); }
 html.gh-light .flow-pill.is-active { background: var(--accent); border-color: transparent; color: #fff; }
 
-/* View switcher row — sits directly above the panes it controls. */
-.flow-viewbar {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px 4px 26px;
-  flex-shrink: 0;
-}
+/* Everything rides one header line: title · flow chips · view switcher · Split ·
+   actions. The header scrolls horizontally rather than wrapping if it gets tight. */
+.flow-work__head { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+.flow-work__head::-webkit-scrollbar { display: none; }
+.flow-work__head > * { flex-shrink: 0; }
 
-/* Folder/flow chips live up in the header now (between title and actions). */
+/* Folder/flow chips live up in the header now (between title and the switcher). */
 .flow-foldertabs { display: flex; gap: 6px; border: none; }
-.flow-work__head .flow-foldertabs { flex: 1; min-width: 0; overflow-x: auto; padding: 0; scrollbar-width: none; }
+.flow-work__head .flow-foldertabs { max-width: 300px; min-width: 0; overflow-x: auto; padding: 0; scrollbar-width: none; }
 .flow-work__head .flow-foldertabs::-webkit-scrollbar { display: none; }
 .flow-foldertab { flex-shrink: 0; }
 .flow-foldertab {
