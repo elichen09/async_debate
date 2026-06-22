@@ -8,13 +8,14 @@ import FlowGrid from "@/app/components/flow/FlowGrid";
 import FlowSpeech from "@/app/components/flow/FlowSpeech";
 import SnippetLibrary from "@/app/components/flow/SnippetLibrary";
 import SendDoc from "@/app/components/flow/SendDoc";
+import ReadDocView from "@/app/components/flow/ReadDocView";
 import FlowTimers from "@/app/components/flow/FlowTimers";
 import ShareDialog from "@/app/components/flow/ShareDialog";
 import type { EditorInsert, Flow, FlowSnippet } from "@/app/flow/shared";
 
 const SNIP_SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
 type Sibling = { id: string; title: string; folder_id: string | null };
-type ViewKind = "flow" | "speech" | "send";
+type ViewKind = "flow" | "speech" | "send" | "read";
 type Pane = { key: string; view: ViewKind; flowId: string };
 
 // Remove Send-doc cards tied to deleted flow points: drop each h4[data-cell] and
@@ -441,6 +442,7 @@ export default function FlowWorkspace() {
           <button className={`flow-tab ${isSoloView("flow") ? "is-active" : ""}`} onClick={() => setView("flow")}>Flow</button>
           <button className={`flow-tab ${isSoloView("speech") ? "is-active" : ""}`} onClick={() => setView("speech")}>Speech</button>
           <button className={`flow-tab ${isSoloView("send") ? "is-active" : ""}`} onClick={() => setView("send")}>Send doc</button>
+          <button className={`flow-tab ${isSoloView("read") ? "is-active" : ""}`} onClick={() => setView("read")}>Read doc</button>
         </div>
         <select
           className="flow-addflow"
@@ -453,6 +455,7 @@ export default function FlowWorkspace() {
             <option value="view:flow">Flow</option>
             <option value="view:speech">Speech</option>
             <option value="view:send">Send doc</option>
+            <option value="view:read">Read doc</option>
           </optgroup>
           {siblings.filter((s) => !panes.some((p) => p.view === "flow" && p.flowId === s.id)).length > 0 && (
             <optgroup label="Add flow">
@@ -478,6 +481,7 @@ export default function FlowWorkspace() {
             const title =
               pane.view === "speech" ? "Speech" :
               pane.view === "send" ? "Send doc" :
+              pane.view === "read" ? "Read doc" :
               (pane.flowId === flowId ? flow.title : siblings.find((s) => s.id === pane.flowId)?.title ?? "Flow");
             return (
               <Fragment key={pane.key}>
@@ -505,7 +509,10 @@ export default function FlowWorkspace() {
                     <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} userId={userId} userName={userName} />
                   )}
                   {pane.view === "send" && (
-                    <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} flowId={flowId} userId={userId} userName={userName} />
+                    <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} slashOptions={slashOptions} flowId={flowId} userId={userId} userName={userName} />
+                  )}
+                  {pane.view === "read" && (
+                    <ReadDocView sendHtml={sendHtml} />
                   )}
                 </div>
               </section>

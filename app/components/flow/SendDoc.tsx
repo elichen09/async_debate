@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { downloadHtmlAsDocx } from "@/lib/sendDocExport";
 import { usePanePresence } from "@/lib/presence";
 import { caretOffsetIn } from "@/lib/caret";
+import { fuzzyRank } from "@/lib/fuzzy";
 import RemoteCarets from "@/app/components/flow/RemoteCarets";
 
 interface SendDocProps {
@@ -11,6 +12,7 @@ interface SendDocProps {
   version: number;          // bumped when an extension appends, to re-sync the DOM
   onChange: (html: string) => void;
   resolveSlashHtml?: (trigger: string) => string | null;
+  slashOptions?: { trigger: string; label: string }[];
   flowId?: string;
   userId?: string;
   userName?: string;
@@ -22,11 +24,15 @@ interface OutlineItem { text: string; level: number; }
 // contentEditable renders card formatting, accepts pasted rich text, and exports
 // the live HTML to .docx. Uncontrolled: innerHTML is set only on external appends
 // (version) so typing never loses the caret.
-export default function SendDoc({ html, version, onChange, resolveSlashHtml, flowId = "", userId = "", userName = "Partner" }: SendDocProps) {
+export default function SendDoc({ html, version, onChange, resolveSlashHtml, slashOptions = [], flowId = "", userId = "", userName = "Partner" }: SendDocProps) {
   const ref = useRef<HTMLDivElement>(null);
   const savedRange = useRef<Range | null>(null);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
   const [fullscreen, setFullscreen] = useState(false);
+  // Slash autocomplete (mirrors FlowSpeech): the partial "/trigger" being typed at
+  // the caret + its screen position, plus the highlighted suggestion.
+  const [slash, setSlash] = useState<{ query: string; top: number; left: number } | null>(null);
+  const [slashActive, setSlashActive] = useState(0);
   const [focused, setFocused] = useState(false);
   const [myCaret, setMyCaret] = useState<number | null>(null);
   const others = usePanePresence(flowId, "send", userId, userName, focused, focused ? myCaret : null);
@@ -130,6 +136,46 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, flo
     if (ref.current) onChange(ref.current.innerHTML);
   }
 
+  // After a keystroke, see if the caret sits at the end of a "/partial" token; if
+  // so, show the dropdown at the caret, else hide it.
+  function updateSlash() {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed) { setSlash(null); return; }
+    const node = sel.anchorNode;
+    if (!node || node.nodeType !== Node.TEXT_NODE) { setSlash(null); return; }
+    const before = (node.textContent ?? "").slice(0, sel.anchorOffset);
+    const m = /(^|\s)\/(\S*)$/.exec(before);
+    if (!m) { setSlash(null); return; }
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    setSlash({ query: m[2].toLowerCase(), top: rect.bottom || rect.top, left: rect.left });
+    setSlashActive(0);
+  }
+
+  // Replace the "/partial" token before the caret with the full "/trigger"; the
+  // user then presses Enter to expand it into the card (handled in onKeyDown).
+  function completeSlash(trigger: string) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const node = sel.anchorNode;
+    if (!node || node.nodeType !== Node.TEXT_NODE) return;
+    const offset = sel.anchorOffset;
+    const before = (node.textContent ?? "").slice(0, offset);
+    const m = /\/(\S*)$/.exec(before);
+    if (!m) return;
+    const start = offset - m[0].length;
+    const range = document.createRange();
+    range.setStart(node, start);
+    range.setEnd(node, offset);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.execCommand("insertText", false, `/${trigger}`);
+    setSlash(null);
+    if (ref.current) onChange(ref.current.innerHTML);
+  }
+
+  const slashMatches = slash ? fuzzyRank(slash.query, slashOptions).slice(0, 50) : [];
+  const dropOpen = !!slash && slashMatches.length > 0;
+
   return (
     <div className={`flow-sendedit ${fullscreen ? "flow-sendedit--full" : ""}`}>
       <div className="flow-sendedit__bar">
@@ -214,6 +260,20 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, flo
           suppressContentEditableWarning
           spellCheck={false}
           onKeyDown={(e) => {
+            // While the autocomplete is open, the arrows/Enter/Tab/Escape drive it.
+            if (dropOpen) {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                setSlashActive((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + slashMatches.length) % slashMatches.length);
+                return;
+              }
+              if (e.key === "Escape") { e.preventDefault(); setSlash(null); return; }
+              if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+                e.preventDefault();
+                completeSlash(slashMatches[slashActive]?.trigger ?? slashMatches[0].trigger);
+                return;
+              }
+            }
             // Slash command: "/topshelf" alone on a line + Enter inserts that card here.
             if (e.key !== "Enter" || e.shiftKey) return;
             const sel = window.getSelection();
@@ -229,19 +289,38 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, flo
             sel!.removeAllRanges();
             sel!.addRange(range);
             document.execCommand("insertHTML", false, card);
+            setSlash(null);
             if (ref.current) onChange(ref.current.innerHTML);
             refreshOutline();
           }}
           onInput={(e) => { onChange((e.target as HTMLDivElement).innerHTML); refreshOutline(); trackCaret(); }}
-          onKeyUp={() => trackCaret()}
-          onMouseUp={() => trackCaret()}
+          onKeyUp={(e) => { if (!["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(e.key)) updateSlash(); trackCaret(); }}
+          onMouseUp={() => { updateSlash(); trackCaret(); }}
           onFocus={() => { setFocused(true); trackCaret(); }}
-          onBlur={() => setFocused(false)}
+          onBlur={() => { setFocused(false); setTimeout(() => setSlash(null), 120); }}
           data-placeholder="Use an extension while flowing, paste cards, or type here…"
         />
         <RemoteCarets editorRef={ref} editors={others} />
         </div>
       </div>
+
+      {dropOpen && slash && (
+        <ul className="flow-slash flow-slash--fixed" role="listbox" style={{ top: slash.top + 4, left: slash.left }}>
+          {slashMatches.map((o, i) => (
+            <li key={o.trigger} role="option" aria-selected={i === slashActive}>
+              <button
+                type="button"
+                ref={i === slashActive ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
+                className={`flow-slash__opt ${i === slashActive ? "is-active" : ""}`}
+                onMouseDown={(e) => { e.preventDefault(); completeSlash(o.trigger); }}
+              >
+                <span className="flow-slash__trig">/{o.trigger}</span>
+                <span className="flow-slash__label">{o.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

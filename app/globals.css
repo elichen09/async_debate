@@ -4133,6 +4133,108 @@ body.flow-send-full .gh-siderail,
 body.flow-send-full .gh-drawer,
 body.flow-send-full .gh-drawer-backdrop { display: none !important; }
 
+/* Read doc — read-only, speech-ready view derived from the Send doc */
+.flow-readview { display: flex; flex-direction: column; height: 100%; gap: 10px; }
+.flow-readview__bar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+.flow-readview__hint { font-size: 12px; color: #8a7f6f; }
+.flow-readstat { font-size: 12.5px; color: #6f6557; white-space: nowrap; }
+.flow-readstat b { font-weight: 700; color: #2a2118; font-variant-numeric: tabular-nums; }
+
+/* Read-speed calibration modal */
+.flow-rtcal-backdrop {
+  position: fixed; inset: 0; z-index: 340;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(40, 28, 12, 0.34);
+  backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+}
+.flow-rtcal {
+  width: min(520px, 100%); max-height: 88vh; overflow-y: auto;
+  background: #fffdf8; border: 1px solid rgba(70, 45, 20, 0.1); border-radius: 18px;
+  box-shadow: 0 24px 64px rgba(40, 25, 10, 0.3);
+  padding: 26px 28px 22px;
+}
+.flow-rtcal__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.flow-rtcal__step { display: block; font-size: 12px; font-weight: 600; color: #a98a5e; margin-bottom: 3px; }
+.flow-rtcal h3 { margin: 0; font-size: 21px; font-weight: 700; color: #2a2118; letter-spacing: -0.01em; }
+.flow-rtcal__sub { margin: 10px 0 16px; font-size: 13.5px; color: #6f6557; line-height: 1.5; }
+.flow-rtcal__dots { display: flex; gap: 6px; padding-top: 8px; flex-shrink: 0; }
+.flow-rtcal__dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(70, 45, 20, 0.16); transition: background 0.2s ease; }
+.flow-rtcal__dot.is-on { background: #c79a52; }
+.flow-rtcal__dot.is-done { background: #cdb78c; }
+.flow-rtcal__stage { display: flex; min-height: 168px; }
+.flow-rtcal__sample {
+  flex: 1; background: #fff; border: 1px solid rgba(70, 45, 20, 0.1); border-radius: 12px;
+  padding: 20px 22px; max-height: 46vh; overflow-y: auto;
+  font-family: var(--font-calibri); font-size: 19px; line-height: 1.65; color: #1a1a1a;
+}
+.flow-rtcal__ready {
+  flex: 1; display: flex; align-items: center; justify-content: center; text-align: center;
+  border: 1px dashed rgba(70, 45, 20, 0.2); border-radius: 12px;
+  color: #8a7f6f; font-size: 14px; padding: 20px;
+}
+.flow-rtcal__ready b { color: #2a2118; font-weight: 700; }
+.flow-rtcal__count {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  border: 1px dashed rgba(70, 45, 20, 0.2); border-radius: 12px;
+  font-size: 76px; font-weight: 800; line-height: 1; color: #c79a52;
+  font-variant-numeric: tabular-nums;
+  animation: rtcal-pop 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes rtcal-pop {
+  from { transform: scale(0.55); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .flow-rtcal__count { animation: none; }
+}
+.flow-rtcal__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.flow-rtcal__timer {
+  margin-right: auto; font-variant-numeric: tabular-nums; font-weight: 700;
+  font-size: 24px; color: #2a2118; letter-spacing: 0.01em;
+}
+.flow-rtcal__rates { display: flex; gap: 12px; margin: 4px 0; }
+.flow-rtcal__rate {
+  flex: 1; background: #fff; border: 1px solid rgba(70, 45, 20, 0.1); border-radius: 12px;
+  padding: 18px 14px; text-align: center;
+}
+.flow-rtcal__rateN { display: block; font-size: 32px; font-weight: 800; color: #2a2118; font-variant-numeric: tabular-nums; line-height: 1; }
+.flow-rtcal__rateL { display: block; margin-top: 7px; font-size: 12px; color: #6f6557; }
+.flow-readview__empty { margin: 40px auto; max-width: 460px; text-align: center; color: #8a7f6f; }
+.flow-readview__doc {
+  flex: 1;
+  overflow-y: auto;
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: var(--radius);
+  padding: 28px 40px 64px;
+  font-family: var(--font-calibri);
+  font-size: 18px;
+  line-height: 1.5;
+  box-shadow: var(--shadow-md);
+  container-type: inline-size;
+}
+.flow-readview__doc h1,
+.flow-readview__doc h2,
+.flow-readview__doc h3,
+.flow-readview__doc h4 { font-family: inherit; font-weight: 800; color: #111; margin: 16px 0 1px; line-height: 1.25; }
+.flow-readview__doc h1 { font-size: 23px; }
+.flow-readview__doc h2 { font-size: 21px; }
+.flow-readview__doc h3 { font-size: 20px; text-align: center; }
+.flow-readview__doc h4 { font-size: 19px; }
+.flow-readview__doc > *:first-child { margin-top: 0; }
+.flow-readview__doc p { margin: 0 0 4px; }
+.flow-readview__doc p.rd-cite { color: #574b39; font-size: 15px; margin: 0 0 2px; }
+/* Tighten the gap between a tag and its cite so each card reads as one unit. */
+.flow-readview__doc h1 + p, .flow-readview__doc h2 + p,
+.flow-readview__doc h3 + p, .flow-readview__doc h4 + p { margin-top: 0; }
+@container (max-width: 560px) {
+  .flow-readview__doc { font-size: 15.5px; padding: 18px 20px 48px; }
+  .flow-readview__doc h1 { font-size: 20px; }
+  .flow-readview__doc h2 { font-size: 18px; }
+  .flow-readview__doc h3 { font-size: 17px; }
+  .flow-readview__doc h4 { font-size: 16px; }
+}
+
 /* Send doc outline pane (Google-Docs style) */
 .flow-sendedit__row { flex: 1; display: flex; min-height: 0; gap: 12px; }
 .flow-sendedit__outline {
@@ -4656,7 +4758,7 @@ body.flow-resizing { cursor: col-resize; user-select: none; }
 html.gh-light .flow-pane--solo { background: transparent; border-color: transparent; box-shadow: none; }
 .flow-pane--solo { flex: 0 1 auto; width: 100%; margin-left: auto; margin-right: auto; }
 .flow-pane--solo[data-view="flow"], .flow-pane--solo[data-view="speech"] { max-width: 880px; }
-.flow-pane--solo[data-view="send"] { max-width: 1040px; }
+.flow-pane--solo[data-view="send"], .flow-pane--solo[data-view="read"] { max-width: 1040px; }
 
 /* Send doc adapts to a narrow split pane: smaller type, tighter padding, the
    outline collapses so the document never looks smooshed. */
