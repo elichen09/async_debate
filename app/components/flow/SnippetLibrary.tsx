@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { parseAtSections, rowsFor } from "@/lib/docxImport";
+import { ChevronDown, ChevronRight, Upload, AlertTriangle, X, Maximize2 } from "lucide-react";
 import type { FlowSnippet, ExtensionPoint } from "@/app/flow/shared";
 
 const SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
@@ -100,7 +101,7 @@ export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSn
                 onClick={(e) => { e.stopPropagation(); toggle(s.id); }}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); e.preventDefault(); toggle(s.id); } }}
               >
-                {open ? "▾" : "▸"}
+                {open ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
               </span>
             )}
             {s.label}
@@ -120,7 +121,7 @@ export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSn
             onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
           />
         </div>
-        <button className="flow-icon-btn flow-snip__del" onClick={() => del(s.id)} aria-label="Delete">×</button>
+        <button className="flow-icon-btn flow-snip__del" onClick={() => del(s.id)} aria-label="Delete"><X size={14} /></button>
         {!q && open && kids.length > 0 && (
           <div className="flow-snip__children">{kids.map((k) => item(k, true))}</div>
         )}
@@ -134,14 +135,14 @@ export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSn
         <div className="flow-snip__head">
           <span className="flow-panel__title">Extensions</span>
           <div className="flow-snip__headbtns">
-            <Link className="flow-icon-btn" href="/flow/extensions" title="Open full library" aria-label="Open full library">⤢</Link>
-            <button className="flow-icon-btn" onClick={onClose} aria-label="Close">×</button>
+            <Link className="flow-icon-btn" href="/flow/extensions" title="Open full library" aria-label="Open full library"><Maximize2 size={15} /></Link>
+            <button className="flow-icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button>
           </div>
         </div>
       )}
 
       <button className="flow-rail__import" onClick={() => fileRef.current?.click()} disabled={busy}>
-        ⬆ Import AT doc (.docx)
+        <Upload size={14} /> Import AT doc (.docx)
       </button>
       <input
         ref={fileRef}
@@ -159,7 +160,7 @@ export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSn
         </button>
       </div>
 
-      {error && <p className="flow-snip__error">⚑ {error}</p>}
+      {error && <p className="flow-snip__error"><AlertTriangle size={13} /> {error}</p>}
 
       <div className="flow-snip__controls">
         <input className="flow-snip__search" placeholder="Search extensions…" value={query} onChange={(e) => setQuery(e.target.value)} />

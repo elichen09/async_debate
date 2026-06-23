@@ -3295,6 +3295,98 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
    tracking, which fights a display serif. */
 .flow-shell .flow-work__title { font-size: 17px; letter-spacing: -0.005em; }
 .flow-shell .flow-rail__brand { font-size: 16px; letter-spacing: 0; text-transform: none; color: rgba(255, 255, 255, 0.72); }
+
+/* ── Interaction motion ──────────────────────────────────────────────────────
+   Entrance choreography for the surfaces that previously snapped in. Each runs
+   once on mount (the elements are conditionally rendered), transform+opacity
+   only, on the shared ease-out-quint curve. Disabled under reduced-motion. */
+@keyframes flow-rise-in   { from { opacity: 0; transform: translateY(6px); }            to { opacity: 1; transform: none; } }
+@keyframes flow-dock-in   { from { opacity: 0; transform: translateX(14px); }           to { opacity: 1; transform: none; } }
+@keyframes flow-modal-in  { from { opacity: 0; transform: translateY(8px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes flow-fade-in   { from { opacity: 0; } to { opacity: 1; } }
+
+/* Menus keep their inline positioning transform (the "more" menu is translateX
+   -100%), so they fade only — no transform keyframe to clobber it. */
+.flow-menu        { animation: flow-fade-in 0.13s var(--ease-out-quint) both; }
+.flow-menu__scrim { animation: flow-fade-in 0.13s linear both; }
+.flow-dock        { animation: flow-dock-in 0.2s var(--ease-out-quint) both; }
+.flow-timers      { animation: flow-rise-in 0.24s var(--ease-out-quint) both; }
+.flow-slash       { animation: flow-rise-in 0.12s var(--ease-out-quint) both; }
+/* Opacity-only: a transform here would make the pane the containing block for the
+   fixed slash dropdown / calibrate modal / speech-length popover inside it. */
+.flow-pane        { animation: flow-fade-in 0.22s var(--ease-out-quint) both; }
+.flow-rtcal-backdrop, .flow-modal-backdrop { animation: flow-fade-in 0.16s linear both; }
+.flow-rtcal       { animation: flow-modal-in 0.22s var(--ease-out-quint) both; }
+.flow-modal       { animation: flow-modal-in 0.22s var(--ease-out-quint) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-menu, .flow-menu__scrim, .flow-dock, .flow-timers, .flow-slash, .flow-pane,
+  .flow-rtcal-backdrop, .flow-modal-backdrop, .flow-rtcal, .flow-modal { animation: none; }
+}
+
+/* ── Native selects → in-brand controls ──────────────────────────────────────
+   Drop the OS chrome (the cheapest tell in the workspace) and draw our own
+   chevron. A neutral-gray caret reads on both the dark chrome and the light
+   theme variants. The selects' own background-color rules stay; we only add the
+   caret + room for it, so this must come after them in source order. */
+.flow-rail__move,
+.flow-snip__sortsel,
+.flow-node__statussel,
+.flow-outline__filter,
+.flow-fmt-sel {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a0a0a0' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 7px center;
+  background-size: 11px;
+  padding-right: 22px;
+  cursor: pointer;
+}
+.flow-rail__move { background-position: right 6px center; padding-right: 20px; }
+
+/* In-brand confirm dialog (replaces window.confirm for destructive actions). */
+.flow-confirm {
+  width: min(400px, 100%);
+  background: #fffdf8;
+  border: 1px solid rgba(70, 45, 20, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(40, 25, 10, 0.3);
+  padding: 22px 24px 18px;
+}
+.flow-confirm__title {
+  margin: 0; font-family: var(--font-serif); font-weight: 400;
+  font-size: 22px; color: #2a2118; letter-spacing: -0.006em;
+}
+.flow-confirm__msg { margin: 9px 0 0; font-size: 13.5px; line-height: 1.5; color: #6f6557; }
+.flow-confirm__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.flow-confirm__danger { background: #c0392b; color: #fff; border-color: #c0392b; }
+.flow-confirm__danger:hover:not(:disabled) { background: #a93226; border-color: #a93226; transform: translateY(-1px); }
+
+/* ── Icon rendering (lucide) ──────────────────────────────────────────────────
+   Icons render block-level (no inline baseline gap) and inherit button color via
+   currentColor. The controls that weren't already flex get centered here, and the
+   icon+text rows (errors, pace chips, import) align on a baseline-free row. */
+.flow-shell svg.lucide { display: block; flex-shrink: 0; }
+.flow-shell .flow-timer__btn,
+.flow-shell .flow-timer__adj,
+.flow-shell .flow-tab--split,
+.flow-shell .flow-pill--icon,
+.flow-shell .flow-node__fold,
+.flow-shell .flow-node__drag,
+.flow-shell .flow-node__statustag,
+.flow-shell .flow-rail__caret,
+.flow-shell .flow-snip__chev,
+.flow-shell .flow-fmt-btn,
+.flow-shell .flow-rail__import {
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.flow-shell .flow-rail__import { gap: 6px; }
+.flow-shell .flow-pace { display: inline-flex; align-items: center; gap: 4px; }
+.flow-shell .flow-rail__error,
+.flow-shell .flow-snip__error,
+.flow-shell .flow-outline__error { display: flex; align-items: flex-start; gap: 6px; }
 /* The grid fills the whole shell from the top-left; the flow list overlays. */
 .flow-content { width: 100%; height: 100%; display: flex; }
 
@@ -3758,6 +3850,11 @@ html.gh-light .flow-node__drag { color: var(--muted); }
 html.gh-light .flow-node__fold { color: var(--muted); }
 .flow-node.is-drop { box-shadow: inset 0 -2px 0 0 var(--accent) !important; }
 .flow-node.is-drag { opacity: 0.45; }
+/* A point dragged in from another pane is hovering this flow (drop to add it). */
+.flow-outline.is-extdrop { box-shadow: inset 0 0 0 2px var(--accent-ring); border-radius: var(--radius); }
+/* Group-delete button reads destructive on hover. */
+.flow-outline__bar .flow-outline__del:hover:not(:disabled) { color: #ff9b8a; border-color: rgba(220, 90, 70, 0.5); }
+html.gh-light .flow-outline__bar .flow-outline__del:hover:not(:disabled) { color: #b23b2e; border-color: rgba(190, 70, 50, 0.45); }
 .flow-node__statustag { flex-shrink: 0; align-self: center; font-size: 10px; font-weight: 700; color: #fff; padding: 1px 6px; border-radius: 3px; line-height: 1.4; }
 .flow-node__btn.is-flag { color: #fff; background: #ef6f6f; border-color: #ef6f6f; }
 .flow-outline__bar .db-btn.is-active { background: var(--accent); color: var(--accent-ink, #fff); border-color: var(--accent); }
@@ -4165,9 +4262,9 @@ body.flow-send-full .gh-drawer-backdrop { display: none !important; }
 /* Read doc — read-only, speech-ready view derived from the Send doc */
 .flow-readview { display: flex; flex-direction: column; height: 100%; gap: 10px; }
 .flow-readview__bar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
-.flow-readview__hint { font-size: 12px; color: #8a7f6f; }
-.flow-readstat { font-size: 12.5px; color: #6f6557; white-space: nowrap; }
-.flow-readstat b { font-weight: 700; color: #2a2118; font-variant-numeric: tabular-nums; }
+.flow-readview__hint { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+.flow-readstat { font-size: 12.5px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; }
+.flow-readstat b { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
 
 /* Read-speed calibration modal */
 .flow-rtcal-backdrop {
@@ -4932,21 +5029,34 @@ html.gh-light .flow-menu__sep { background: rgba(70, 45, 20, 0.1); }
   font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
   white-space: nowrap; font-variant-numeric: tabular-nums;
 }
-.flow-pace.is-under { color: #2f6b3d; background: rgba(60, 150, 80, 0.14); }
-.flow-pace.is-over { color: #b23b2e; background: rgba(190, 70, 50, 0.12); }
-.flow-pace--live { color: #2a2118; background: rgba(70, 45, 20, 0.08); }
-.flow-pace--live.is-low { color: #b23b2e; background: rgba(190, 70, 50, 0.15); }
+.flow-pace.is-under { color: #74d99a; background: rgba(70, 180, 110, 0.16); }
+.flow-pace.is-over { color: #ff9b8a; background: rgba(220, 90, 70, 0.18); }
+.flow-pace--live { color: rgba(255, 255, 255, 0.92); background: rgba(255, 255, 255, 0.08); }
+.flow-pace--live.is-low { color: #ff9b8a; background: rgba(220, 90, 70, 0.22); }
 
-/* Editable speech-length chip + its popover (the Read bar is always paper). */
+/* Editable speech-length chip — sits in the dark read-bar chrome, like the Send
+   doc bar; its popover renders as a paper menu (.flow-speechpop). */
 .flow-target {
   display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-display);
-  font-size: 12.5px; font-weight: 600; color: #6f6557; cursor: pointer;
-  padding: 2px 9px; border-radius: 999px; border: 1px solid rgba(70, 45, 20, 0.16);
-  background: rgba(70, 45, 20, 0.05); white-space: nowrap; transition: background 0.14s ease, border-color 0.14s ease;
+  font-size: 12.5px; font-weight: 600; color: rgba(255, 255, 255, 0.8); cursor: pointer;
+  padding: 2px 9px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06); white-space: nowrap; transition: background 0.14s ease, border-color 0.14s ease;
 }
-.flow-target:hover, .flow-target.is-open { background: rgba(70, 45, 20, 0.1); border-color: rgba(70, 45, 20, 0.28); }
-.flow-target b { color: #2a2118; font-weight: 700; font-variant-numeric: tabular-nums; }
-.flow-target__caret { font-size: 9px; color: #a98a5e; }
+.flow-target:hover, .flow-target.is-open { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.32); }
+.flow-target b { color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
+.flow-target__caret { font-size: 9px; color: rgba(255, 255, 255, 0.5); }
+/* Light theme: the pane is paper (#fffdf8), so the read bar reverts to warm ink. */
+html.gh-light .flow-readstat { color: #6f6557; }
+html.gh-light .flow-readstat b { color: #2a2118; }
+html.gh-light .flow-readview__hint { color: #8a7f6f; }
+html.gh-light .flow-pace.is-under { color: #2f6b3d; background: rgba(60, 150, 80, 0.14); }
+html.gh-light .flow-pace.is-over { color: #b23b2e; background: rgba(190, 70, 50, 0.12); }
+html.gh-light .flow-pace--live { color: #2a2118; background: rgba(70, 45, 20, 0.08); }
+html.gh-light .flow-pace--live.is-low { color: #b23b2e; background: rgba(190, 70, 50, 0.15); }
+html.gh-light .flow-target { color: #6f6557; border-color: rgba(70, 45, 20, 0.16); background: rgba(70, 45, 20, 0.05); }
+html.gh-light .flow-target:hover, html.gh-light .flow-target.is-open { background: rgba(70, 45, 20, 0.1); border-color: rgba(70, 45, 20, 0.28); }
+html.gh-light .flow-target b { color: #2a2118; }
+html.gh-light .flow-target__caret { color: #a98a5e; }
 /* Paper-styled popover (overrides the dark .flow-menu base — read bar is light). */
 .flow-speechpop {
   min-width: 200px; gap: 8px; padding: 10px;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { AlertTriangle, X } from "lucide-react";
 
 interface ShareDialogProps {
   flowId: string;
@@ -85,7 +86,7 @@ export default function ShareDialog({ flowId, ownerId, userId, onClose, embedded
               {busy ? "…" : "Add"}
             </button>
           </div>
-          {error && <p style={{ fontSize: 12, color: "var(--loss)", margin: "8px 0 0" }}>⚑ {error}</p>}
+          {error && <p style={{ fontSize: 12, color: "var(--loss)", margin: "8px 0 0", display: "flex", alignItems: "center", gap: 6 }}><AlertTriangle size={13} /> {error}</p>}
         </>
       )}
 
@@ -97,7 +98,7 @@ export default function ShareDialog({ flowId, ownerId, userId, onClose, embedded
             <div className="flow-share__row" key={c.user_id}>
               <span>@{c.profile?.username ?? "user"}</span>
               {isOwner && (
-                <button className="flow-icon-btn" onClick={() => remove(c.user_id)} aria-label="Remove">×</button>
+                <button className="flow-icon-btn" onClick={() => remove(c.user_id)} aria-label="Remove"><X size={14} /></button>
               )}
             </div>
           ))
@@ -113,7 +114,7 @@ export default function ShareDialog({ flowId, ownerId, userId, onClose, embedded
       <div className="flow-modal db-card" onClick={(e) => e.stopPropagation()}>
         <div className="flow-snip__head">
           <span className="flow-panel__title">Share flow</span>
-          <button className="flow-icon-btn" onClick={onClose} aria-label="Close">×</button>
+          <button className="flow-icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button>
         </div>
         {inner}
       </div>

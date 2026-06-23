@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import SnippetLibrary from "@/app/components/flow/SnippetLibrary";
 import ShareDialog from "@/app/components/flow/ShareDialog";
+import { Maximize2, X } from "lucide-react";
 import type { FlowSnippet } from "@/app/flow/shared";
 
 type DockTab = "extensions" | "share";
@@ -37,9 +38,9 @@ export default function FlowDock({ tab, onTab, onClose, userId, onUse, snippets,
         </div>
         <div className="flow-dock__headbtns">
           {tab === "extensions" && (
-            <Link className="flow-icon-btn" href="/flow/extensions" title="Open full library" aria-label="Open full library">⤢</Link>
+            <Link className="flow-icon-btn" href="/flow/extensions" title="Open full library" aria-label="Open full library"><Maximize2 size={15} /></Link>
           )}
-          <button className="flow-icon-btn" onClick={onClose} aria-label="Close">×</button>
+          <button className="flow-icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button>
         </div>
       </div>
       <div className="flow-dock__body">

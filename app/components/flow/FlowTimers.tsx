@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Play, Pause, RotateCcw, Minus, Plus } from "lucide-react";
 import { loadSpeechSec, saveSpeechSec } from "@/lib/readEstimate";
 
 // A clock counts down `remaining` ms; while running we store an absolute `endsAt`
@@ -91,8 +92,8 @@ export default function FlowTimers({ flowId, onState }: { flowId: string; onStat
       <div className={`flow-timer ${clock.running ? "is-running" : ""} ${ms === 0 ? "is-done" : ""} ${ms <= 30_000 && ms > 0 ? "is-low" : ""}`}>
         <span className="flow-timer__label" style={{ color: accent }}>{label}</span>
         <span className="flow-timer__time">{fmt(ms)}</span>
-        <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, [key]: s[key].running ? pause(s[key]) : start(s[key]) }))} title={clock.running ? "Pause" : "Start"}>{clock.running ? "⏸" : "▶"}</button>
-        <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, [key]: idle(s.prepDur) }))} title="Reset">↺</button>
+        <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, [key]: s[key].running ? pause(s[key]) : start(s[key]) }))} title={clock.running ? "Pause" : "Start"}>{clock.running ? <Pause size={13} /> : <Play size={13} />}</button>
+        <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, [key]: idle(s.prepDur) }))} title="Reset"><RotateCcw size={13} /></button>
       </div>
     );
   };
@@ -101,12 +102,12 @@ export default function FlowTimers({ flowId, onState }: { flowId: string; onStat
   return (
     <div className="flow-timers" role="group" aria-label="Timers">
       <div className={`flow-timer flow-timer--main ${st.main.running ? "is-running" : ""} ${mainMs === 0 ? "is-done" : ""} ${mainMs <= 30_000 && mainMs > 0 ? "is-low" : ""}`}>
-        <button className="flow-timer__adj" onClick={() => adjustMain(-MIN)} title="−1 min" aria-label="Decrease">−</button>
+        <button className="flow-timer__adj" onClick={() => adjustMain(-MIN)} title="−1 min" aria-label="Decrease"><Minus size={13} /></button>
         <span className="flow-timer__label">Speech</span>
         <span className="flow-timer__time">{fmt(mainMs)}</span>
-        <button className="flow-timer__adj" onClick={() => adjustMain(MIN)} title="+1 min" aria-label="Increase">+</button>
-        <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, main: s.main.running ? pause(s.main) : start(s.main) }))}>{st.main.running ? "⏸" : "▶"}</button>
-        <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, main: idle(s.mainDur) }))} title="Reset">↺</button>
+        <button className="flow-timer__adj" onClick={() => adjustMain(MIN)} title="+1 min" aria-label="Increase"><Plus size={13} /></button>
+        <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, main: s.main.running ? pause(s.main) : start(s.main) }))} title={st.main.running ? "Pause" : "Start"}>{st.main.running ? <Pause size={13} /> : <Play size={13} />}</button>
+        <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, main: idle(s.mainDur) }))} title="Reset"><RotateCcw size={13} /></button>
       </div>
       {prep("Pro prep", "#6f9bea", "pro")}
       {prep("Con prep", "#e0704f", "con")}

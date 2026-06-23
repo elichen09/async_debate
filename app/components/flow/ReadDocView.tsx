@@ -1,6 +1,7 @@
 "use client";
 
 import { createElement, useMemo, useState } from "react";
+import { Download } from "lucide-react";
 import { toReadDocHtml } from "@/lib/readDoc";
 import { downloadHtmlAsDocx } from "@/lib/sendDocExport";
 import ReadTimer from "@/app/components/flow/ReadTimer";
@@ -43,7 +44,7 @@ export default function ReadDocView({ sendHtml, timer }: { sendHtml: string; tim
           disabled={empty}
           onClick={() => downloadHtmlAsDocx(read, "read-doc.docx")}
         >
-          ⬇ Download .docx
+          <Download size={15} /> Download .docx
         </button>
       </div>
       {empty ? (

@@ -1,5 +1,6 @@
 import FlowSidebar from "@/app/components/flow/FlowSidebar";
 import FlowGate from "@/app/components/flow/FlowGate";
+import FlowConfirmProvider from "@/app/components/flow/ConfirmProvider";
 import ForceGridScene from "@/app/components/ForceGridScene";
 
 // Two-pane shell: persistent flow list on the left, the active flow on the right.
@@ -13,9 +14,11 @@ export default function FlowLayout({ children }: { children: React.ReactNode }) 
           (and drop the heavy animated backgrounds) the whole time you're in it. */}
       <ForceGridScene />
       <div className="flow-shell">
-        <div className="flow-nav-hotzone" aria-hidden />
-        <FlowSidebar />
-        <div className="flow-content">{children}</div>
+        <FlowConfirmProvider>
+          <div className="flow-nav-hotzone" aria-hidden />
+          <FlowSidebar />
+          <div className="flow-content">{children}</div>
+        </FlowConfirmProvider>
       </div>
     </FlowGate>
   );

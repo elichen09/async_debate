@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { parseFlowHeadings } from "@/lib/docxImport";
+import { useConfirm } from "@/app/components/flow/ConfirmProvider";
+import { FolderPlus, ChevronRight, ChevronDown, Upload, AlertTriangle, X } from "lucide-react";
 import { type Flow, type FlowFolder } from "@/app/flow/shared";
 
 // Left rail: lists the user's flows (owned + shared), organized into folders,
@@ -14,6 +16,7 @@ export default function FlowSidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const params = useParams();
+  const confirm = useConfirm();
   const activeId = (params?.id as string) ?? "";
   const [userId, setUserId] = useState("");
   const [flows, setFlows] = useState<Flow[]>([]);
@@ -169,7 +172,13 @@ export default function FlowSidebar() {
   }
 
   async function deleteFlow(flowId: string) {
-    if (!window.confirm("Delete this flow? Its grid, speech, and shares are removed for everyone.")) return;
+    const ok = await confirm({
+      title: "Delete this flow?",
+      message: "Its grid, speech, and shares are removed for everyone.",
+      confirmLabel: "Delete flow",
+      tone: "danger",
+    });
+    if (!ok) return;
     setFlows((prev) => prev.filter((f) => f.id !== flowId));
     await supabase.from("flows").delete().eq("id", flowId);
     if (activeId === flowId) router.push("/flow");
@@ -228,7 +237,7 @@ export default function FlowSidebar() {
                 onClick={(e) => { e.stopPropagation(); deleteFlow(f.id); }}
                 title="Delete flow"
                 aria-label="Delete flow"
-              >×</button>
+              ><X size={14} /></button>
             )}
           </>
         )}
@@ -240,7 +249,7 @@ export default function FlowSidebar() {
     <nav className="flow-rail" aria-label="Flows">
       <div className="flow-rail__top">
         <p className="flow-rail__brand">Flows</p>
-        <button className="flow-icon-btn" onClick={createFolder} title="New folder" aria-label="New folder">＋▢</button>
+        <button className="flow-icon-btn" onClick={createFolder} title="New folder" aria-label="New folder"><FolderPlus size={16} /></button>
       </div>
 
       <div className="flow-rail__list">
@@ -251,7 +260,7 @@ export default function FlowSidebar() {
             <div key={fo.id} className="flow-rail__folder">
               <div className="flow-rail__folder-head">
                 <button className="flow-rail__caret" onClick={() => toggleCollapse(fo.id)} aria-label="Toggle folder">
-                  {isCollapsed ? "▸" : "▾"}
+                  {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
                 </button>
                 {renamingFolder === fo.id ? (
                   <input
@@ -272,7 +281,7 @@ export default function FlowSidebar() {
                   </button>
                 )}
                 <span className="flow-rail__count">{items.length}</span>
-                <button className="flow-icon-btn flow-rail__folder-del" onClick={() => deleteFolder(fo.id)} aria-label="Delete folder">×</button>
+                <button className="flow-icon-btn flow-rail__folder-del" onClick={() => deleteFolder(fo.id)} aria-label="Delete folder"><X size={14} /></button>
               </div>
               {!isCollapsed && <div className="flow-rail__folder-body">{items.map(renderFlow)}</div>}
             </div>
@@ -287,13 +296,13 @@ export default function FlowSidebar() {
         )}
       </div>
 
-      {error && <p className="flow-rail__error">⚑ {error}</p>}
+      {error && <p className="flow-rail__error"><AlertTriangle size={13} /> {error}</p>}
       <div className="flow-rail__create">
         <button className="flow-rail__new" onClick={() => createFlow("aff")} disabled={creating}>+ aff</button>
         <button className="flow-rail__new" onClick={() => createFlow("neg")} disabled={creating}>+ neg</button>
       </div>
       <button className="flow-rail__import" onClick={() => fileRef.current?.click()} disabled={creating}>
-        ⬆ Import .docx
+        <Upload size={14} /> Import .docx
       </button>
       <input
         ref={fileRef}

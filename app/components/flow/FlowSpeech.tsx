@@ -5,8 +5,9 @@ import { supabase } from "@/lib/supabase";
 import { fuzzyRank } from "@/lib/fuzzy";
 import { usePanePresence } from "@/lib/presence";
 import { caretOffsetIn } from "@/lib/caret";
+import { useConfirm } from "@/app/components/flow/ConfirmProvider";
 import RemoteCarets from "@/app/components/flow/RemoteCarets";
-import type { EditorInsert } from "@/app/flow/shared";
+import { FLOW_DRAG_MIME, type EditorInsert } from "@/app/flow/shared";
 
 interface FlowSpeechProps {
   flowId: string;
@@ -37,6 +38,7 @@ function toHtml(stored: string): string {
 // after your own typing.
 export default function FlowSpeech({ flowId, initialBody, registerInsert, resolveSlashText, slashOptions = [], userId = "", userName = "Partner" }: FlowSpeechProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const confirm = useConfirm();
   const [focused, setFocused] = useState(false);
   const [myCaret, setMyCaret] = useState<number | null>(null);
   const others = usePanePresence(flowId, "speech", userId, userName, focused, focused ? myCaret : null);
@@ -118,6 +120,32 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
     saveTimer.current = setTimeout(() => { saveTimer.current = null; save(latest.current); }, 200);
   }
 
+  // A flow point dragged from a Flow pane: drop it into the speech at the cursor,
+  // keeping the outline's indent colors (the HTML the Flow pane put on the drag).
+  function onDropPoint(e: React.DragEvent) {
+    if (!e.dataTransfer.types.includes(FLOW_DRAG_MIME)) return;
+    e.preventDefault();
+    const el = ref.current;
+    if (!el) return;
+    const html = e.dataTransfer.getData("text/html");
+    const text = e.dataTransfer.getData("text/plain");
+    const d = document as Document & {
+      caretRangeFromPoint?: (x: number, y: number) => Range | null;
+      caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+    };
+    let range: Range | null = d.caretRangeFromPoint?.(e.clientX, e.clientY) ?? null;
+    if (!range && d.caretPositionFromPoint) {
+      const pos = d.caretPositionFromPoint(e.clientX, e.clientY);
+      if (pos) { range = document.createRange(); range.setStart(pos.offsetNode, pos.offset); range.collapse(true); }
+    }
+    el.focus();
+    const sel = window.getSelection();
+    if (range && sel) { sel.removeAllRanges(); sel.addRange(range); }
+    if (html) document.execCommand("insertHTML", false, html);
+    else if (text) document.execCommand("insertText", false, text);
+    onInput();
+  }
+
   function insert(text: string) {
     const el = ref.current;
     if (!el) return;
@@ -163,9 +191,15 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
     onInput();
   }
 
-  function clearSpeech() {
+  async function clearSpeech() {
     if (!ref.current?.textContent?.trim()) return;
-    if (!window.confirm("Clear the speech for everyone on this flow?")) return;
+    const ok = await confirm({
+      title: "Clear the speech?",
+      message: "This clears it for everyone on this flow.",
+      confirmLabel: "Clear speech",
+      tone: "danger",
+    });
+    if (!ok) return;
     if (ref.current) ref.current.innerHTML = "";
     latest.current = "";
     save("");
@@ -225,6 +259,8 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
         onMouseUp={() => { updateSlash(); trackCaret(); }}
         onFocus={() => { registerInsert(insert); setFocused(true); trackCaret(); }}
         onBlur={() => { save(latest.current); setFocused(false); setTimeout(() => setSlash(null), 120); }}
+        onDragOver={(e) => { if (e.dataTransfer.types.includes(FLOW_DRAG_MIME)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }}
+        onDrop={onDropPoint}
       />
       <RemoteCarets editorRef={ref} editors={others} />
       </div>

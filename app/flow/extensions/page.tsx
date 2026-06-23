@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { parseAtSections, rowsFor, triggerNamePart } from "@/lib/docxImport";
+import { useConfirm } from "@/app/components/flow/ConfirmProvider";
 import type { FlowSnippet, FlowSnippetFolder, ExtensionPoint } from "@/app/flow/shared";
 
 const SEL = "id, owner_id, label, body, points, shortcut, parent_id, folder_id, sort_order, created_at";
@@ -18,6 +19,7 @@ type DropTarget = { kind: "card-group"; id: string } | { kind: "folder"; id: str
 // another, import an AT .docx, add by hand, assign shortcuts, delete.
 export default function ExtensionsPage() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [userId, setUserId] = useState("");
   const [snippets, setSnippets] = useState<FlowSnippet[]>([]);
   const [folders, setFolders] = useState<FlowSnippetFolder[]>([]);
@@ -128,7 +130,13 @@ export default function ExtensionsPage() {
     await supabase.from("flow_snippet_folders").update({ name: clean }).eq("id", id);
   }
   async function deleteFolder(id: string) {
-    if (!window.confirm("Delete this folder? Its blocks move back to Ungrouped (they aren't deleted).")) return;
+    const ok = await confirm({
+      title: "Delete this folder?",
+      message: "Its blocks move back to Ungrouped (they aren't deleted).",
+      confirmLabel: "Delete folder",
+      tone: "danger",
+    });
+    if (!ok) return;
     setSnippets((p) => p.map((s) => (s.folder_id === id ? { ...s, folder_id: null } : s)));
     setFolders((p) => p.filter((f) => f.id !== id));
     await supabase.from("flow_snippets").update({ folder_id: null }).eq("folder_id", id);

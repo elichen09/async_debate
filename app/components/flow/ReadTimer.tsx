@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronDown, Play } from "lucide-react";
 import type { TimerSnap } from "@/app/components/flow/FlowTimers";
 import {
   type Settings,
@@ -79,7 +80,7 @@ export default function ReadTimer({ analysis, settings, onSave, timer, targetSec
       )}
       {clock?.running && leftMs != null && (
         <span className={`flow-pace flow-pace--live ${leftMs <= 30_000 ? "is-low" : ""}`} title="Speech clock remaining">
-          ▶ {fmt(leftMs / 1000)} left
+          <Play size={11} /> {fmt(leftMs / 1000)} left
         </span>
       )}
       <button className="db-btn db-btn--glass db-btn--sm" onClick={() => setOpen(true)}>
@@ -112,7 +113,7 @@ function SpeechLen({ sec, onChange }: { sec: number; onChange: (s: number) => vo
         onClick={toggle}
         title="Speech length to pace against — click to change"
       >
-<b>{fmt(sec)}</b> speech <span className="flow-target__caret" aria-hidden>▾</span>
+<b>{fmt(sec)}</b> speech <ChevronDown size={12} className="flow-target__caret" aria-hidden />
       </button>
       {open && rect && (
         <>

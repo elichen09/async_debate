@@ -11,6 +11,7 @@ import ReadDocView from "@/app/components/flow/ReadDocView";
 import FlowTimers, { type TimerSnap } from "@/app/components/flow/FlowTimers";
 import FlowDock from "@/app/components/flow/FlowDock";
 import FlowShortcuts from "@/app/components/flow/FlowShortcuts";
+import { Columns2, Ellipsis, X } from "lucide-react";
 import type { EditorInsert, Flow, FlowSnippet } from "@/app/flow/shared";
 
 const SNIP_SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
@@ -559,7 +560,7 @@ export default function FlowWorkspace() {
             onClick={(e) => openMenu("split", e)}
             title="Open another view or flow side-by-side"
             aria-label="Split view"
-          >＋</button>
+          ><Columns2 size={15} /></button>
         </div>
         <div className="flow-work__actions">
           <button
@@ -567,7 +568,7 @@ export default function FlowWorkspace() {
             onClick={(e) => openMenu("more", e)}
             title="Tools & panels"
             aria-label="Tools and panels"
-          >⋯</button>
+          ><Ellipsis size={15} /></button>
         </div>
       </header>
 
@@ -596,7 +597,7 @@ export default function FlowWorkspace() {
                 {panes.length > 1 && (
                   <div className="flow-pane__head">
                     <span className="flow-pane__title" title={title}>{title}</span>
-                    <button className="flow-pane__close" onClick={() => closePane(pane.key)} aria-label="Close pane" title="Close pane">×</button>
+                    <button className="flow-pane__close" onClick={() => closePane(pane.key)} aria-label="Close pane" title="Close pane"><X size={15} /></button>
                   </div>
                 )}
                 <div className="flow-pane__body">
@@ -669,11 +670,11 @@ export default function FlowWorkspace() {
                   <span>Share</span>{dock === "share" && <span className="flow-menu__check">✓</span>}
                 </button>
                 <button className={`flow-menu__item ${showTimers ? "is-on" : ""}`} role="menuitem" onClick={() => { setShowTimers(!showTimers); setMenu(null); }}>
-                  <span>⏱ Timers</span>{showTimers && <span className="flow-menu__check">✓</span>}
+                  <span>Timers</span>{showTimers && <span className="flow-menu__check">✓</span>}
                 </button>
                 <div className="flow-menu__sep" />
                 <button className="flow-menu__item" role="menuitem" onClick={() => { setFullscreen((f) => !f); setMenu(null); }}>
-                  {fullscreen ? "⤡ Exit fullscreen" : "⤢ Fullscreen"}
+                  {fullscreen ? "Exit fullscreen" : "Fullscreen"}
                 </button>
                 <button className="flow-menu__item" role="menuitem" onClick={() => { setShowShortcuts(true); setMenu(null); }}>
                   <span>Keyboard shortcuts</span><span className="flow-menu__kbd">?</span>

@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { fuzzyRank } from "@/lib/fuzzy";
-import type { FlowCell, EditorInsert } from "@/app/flow/shared";
+import { GripVertical, ChevronRight, ChevronDown, Flag, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2 } from "lucide-react";
+import { useConfirm } from "@/app/components/flow/ConfirmProvider";
+import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, type FlowCell, type EditorInsert, type FlowDragPayload } from "@/app/flow/shared";
+
+const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 // A short, stable color per collaborator (keyed off their user id) for presence.
 const PRESENCE_COLORS = ["#e0704f", "#6f9bea", "#5fbf8f", "#c98bdb", "#e0b84f", "#5fc7d6"];
@@ -72,6 +76,7 @@ function nodeLabel(count: number, depth: number): string {
 // into a response, Shift+Tab outdents, and highlighting marks key cards. Numbers
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
 export default function FlowGrid({ flowId, userId, userName = "Partner", registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints, onReorder }: FlowGridProps) {
+  const confirm = useConfirm();
   const [cells, setCells] = useState<FlowCell[]>([]);
   const [loadError, setLoadError] = useState("");
   const cellsRef = useRef<FlowCell[]>([]);
@@ -90,6 +95,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   const [flaggedOnly, setFlaggedOnly] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
+  const [extDrop, setExtDrop] = useState(false);   // a point from another pane is hovering this flow
   // Slash autocomplete: which cell is typing a "/trigger" and the partial text.
   const [slash, setSlash] = useState<{ id: string; query: string } | null>(null);
   const [slashActive, setSlashActive] = useState(0);
@@ -360,7 +366,13 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
 
   async function clearAll() {
     if (!cellsRef.current.length) return;
-    if (!window.confirm("Clear the whole flow? This removes every point for everyone on it.")) return;
+    const ok = await confirm({
+      title: "Clear the whole flow?",
+      message: "This removes every point for everyone on it.",
+      confirmLabel: "Clear flow",
+      tone: "danger",
+    });
+    if (!ok) return;
     const ids = cellsRef.current.map((c) => c.id);
     setCells([]);
     onCellsDeleted?.(ids);
@@ -376,6 +388,26 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     setCells((prev) => prev.filter((c) => c.id !== cell.id));
     onCellsDeleted?.([cell.id]);
     await supabase.from("flow_cells").delete().eq("id", cell.id);
+  }
+
+  // Delete every selected point along with its sub-points. Removes for everyone and
+  // drops the Send doc cards tied to them. Confirmed, since it's bulk + irreversible.
+  async function deleteSelected() {
+    if (!selected.size) return;
+    const ids = new Set<string>();
+    for (const sid of selected) for (const d of subtreeIds(sid)) ids.add(d);
+    const idArr = [...ids];
+    const ok = await confirm({
+      title: idArr.length === 1 ? "Delete this point?" : `Delete ${idArr.length} points?`,
+      message: "They're removed for everyone on this flow.",
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setCells((prev) => prev.filter((c) => !ids.has(c.id)));
+    onCellsDeleted?.(idArr);
+    clearSelection();
+    await supabase.from("flow_cells").delete().in("id", idArr);
   }
 
   function toggleCollapse(id: string) {
@@ -428,6 +460,91 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       .map((c) => c.id);
     onReorder?.(newOrder);
     if (rootIds.length > 1) clearSelection();
+  }
+
+  // The set of points a drag carries: the dragged point's subtree, or — if it's
+  // part of a multi-selection — every selected point with its subtree, in order.
+  function dragGroup(draggedId: string): FlowCell[] {
+    const list = sorted();
+    const rootIds = selected.size > 1 && selected.has(draggedId)
+      ? list.filter((c) => selected.has(c.id)).map((c) => c.id)
+      : [draggedId];
+    const set = new Set<string>();
+    for (const rid of rootIds) {
+      const ri = list.findIndex((c) => c.id === rid);
+      if (ri < 0) continue;
+      set.add(rid);
+      for (let i = ri + 1; i < list.length && list[i].depth > list[ri].depth; i++) set.add(list[i].id);
+    }
+    return list.filter((c) => set.has(c.id));
+  }
+
+  // On drag start, stash the group on the native dataTransfer so a *different* pane
+  // (another flow, or the Speech tab) can read it: JSON for flow→flow inserts, plus
+  // colored HTML / tab-indented text for the Speech doc (mirrors Copy). Depths are
+  // normalized so the shallowest point is 0.
+  function startDrag(e: React.DragEvent, cell: FlowCell) {
+    setDragId(cell.id);
+    e.dataTransfer.effectAllowed = "copyMove";
+    const group = dragGroup(cell.id);
+    if (!group.length) return;
+    const min = Math.min(...group.map((c) => c.depth));
+    const payload: FlowDragPayload = {
+      sourceFlowId: flowId,
+      points: group.map((c) => ({ content: c.content, depth: c.depth - min, highlighted: c.highlighted, status: c.status ?? null })),
+    };
+    const text = group.map((c) => "\t".repeat(c.depth - min) + c.content).join("\n");
+    const html = group.map((c) => {
+      const color = FLOW_DEPTH_COLORS[c.depth % 2];
+      const indent = (c.depth - min) * 24;
+      return `<div style="margin-left:${indent}px;color:${color}">${escHtml(c.content) || "<br>"}</div>`;
+    }).join("");
+    try {
+      e.dataTransfer.setData(FLOW_DRAG_MIME, JSON.stringify(payload));
+      e.dataTransfer.setData("text/plain", text);
+      e.dataTransfer.setData("text/html", html);
+    } catch { /* some browsers block setData on certain types */ }
+  }
+
+  // Drop a group dragged from another flow: insert its points as new cells. On a
+  // target node they land just after that node's whole subtree, nested under the
+  // target's depth; dropped in empty space they append at the bottom.
+  async function insertExternal(payload: FlowDragPayload, afterCell: FlowCell | null) {
+    if (!payload?.points?.length) return;
+    if (payload.sourceFlowId === flowId && !afterCell) return; // no-op self-append
+    const list = sorted();
+    let baseDepth = 0, lo: number, hi: number;
+    if (afterCell) {
+      baseDepth = afterCell.depth;
+      const ti = list.findIndex((c) => c.id === afterCell.id);
+      let end = ti;
+      for (let j = ti + 1; j < list.length && list[j].depth > afterCell.depth; j++) end = j;
+      lo = list[end].row_index;
+      hi = list[end + 1] ? list[end + 1].row_index : lo + 1;
+    } else {
+      lo = list.length ? Math.max(...list.map((c) => c.row_index)) : -1;
+      hi = lo + 1;
+    }
+    const n = payload.points.length;
+    const rows = payload.points.map((p, k) => ({
+      flow_id: flowId,
+      col: 0,
+      row_index: lo + ((hi - lo) * (k + 1)) / (n + 1),
+      depth: Math.max(0, baseDepth + p.depth),
+      content: p.content,
+      highlighted: !!p.highlighted,
+      status: p.status ?? null,
+      updated_by: userId,
+    }));
+    const { data } = await supabase.from("flow_cells").insert(rows).select(SEL);
+    if (data) setCells((prev) => [...prev, ...(data as FlowCell[])]);
+  }
+
+  // Read a cross-pane drop payload off the event (returns null for non-flow drags).
+  function readDrag(e: React.DragEvent): FlowDragPayload | null {
+    const raw = e.dataTransfer.getData(FLOW_DRAG_MIME);
+    if (!raw) return null;
+    try { return JSON.parse(raw) as FlowDragPayload; } catch { return null; }
   }
 
   // Click a point's number to select it; Shift-click selects a range.
@@ -566,10 +683,28 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   const anyCollapsed = collapsed.size > 0;
 
   return (
-    <div className="flow-outline">
+    <div
+      className={`flow-outline ${extDrop ? "is-extdrop" : ""}`}
+      onKeyDown={(e) => {
+        // Del / Backspace clears the selected points — but never while typing in a cell.
+        if ((e.key === "Delete" || e.key === "Backspace") && selected.size) {
+          const t = e.target as HTMLElement;
+          if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+          e.preventDefault();
+          deleteSelected();
+        }
+      }}
+      onDragOver={(e) => { if (!dragId && e.dataTransfer.types.includes(FLOW_DRAG_MIME)) { e.preventDefault(); setExtDrop(true); } }}
+      onDragLeave={(e) => { if (e.target === e.currentTarget) setExtDrop(false); }}
+      onDrop={(e) => {
+        // Node drops stop propagation, so this only fires for empty-area drops → append.
+        if (!dragId) { const p = readDrag(e); if (p) { e.preventDefault(); insertExternal(p, null); } }
+        setExtDrop(false);
+      }}
+    >
       {loadError && (
         <p className="flow-outline__error">
-          ⚑ Couldn’t load the flow: {loadError}. If this mentions “depth”,
+          <AlertTriangle size={13} /> Couldn’t load the flow: {loadError}. If this mentions “depth”,
           “highlighted”, or “status”, run the flow_cells migrations in Supabase
           (flows.sql and flow_cell_status.sql).
         </p>
@@ -583,15 +718,20 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             {selected.size ? `Copy ${selected.size}` : "Copy"}
           </button>
           {selected.size > 0 && (
-            <button className="db-btn db-btn--glass db-btn--sm" onClick={clearSelection}>Deselect</button>
+            <>
+              <button className="db-btn db-btn--glass db-btn--sm flow-outline__del" onClick={deleteSelected} title="Delete selected points (Del)">
+                <Trash2 size={13} /> Delete {selected.size}
+              </button>
+              <button className="db-btn db-btn--glass db-btn--sm" onClick={clearSelection}>Deselect</button>
+            </>
           )}
           <button className={`db-btn db-btn--glass db-btn--sm ${flaggedOnly ? "is-active" : ""}`} onClick={() => setFlaggedOnly((f) => !f)} title="Show only flagged points">
-            ⚑ {flaggedOnly ? "Showing flagged" : "Only flagged"}
+            <Flag size={13} /> {flaggedOnly ? "Showing flagged" : "Only flagged"}
           </button>
           <button className="db-btn db-btn--glass db-btn--sm" onClick={() => (anyCollapsed ? setCollapsed(new Set()) : setCollapsed(new Set(labeled.filter((l) => l.hasKids).map((l) => l.cell.id))))}>
             {anyCollapsed ? "Expand all" : "Collapse all"}
           </button>
-          <span className="flow-outline__bar-hint">Select numbers, then drag ⠿ to move them as a group</span>
+          <span className="flow-outline__bar-hint">Select numbers, then drag the handle to move them as a group</span>
           <button className="db-btn db-btn--glass db-btn--sm" onClick={clearAll}>Clear flow</button>
         </div>
       )}
@@ -600,18 +740,26 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
           key={cell.id}
           className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${dropId === cell.id ? "is-drop" : ""} ${dragId === cell.id || (dragId && selected.size > 1 && selected.has(dragId) && selected.has(cell.id)) ? "is-drag" : ""}`}
           style={{ marginLeft: cell.depth * INDENT, ...(remoteEditors[cell.id]?.length ? { boxShadow: `inset 0 0 0 1.5px ${remoteEditors[cell.id][0].color}` } : cell.status === "flag" ? { boxShadow: `inset 3px 0 0 ${FLAG_COLOR}` } : {}) }}
-          onDragOver={(e) => { if (dragId && dragId !== cell.id) { e.preventDefault(); setDropId(cell.id); } }}
-          onDrop={(e) => { e.preventDefault(); if (dragId) moveSubtree(dragId, cell.id); setDragId(null); setDropId(null); }}
+          onDragOver={(e) => {
+            if (dragId) { if (dragId !== cell.id) { e.preventDefault(); setDropId(cell.id); } }
+            else if (e.dataTransfer.types.includes(FLOW_DRAG_MIME)) { e.preventDefault(); setDropId(cell.id); }
+          }}
+          onDrop={(e) => {
+            e.preventDefault(); e.stopPropagation();
+            if (dragId) moveSubtree(dragId, cell.id);            // same flow → reorder
+            else { const p = readDrag(e); if (p) insertExternal(p, cell); }  // another pane → insert after
+            setDragId(null); setDropId(null); setExtDrop(false);
+          }}
         >
           <span
             className="flow-node__drag"
             draggable
-            title="Drag to move this point (and its sub-points)"
-            onDragStart={(e) => { setDragId(cell.id); e.dataTransfer.effectAllowed = "move"; }}
-            onDragEnd={() => { setDragId(null); setDropId(null); }}
-          >⠿</span>
+            title="Drag to move this point — reorder here, or across panes into another flow or the Speech tab"
+            onDragStart={(e) => startDrag(e, cell)}
+            onDragEnd={() => { setDragId(null); setDropId(null); setExtDrop(false); }}
+          ><GripVertical size={14} /></span>
           {hasKids ? (
-            <button className="flow-node__fold" onClick={() => toggleCollapse(cell.id)} aria-label={collapsed.has(cell.id) ? "Expand" : "Collapse"} title={collapsed.has(cell.id) ? "Expand" : "Collapse"}>{collapsed.has(cell.id) ? "▸" : "▾"}</button>
+            <button className="flow-node__fold" onClick={() => toggleCollapse(cell.id)} aria-label={collapsed.has(cell.id) ? "Expand" : "Collapse"} title={collapsed.has(cell.id) ? "Expand" : "Collapse"}>{collapsed.has(cell.id) ? <ChevronRight size={12} /> : <ChevronDown size={12} />}</button>
           ) : (
             <span className="flow-node__fold flow-node__fold--leaf" />
           )}
@@ -624,7 +772,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectLabel(cell, false); } }}
           >{label}</span>
           {cell.status === "flag" && (
-            <span className="flow-node__statustag" style={{ background: FLAG_COLOR }}>⚑</span>
+            <span className="flow-node__statustag" style={{ background: FLAG_COLOR }}><Flag size={10} /></span>
           )}
           <textarea
             className="flow-node__text"
@@ -744,12 +892,12 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             </ul>
           )}
           <div className="flow-node__tools">
-            <button className={`flow-node__btn ${cell.status === "flag" ? "is-flag" : ""}`} onClick={() => toggleFlag(cell)} title="Flag (or type /flag)" aria-label="Flag">⚑</button>
-            <button className="flow-node__btn flow-node__btn--sub" onClick={() => addChild(cell)} title="Add sub-point inside" aria-label="Add sub-point">↳+</button>
-            <button className="flow-node__btn" onClick={() => reIndent(cell, -1)} title="Outdent (Shift+Tab)" aria-label="Outdent">←</button>
-            <button className="flow-node__btn" onClick={() => reIndent(cell, 1)} title="Indent (Tab)" aria-label="Indent">→</button>
-            <button className="flow-node__btn" onClick={() => toggleHighlight(cell)} title="Highlight (Ctrl+E)" aria-label="Highlight">▤</button>
-            <button className="flow-node__btn" onClick={() => delNode(cell)} title="Delete" aria-label="Delete">×</button>
+            <button className={`flow-node__btn ${cell.status === "flag" ? "is-flag" : ""}`} onClick={() => toggleFlag(cell)} title="Flag (or type /flag)" aria-label="Flag"><Flag size={13} /></button>
+            <button className="flow-node__btn flow-node__btn--sub" onClick={() => addChild(cell)} title="Add sub-point inside" aria-label="Add sub-point"><ListPlus size={13} /></button>
+            <button className="flow-node__btn" onClick={() => reIndent(cell, -1)} title="Outdent (Shift+Tab)" aria-label="Outdent"><IndentDecrease size={13} /></button>
+            <button className="flow-node__btn" onClick={() => reIndent(cell, 1)} title="Indent (Tab)" aria-label="Indent"><IndentIncrease size={13} /></button>
+            <button className="flow-node__btn" onClick={() => toggleHighlight(cell)} title="Highlight (Ctrl+E)" aria-label="Highlight"><Highlighter size={13} /></button>
+            <button className="flow-node__btn" onClick={() => delNode(cell)} title="Delete" aria-label="Delete"><X size={13} /></button>
           </div>
         </div>
       ))}

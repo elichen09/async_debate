@@ -5,6 +5,7 @@ import { downloadHtmlAsDocx } from "@/lib/sendDocExport";
 import { usePanePresence } from "@/lib/presence";
 import { caretOffsetIn } from "@/lib/caret";
 import { fuzzyRank } from "@/lib/fuzzy";
+import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Download, Maximize2, Minimize2 } from "lucide-react";
 import RemoteCarets from "@/app/components/flow/RemoteCarets";
 
 interface SendDocProps {
@@ -193,16 +194,16 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, sla
           ))}
         </div>
         <div className="flow-sendedit__fmt" role="group" aria-label="Style">
-          {([["bold", "B", "Bold (Ctrl+B)"], ["italic", "I", "Italic (Ctrl+I)"], ["underline", "U", "Underline (Ctrl+U)"]] as const).map(([cmd, glyph, lbl]) => (
+          {([["bold", Bold, "Bold (Ctrl+B)"], ["italic", Italic, "Italic (Ctrl+I)"], ["underline", Underline, "Underline (Ctrl+U)"]] as const).map(([cmd, Icon, lbl]) => (
             <button key={cmd} className={`flow-fmt-btn flow-fmt-btn--${cmd}`} onMouseDown={(e) => e.preventDefault()} onClick={() => style(cmd)} title={lbl} aria-label={lbl}>
-              {glyph}
+              <Icon size={14} />
             </button>
           ))}
         </div>
         <div className="flow-sendedit__fmt" role="group" aria-label="Align">
-          {([["justifyLeft", "⯇", "Align left"], ["justifyCenter", "≡", "Align center"], ["justifyRight", "⯈", "Align right"]] as const).map(([cmd, glyph, lbl]) => (
+          {([["justifyLeft", AlignLeft, "Align left"], ["justifyCenter", AlignCenter, "Align center"], ["justifyRight", AlignRight, "Align right"]] as const).map(([cmd, Icon, lbl]) => (
             <button key={cmd} className="flow-fmt-btn" onMouseDown={(e) => e.preventDefault()} onClick={() => align(cmd)} title={lbl} aria-label={lbl}>
-              {glyph}
+              <Icon size={14} />
             </button>
           ))}
         </div>
@@ -224,11 +225,11 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, sla
         </select>
         <span className="flow-sendedit__spacer" />
         <button className="db-btn db-btn--accent db-btn--sm" onClick={() => downloadHtmlAsDocx(ref.current?.innerHTML ?? html)}>
-          ⬇ Download .docx
+          <Download size={15} /> Download .docx
         </button>
         <button className="db-btn db-btn--glass db-btn--sm" onClick={clear}>Clear</button>
         <button className="db-btn db-btn--glass db-btn--sm" onClick={() => setFullscreen((f) => !f)}>
-          {fullscreen ? "⤡ Exit" : "⤢ Fullscreen"}
+          {fullscreen ? <><Minimize2 size={14} /> Exit</> : <><Maximize2 size={14} /> Fullscreen</>}
         </button>
       </div>
 

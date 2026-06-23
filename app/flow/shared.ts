@@ -100,3 +100,23 @@ export interface FlowSnippetFolder {
 // An editor (a grid cell or the speech area) registers this on focus so the
 // snippet library can insert text into whatever the user last touched.
 export type EditorInsert = (text: string) => void;
+
+// Cross-pane drag of flow points: when split-screening you can drag a point (and
+// its sub-points) from one flow into another, or onto the Speech tab. The dragged
+// group rides the native dataTransfer so a different pane (a separate component
+// instance) can read it. Depths are normalized so the shallowest point is 0.
+export const FLOW_DRAG_MIME = "application/x-debate-flow";
+export interface FlowDragPoint {
+  content: string;
+  depth: number;            // relative to the dragged group (top point = 0)
+  highlighted?: boolean;
+  status?: string | null;
+}
+export interface FlowDragPayload {
+  sourceFlowId: string;
+  points: FlowDragPoint[];
+}
+
+// The two indent colors the outline alternates by depth (mirrors --c0/--c1 CSS).
+// Shared so Copy and cross-pane drag write the same color-coding into the Speech doc.
+export const FLOW_DEPTH_COLORS = ["#ffa987", "#9cc3ff"];
