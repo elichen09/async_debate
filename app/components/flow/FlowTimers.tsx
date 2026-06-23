@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { loadSpeechSec, saveSpeechSec } from "@/lib/readEstimate";
 
 // A clock counts down `remaining` ms; while running we store an absolute `endsAt`
 // so every collaborator computes the same value from their own wall clock.
@@ -12,10 +13,16 @@ interface TState {
   prepDur: number; pro: Clock; con: Clock;
 }
 
+// A snapshot of the speech clock the Read doc reads to show pace-vs-time.
+export type TimerSnap = { mainDur: number; main: Clock };
+
 const MIN = 60_000;
 const idle = (ms: number): Clock => ({ running: false, endsAt: null, remaining: ms });
 function initial(): TState {
-  return { rev: 0, mainDur: 4 * MIN, main: idle(4 * MIN), prepDur: 3 * MIN, pro: idle(3 * MIN), con: idle(3 * MIN) };
+  // Seed the speech clock from the shared speech length so the timer and the
+  // Read-doc pace chip agree out of the box.
+  const dur = loadSpeechSec() * 1000;
+  return { rev: 0, mainDur: dur, main: idle(dur), prepDur: 3 * MIN, pro: idle(3 * MIN), con: idle(3 * MIN) };
 }
 function clockMs(c: Clock): number {
   return c.running && c.endsAt != null ? Math.max(0, c.endsAt - Date.now()) : Math.max(0, c.remaining);
@@ -35,13 +42,16 @@ function pause(c: Clock): Clock {
 // Shared per-flow speech + prep timers, pinned under the header. State syncs over a
 // Realtime broadcast channel (ephemeral — no schema); a fresh tab requests the
 // current state on join, and we re-render on a local tick to count down smoothly.
-export default function FlowTimers({ flowId }: { flowId: string }) {
+export default function FlowTimers({ flowId, onState }: { flowId: string; onState?: (s: TimerSnap) => void }) {
   const [st, setSt] = useState<TState>(initial);
   const stRef = useRef(st);
   const chRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const subscribed = useRef(false);
   const [, force] = useState(0);
   useEffect(() => { stRef.current = st; }, [st]);
+  // Surface the speech clock to the page (for the Read-doc pace chip). Fires only
+  // when the clock actually changes (commits / collaborator updates), not on ticks.
+  useEffect(() => { onState?.({ mainDur: st.mainDur, main: st.main }); }, [st.mainDur, st.main, onState]);
 
   useEffect(() => {
     const ch = supabase.channel(`flow_timer:${flowId}`);
@@ -70,6 +80,7 @@ export default function FlowTimers({ flowId }: { flowId: string }) {
 
   const adjustMain = (delta: number) => commit((s) => {
     const dur = Math.max(MIN, Math.min(60 * MIN, s.mainDur + delta));
+    saveSpeechSec(Math.round(dur / 1000)); // keep the Read-doc pace target in sync
     return { ...s, mainDur: dur, main: idle(dur) };
   });
 

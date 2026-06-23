@@ -3265,7 +3265,36 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
   height: calc(100dvh - 44px);
   position: relative;
   z-index: 1;
+
+  /* Premium typography, scoped to the flow workspace only. The site keeps
+     Fraunces/Lora; here the functional chrome runs on Hanken Grotesk (a refined
+     humanist sans) and the display/masthead moments on Libre Caslon Display.
+     Document surfaces (Send doc, Speech, Read doc, calibrate sample) pin
+     --font-calibri directly, so this swap never touches them. */
+  --font-display: var(--font-hanken), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-body:    var(--font-hanken), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-serif:   var(--font-caslon), "Fraunces", Georgia, "Times New Roman", serif;
 }
+
+/* Caslon Display ships a single 400 cut (already a display weight), so the
+   heading moments stay at 400 rather than forcing a synthetic bold. Hierarchy
+   comes from size, the serif itself, and color. Selectors are scoped under
+   .flow-shell so they outrank the base chrome rules later in the file. */
+.flow-shell .flow-empty__title,
+.flow-shell .flow-work__title,
+.flow-shell .flow-rail__brand,
+.flow-shell .flow-rtcal h3,
+.flow-shell .flow-panel__title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+}
+.flow-shell .flow-empty__title { letter-spacing: -0.012em; text-wrap: balance; }
+.flow-shell .flow-rtcal h3 { letter-spacing: -0.006em; font-size: 24px; }
+/* Bump the small chrome mastheads so the serif reads at a comfortable optical
+   size instead of looking cramped at the old sans sizes; drop the old uppercase
+   tracking, which fights a display serif. */
+.flow-shell .flow-work__title { font-size: 17px; letter-spacing: -0.005em; }
+.flow-shell .flow-rail__brand { font-size: 16px; letter-spacing: 0; text-transform: none; color: rgba(255, 255, 255, 0.72); }
 /* The grid fills the whole shell from the top-left; the flow list overlays. */
 .flow-content { width: 100%; height: 100%; display: flex; }
 
@@ -4825,3 +4854,143 @@ html.gh-light .flow-empty__sub { color: var(--ink-soft); }
   .flow-tab, .flow-pill, .flow-addflow, .flow-foldertab { transition: none; }
   .flow-pill:hover, .flow-addflow:hover { transform: none; }
 }
+
+/* =========================================================================
+   FLOW WORKSPACE — streamlined chrome: split tab, ⋯ menu, unified dock,
+   shortcuts overlay, read-doc pace + per-card chips
+   ========================================================================= */
+
+/* The "＋" split control rides at the end of the view switcher. */
+.flow-tab--split { padding: 5px 11px; font-size: 14px; line-height: 1; color: rgba(255, 255, 255, 0.45); }
+.flow-tab--split:hover { color: rgba(255, 255, 255, 0.95); }
+html.gh-light .flow-tab--split { color: var(--muted); }
+html.gh-light .flow-tab--split:hover { color: var(--ink); }
+.flow-pill--icon { padding: 0; width: 32px; display: inline-flex; align-items: center; justify-content: center; font-size: 17px; line-height: 1; }
+
+/* Dropdown menus (split / ⋯) — fixed-positioned so the scrolling header can't clip
+   them. A transparent scrim closes them on outside click. */
+.flow-menu__scrim { position: fixed; inset: 0; z-index: 360; }
+.flow-menu {
+  position: fixed; z-index: 361; min-width: 184px; max-width: 260px;
+  display: flex; flex-direction: column; padding: 6px;
+  background: oklch(0.17 0.02 60 / 0.96); border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  animation: flow-menu-in 0.14s ease-out;
+}
+@keyframes flow-menu-in { from { opacity: 0; } to { opacity: 1; } }
+html.gh-light .flow-menu { background: #fffdf8; border-color: rgba(70, 45, 20, 0.14); box-shadow: 0 18px 44px rgba(70, 45, 20, 0.2); }
+.flow-menu__label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.4); padding: 8px 10px 4px; }
+html.gh-light .flow-menu__label { color: var(--muted); }
+.flow-menu__item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; text-align: left; padding: 8px 10px; border: none; border-radius: 8px;
+  background: none; cursor: pointer; font-family: var(--font-display); font-size: 13px; font-weight: 600;
+  color: rgba(255, 255, 255, 0.86); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.flow-menu__item:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+.flow-menu__item.is-on { color: var(--accent); }
+html.gh-light .flow-menu__item { color: var(--ink-soft); }
+html.gh-light .flow-menu__item:hover { background: rgba(70, 45, 20, 0.07); color: var(--ink); }
+html.gh-light .flow-menu__item.is-on { color: var(--accent-deep); }
+.flow-menu__check { color: var(--accent); font-size: 12px; }
+.flow-menu__kbd {
+  font-family: var(--font-mono); font-size: 11px; min-width: 18px; text-align: center;
+  padding: 1px 5px; border-radius: 5px; background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.7);
+}
+html.gh-light .flow-menu__kbd { background: rgba(70, 45, 20, 0.08); color: var(--ink-soft); }
+.flow-menu__sep { height: 1px; margin: 5px 6px; background: rgba(255, 255, 255, 0.1); }
+html.gh-light .flow-menu__sep { background: rgba(70, 45, 20, 0.1); }
+
+/* Unified right dock: Extensions + Share share one surface (mirrors .flow-snip). */
+.flow-dock {
+  width: 300px; flex: none; height: 100%; display: flex; flex-direction: column;
+  background: oklch(0.1 0.03 232 / 0.5); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-left: 1px solid rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.9);
+}
+.flow-dock__head { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 10px 8px 14px; }
+.flow-dock__tabs { display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.08); }
+.flow-dock__tab {
+  padding: 4px 12px; border: none; border-radius: 7px; background: none; cursor: pointer;
+  font-family: var(--font-display); font-size: 12.5px; font-weight: 600; color: rgba(255, 255, 255, 0.6);
+  transition: color 0.16s ease, background 0.16s ease;
+}
+.flow-dock__tab:hover { color: #fff; }
+.flow-dock__tab.is-active { color: var(--ink); background: #fffdf8; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
+.flow-dock__headbtns { display: flex; gap: 2px; }
+.flow-dock__body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 14px 16px; }
+/* Children render chrome-free inside the dock. */
+.flow-snip--embedded { width: auto; height: auto; padding: 0; background: none; border: none; backdrop-filter: none; -webkit-backdrop-filter: none; overflow: visible; }
+.flow-share--embedded { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+.flow-dock .flow-share__row { color: rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.12); }
+@media (max-width: 760px) {
+  .flow-dock { position: fixed; right: 0; top: 44px; bottom: 0; z-index: 150; }
+}
+
+/* Read-doc pace chips: how the estimate stacks up against the speech clock. */
+.flow-pace {
+  font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.flow-pace.is-under { color: #2f6b3d; background: rgba(60, 150, 80, 0.14); }
+.flow-pace.is-over { color: #b23b2e; background: rgba(190, 70, 50, 0.12); }
+.flow-pace--live { color: #2a2118; background: rgba(70, 45, 20, 0.08); }
+.flow-pace--live.is-low { color: #b23b2e; background: rgba(190, 70, 50, 0.15); }
+
+/* Editable speech-length chip + its popover (the Read bar is always paper). */
+.flow-target {
+  display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-display);
+  font-size: 12.5px; font-weight: 600; color: #6f6557; cursor: pointer;
+  padding: 2px 9px; border-radius: 999px; border: 1px solid rgba(70, 45, 20, 0.16);
+  background: rgba(70, 45, 20, 0.05); white-space: nowrap; transition: background 0.14s ease, border-color 0.14s ease;
+}
+.flow-target:hover, .flow-target.is-open { background: rgba(70, 45, 20, 0.1); border-color: rgba(70, 45, 20, 0.28); }
+.flow-target b { color: #2a2118; font-weight: 700; font-variant-numeric: tabular-nums; }
+.flow-target__caret { font-size: 9px; color: #a98a5e; }
+/* Paper-styled popover (overrides the dark .flow-menu base — read bar is light). */
+.flow-speechpop {
+  min-width: 200px; gap: 8px; padding: 10px;
+  background: #fffdf8; border-color: rgba(70, 45, 20, 0.14); box-shadow: 0 18px 44px rgba(70, 45, 20, 0.22);
+}
+.flow-speechpop .flow-menu__label { color: #8a7f6f; padding: 0 2px 2px; }
+.flow-speechpop__stepper { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.flow-speechpop__step {
+  font-family: var(--font-display); font-size: 12px; font-weight: 600; color: #6f5a3a;
+  padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(70, 45, 20, 0.16);
+  background: rgba(70, 45, 20, 0.04); cursor: pointer; transition: background 0.14s ease;
+}
+.flow-speechpop__step:hover:not(:disabled) { background: rgba(70, 45, 20, 0.1); }
+.flow-speechpop__step:disabled { opacity: 0.4; cursor: default; }
+.flow-speechpop__time { font-family: var(--font-display); font-size: 18px; font-weight: 700; color: #2a2118; font-variant-numeric: tabular-nums; }
+.flow-speechpop__presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.flow-speechpop__preset {
+  text-align: center; padding: 6px 4px; border-radius: 8px; border: 1px solid transparent;
+  background: rgba(70, 45, 20, 0.04); cursor: pointer; transition: background 0.14s ease, border-color 0.14s ease;
+  font-family: var(--font-display); font-size: 13px; font-weight: 700; color: #2a2118; font-variant-numeric: tabular-nums;
+}
+.flow-speechpop__preset:hover { background: rgba(70, 45, 20, 0.1); }
+.flow-speechpop__preset.is-on { border-color: var(--accent); background: rgba(169, 138, 94, 0.16); }
+
+/* Per-card time chip inside the read doc. */
+.flow-readview__doc .rd-seg:first-child > :first-child { margin-top: 0; }
+.flow-readview__doc .rd-head { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; }
+.rd-chip {
+  flex-shrink: 0; font-family: var(--font-display); font-size: 12px; font-weight: 600;
+  color: #a98a5e; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.flow-readview__doc p .rd-chip { margin-right: 8px; }
+
+/* Keyboard-shortcuts overlay (reuses the .flow-rtcal paper card). */
+.flow-keys { width: min(560px, 100%); }
+.flow-keys__groups { display: grid; grid-template-columns: 1fr; gap: 18px; margin: 6px 0 4px; }
+.flow-keys__gtitle { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a98a5e; margin-bottom: 8px; }
+.flow-keys__row { display: flex; align-items: baseline; gap: 14px; padding: 5px 0; }
+.flow-keys__combo { flex-shrink: 0; display: flex; gap: 4px; min-width: 116px; }
+.flow-keys__combo kbd {
+  font-family: var(--font-mono); font-size: 11.5px; font-weight: 600; line-height: 1.6;
+  min-width: 20px; text-align: center; padding: 1px 7px; border-radius: 6px;
+  background: #fff; border: 1px solid rgba(70, 45, 20, 0.18); box-shadow: 0 1px 0 rgba(70, 45, 20, 0.12);
+  color: #2a2118;
+}
+.flow-keys__desc { font-size: 13.5px; color: #574b39; line-height: 1.45; }
+@media (min-width: 520px) { .flow-keys__groups { grid-template-columns: 1fr 1fr; } }

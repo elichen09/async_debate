@@ -6,17 +6,78 @@ import { supabase } from "@/lib/supabase";
 import { blockToHtml, cardHtml } from "@/lib/richText";
 import FlowGrid from "@/app/components/flow/FlowGrid";
 import FlowSpeech from "@/app/components/flow/FlowSpeech";
-import SnippetLibrary from "@/app/components/flow/SnippetLibrary";
 import SendDoc from "@/app/components/flow/SendDoc";
 import ReadDocView from "@/app/components/flow/ReadDocView";
-import FlowTimers from "@/app/components/flow/FlowTimers";
-import ShareDialog from "@/app/components/flow/ShareDialog";
+import FlowTimers, { type TimerSnap } from "@/app/components/flow/FlowTimers";
+import FlowDock from "@/app/components/flow/FlowDock";
+import FlowShortcuts from "@/app/components/flow/FlowShortcuts";
 import type { EditorInsert, Flow, FlowSnippet } from "@/app/flow/shared";
 
 const SNIP_SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
 type Sibling = { id: string; title: string; folder_id: string | null };
 type ViewKind = "flow" | "speech" | "send" | "read";
+type DockTab = "extensions" | "share";
 type Pane = { key: string; view: ViewKind; flowId: string };
+
+// Remembered workspace layout (which view/panel you left open) so a reload — or
+// switching flows — lands you back where you were instead of always on Flow.
+const UI_KEY = "flow.ui.v1";
+type PaneSpec = { view: ViewKind; flowId: string };
+type SavedUi = {
+  layout: PaneSpec[]; layoutFlow: string; widths: number[];   // the current arrangement (for reload / flow switch)
+  split: PaneSpec[]; splitWidths: number[]; splitFlow: string; // the last ≥2-pane split (for tab rebuild)
+  dock: DockTab | null; timers: boolean;
+};
+function loadUi(): SavedUi {
+  const fallback: SavedUi = { layout: [], layoutFlow: "", widths: [], split: [], splitWidths: [], splitFlow: "", dock: null, timers: false };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const r = JSON.parse(localStorage.getItem(UI_KEY) || "null");
+    if (r && typeof r === "object") return {
+      layout: Array.isArray(r.layout) ? r.layout : [],
+      layoutFlow: typeof r.layoutFlow === "string" ? r.layoutFlow : "",
+      widths: Array.isArray(r.widths) ? r.widths : [],
+      split: Array.isArray(r.split) ? r.split : [],
+      splitWidths: Array.isArray(r.splitWidths) ? r.splitWidths : [],
+      splitFlow: typeof r.splitFlow === "string" ? r.splitFlow : "",
+      dock: r.dock ?? null,
+      timers: !!r.timers,
+    };
+  } catch { /* ignore */ }
+  return fallback;
+}
+function saveUi(patch: Partial<SavedUi>) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(UI_KEY, JSON.stringify({ ...loadUi(), ...patch })); } catch { /* ignore */ }
+}
+
+// Turn saved pane specs into live panes for `flowId`. When the specs were saved
+// under this same flow we restore them exactly (sibling-flow panes + widths);
+// otherwise we keep the split shape but point flow panes at the current flow — so a
+// Flow + Send doc split survives reloads, flow switches, and tab navigation.
+let paneKeySeq = 0;
+function specsToPanes(specs: PaneSpec[], widths: number[], savedFlow: string, flowId: string): { panes: Pane[]; flexes: Record<string, number> } {
+  const sameFlow = savedFlow === flowId && specs.length > 0;
+  const list = specs.length ? specs : [{ view: "flow" as ViewKind, flowId }];
+  const panes: Pane[] = [];
+  const flexes: Record<string, number> = {};
+  const seen = new Set<string>();
+  list.forEach((s, i) => {
+    const fid = s.view === "flow" ? (sameFlow ? s.flowId : flowId) : flowId;
+    const dk = `${s.view}:${fid}`;
+    if (seen.has(dk)) return;          // never two panes of the same view+flow
+    seen.add(dk);
+    const key = `p${paneKeySeq++}`;
+    panes.push({ key, view: s.view, flowId: fid });
+    if (sameFlow && typeof widths[i] === "number") flexes[key] = widths[i];
+  });
+  if (!panes.length) panes.push({ key: `p${paneKeySeq++}`, view: "flow", flowId });
+  return { panes, flexes };
+}
+function restoreLayout(flowId: string) {
+  const ui = loadUi();
+  return specsToPanes(ui.layout, ui.widths, ui.layoutFlow, flowId);
+}
 
 // Remove Send-doc cards tied to deleted flow points: drop each h4[data-cell] and
 // its body (siblings up to the next heading), then any block title (h3[data-block])
@@ -118,12 +179,24 @@ export default function FlowWorkspace() {
   const [loading, setLoading] = useState(true);
   // Split view: any number of side-by-side panes. Each is a view of a flow; the
   // Speech/Send panes always target the URL flow, Flow panes can be any sibling.
-  const [panes, setPanes] = useState<Pane[]>([{ key: "p0", view: "flow", flowId }]);
-  const [flexes, setFlexes] = useState<Record<string, number>>({});  // per-pane flex-grow weights (drag to resize)
-  const [showSnippets, setShowSnippets] = useState(false);
-  const [showShare, setShowShare] = useState(false);
+  const [boot] = useState(() => restoreLayout(flowId));   // saved split, restored once on mount
+  const [panes, setPanes] = useState<Pane[]>(boot.panes);
+  const [flexes, setFlexes] = useState<Record<string, number>>(boot.flexes);  // per-pane flex-grow weights (drag to resize)
+  const [dock, setDockState] = useState<DockTab | null>(() => loadUi().dock);
   const [fullscreen, setFullscreen] = useState(false);
-  const [showTimers, setShowTimers] = useState(false);
+  const [showTimers, setShowTimersState] = useState(() => loadUi().timers);
+  const [menu, setMenu] = useState<{ kind: "split" | "more"; rect: DOMRect } | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+  const [timerSnap, setTimerSnap] = useState<TimerSnap | null>(null);  // live speech clock for the Read-doc pace chip
+  // Toggle helpers that also remember the choice for next time.
+  const setDock = (d: DockTab | null) => { setDockState(d); saveUi({ dock: d }); };
+  const setShowTimers = (v: boolean) => { setShowTimersState(v); saveUi({ timers: v }); };
+  const openMenu = (kind: "split" | "more", e: React.MouseEvent) => {
+    // Capture the rect now — the synthetic event's currentTarget is nulled out by
+    // the time a state-updater callback runs under automatic batching.
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenu((m) => (m?.kind === kind ? null : { kind, rect }));
+  };
   const [snippets, setSnippets] = useState<FlowSnippet[]>([]);
   const [sendHtml, setSendHtml] = useState("");
   const [sendVersion, setSendVersion] = useState(0);
@@ -134,8 +207,10 @@ export default function FlowWorkspace() {
   const [prevFlowId, setPrevFlowId] = useState(flowId);
   if (prevFlowId !== flowId) {
     setPrevFlowId(flowId);
-    setPanes([{ key: `main-${flowId}`, view: "flow", flowId }]);
-    setFlexes({});
+    // Restore the saved split shape for the flow we're switching to.
+    const r = restoreLayout(flowId);
+    setPanes(r.panes);
+    setFlexes(r.flexes);
   }
 
   const activeInsert = useRef<EditorInsert | null>(null);
@@ -160,6 +235,18 @@ export default function FlowWorkspace() {
     if (fp.length) savedFlowPanesRef.current = fp;
   }, [panes]);
 
+  // Persist the pane layout (views + which flow each shows + column widths) so a
+  // split survives reloads and follows you across flows. Any time it's an actual
+  // split (≥2 panes) we also stash it as the remembered split a tab can rebuild.
+  // Widths come from the ref (latest committed) so resizing rewrites on drag end.
+  useEffect(() => {
+    const specs = panes.map((p) => ({ view: p.view, flowId: p.flowId }));
+    const widths = panes.map((p) => flexesRef.current[p.key] ?? 1);
+    const patch: Partial<SavedUi> = { layout: specs, layoutFlow: flowId, widths };
+    if (panes.length >= 2) { patch.split = specs; patch.splitWidths = widths; patch.splitFlow = flowId; }
+    saveUi(patch);
+  }, [panes, flowId]);
+
   // Fullscreen workspace: hide the site nav/rail so panes fill the whole screen.
   useEffect(() => {
     document.body.classList.toggle("flow-work-full", fullscreen);
@@ -167,33 +254,41 @@ export default function FlowWorkspace() {
   }, [fullscreen]);
 
   // --- View / split controls ---
-  // A tab SWITCHES the workspace's view (no automatic splitting). The Flow tab
-  // restores your last flow arrangement — so a 2-flow split survives a trip to
-  // Speech/Send and back. Speech/Send are always a single pane for the URL flow.
+  // A tab brings its view on screen. If that view belonged to your last split, the
+  // whole split is rebuilt (so clicking away to Speech and back to Flow restores a
+  // Flow + Send doc split); otherwise it's a single pane for the URL flow.
   function setView(view: ViewKind) {
+    if (panes.some((p) => p.view === view)) return;   // already on screen — don't churn the panes
+    const ui = loadUi();
+    if (ui.split.length >= 2 && ui.split.some((s) => s.view === view)) {
+      const r = specsToPanes(ui.split, ui.splitWidths, ui.splitFlow, flowId);
+      setPanes(r.panes); setFlexes(r.flexes);
+      return;
+    }
     setFlexes({});
     if (view === "flow") {
       const restore = savedFlowPanesRef.current.length ? savedFlowPanesRef.current : [{ key: `p${paneSeq.current++}`, view: "flow" as ViewKind, flowId }];
       setPanes(restore);
-    } else {
-      setPanes([{ key: `p${paneSeq.current++}`, view, flowId }]);
+      return;
     }
+    setPanes([{ key: `p${paneSeq.current++}`, view, flowId }]);
   }
-  const showingFlow = panes.length > 0 && panes.every((p) => p.view === "flow");
-  const isSoloView = (view: ViewKind) => (view === "flow" ? showingFlow : panes.length === 1 && panes[0].view === view);
+  // A tab is active when its view is visible in any pane (both light up in a split).
+  const isViewShown = (view: ViewKind) => panes.some((p) => p.view === view);
   // Split EXPLICITLY: add a view (for the URL flow) or another flow as a new pane.
   function addPane(view: ViewKind, fid: string = flowId) {
     const key = `p${paneSeq.current++}`;
     setFlexes({});  // reset to equal widths when the set of panes changes
     setPanes((prev) => (prev.some((p) => p.view === view && p.flowId === fid) ? prev : [...prev, { key, view, flowId: fid }]));
   }
-  function onSplit(value: string) {
-    if (value.startsWith("view:")) addPane(value.slice(5) as ViewKind);
-    else if (value.startsWith("flow:")) addPane("flow", value.slice(5));
-  }
   function closePane(key: string) {
+    if (panes.length <= 1) return;
     setFlexes({});
-    setPanes((prev) => (prev.length > 1 ? prev.filter((p) => p.key !== key) : prev));
+    const next = panes.filter((p) => p.key !== key);
+    setPanes(next);
+    // Explicitly closing down to one pane dismantles the split — forget it so a tab
+    // click doesn't resurrect it (tab-navigation collapses keep the memory).
+    if (next.length < 2) saveUi({ split: [], splitWidths: [], splitFlow: "" });
   }
   // Drag a divider to stretch/shrink the two panes on either side. Conserves the
   // pair's combined width, so other panes stay put. flex-grow ratios = width ratios
@@ -219,6 +314,9 @@ export default function FlowWorkspace() {
       window.removeEventListener("pointerup", onUp);
       resizer.classList.remove("is-active");
       document.body.classList.remove("flow-resizing");
+      // Remember the new column widths for this layout (and the remembered split).
+      const w = panesRef.current.map((p) => flexesRef.current[p.key] ?? 1);
+      saveUi(panesRef.current.length >= 2 ? { widths: w, splitWidths: w } : { widths: w });
     };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
@@ -412,6 +510,19 @@ export default function FlowWorkspace() {
     return () => window.removeEventListener("keydown", onKey);
   }, [siblings, flowId, router]);
 
+  // "?" opens the keyboard-shortcut overlay (but not while you're typing).
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "?") return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      e.preventDefault();
+      setShowShortcuts((s) => !s);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   if (loading || !flow) {
     return (
       <div className="flow-loading">
@@ -439,41 +550,28 @@ export default function FlowWorkspace() {
           </div>
         )}
         <div className="flow-work__tabs" role="group" aria-label="View">
-          <button className={`flow-tab ${isSoloView("flow") ? "is-active" : ""}`} onClick={() => setView("flow")}>Flow</button>
-          <button className={`flow-tab ${isSoloView("speech") ? "is-active" : ""}`} onClick={() => setView("speech")}>Speech</button>
-          <button className={`flow-tab ${isSoloView("send") ? "is-active" : ""}`} onClick={() => setView("send")}>Send doc</button>
-          <button className={`flow-tab ${isSoloView("read") ? "is-active" : ""}`} onClick={() => setView("read")}>Read doc</button>
+          <button className={`flow-tab ${isViewShown("flow") ? "is-active" : ""}`} onClick={() => setView("flow")}>Flow</button>
+          <button className={`flow-tab ${isViewShown("speech") ? "is-active" : ""}`} onClick={() => setView("speech")}>Speech</button>
+          <button className={`flow-tab ${isViewShown("send") ? "is-active" : ""}`} onClick={() => setView("send")}>Send doc</button>
+          <button className={`flow-tab ${isViewShown("read") ? "is-active" : ""}`} onClick={() => setView("read")}>Read doc</button>
+          <button
+            className={`flow-tab flow-tab--split ${menu?.kind === "split" ? "is-active" : ""}`}
+            onClick={(e) => openMenu("split", e)}
+            title="Open another view or flow side-by-side"
+            aria-label="Split view"
+          >＋</button>
         </div>
-        <select
-          className="flow-addflow"
-          value=""
-          title="Open another view or flow side-by-side"
-          onChange={(e) => { onSplit(e.target.value); e.currentTarget.value = ""; }}
-        >
-          <option value="" disabled>＋ Split…</option>
-          <optgroup label="Add view">
-            <option value="view:flow">Flow</option>
-            <option value="view:speech">Speech</option>
-            <option value="view:send">Send doc</option>
-            <option value="view:read">Read doc</option>
-          </optgroup>
-          {siblings.filter((s) => !panes.some((p) => p.view === "flow" && p.flowId === s.id)).length > 0 && (
-            <optgroup label="Add flow">
-              {siblings.filter((s) => !panes.some((p) => p.view === "flow" && p.flowId === s.id)).map((s) => (
-                <option key={s.id} value={`flow:${s.id}`}>{s.title}</option>
-              ))}
-            </optgroup>
-          )}
-        </select>
         <div className="flow-work__actions">
-          <button className={`flow-pill ${showTimers ? "is-active" : ""}`} onClick={() => setShowTimers((s) => !s)} title="Toggle timers">⏱ Timers</button>
-          <button className="flow-pill" onClick={() => setFullscreen((f) => !f)} title="Toggle fullscreen">{fullscreen ? "⤡ Exit" : "⤢ Fullscreen"}</button>
-          <button className={`flow-pill ${showSnippets ? "is-active" : ""}`} onClick={() => setShowSnippets((s) => !s)}>Extensions</button>
-          <button className="flow-pill" onClick={() => setShowShare(true)}>Share</button>
+          <button
+            className={`flow-pill flow-pill--icon ${menu?.kind === "more" || dock || showTimers ? "is-active" : ""}`}
+            onClick={(e) => openMenu("more", e)}
+            title="Tools & panels"
+            aria-label="Tools and panels"
+          >⋯</button>
         </div>
       </header>
 
-      {showTimers && <FlowTimers flowId={flowId} />}
+      {showTimers && <FlowTimers flowId={flowId} onState={setTimerSnap} />}
 
       <div className="flow-work__body">
         <div className="flow-work__panes">
@@ -512,7 +610,7 @@ export default function FlowWorkspace() {
                     <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} slashOptions={slashOptions} flowId={flowId} userId={userId} userName={userName} />
                   )}
                   {pane.view === "read" && (
-                    <ReadDocView sendHtml={sendHtml} />
+                    <ReadDocView sendHtml={sendHtml} timer={timerSnap} />
                   )}
                 </div>
               </section>
@@ -521,14 +619,72 @@ export default function FlowWorkspace() {
           })}
         </div>
 
-        {showSnippets && (
-          <SnippetLibrary userId={userId} onClose={() => setShowSnippets(false)} onUse={runExtension} snippets={snippets} setSnippets={setSnippets} />
+        {dock && (
+          <FlowDock
+            tab={dock}
+            onTab={setDock}
+            onClose={() => setDock(null)}
+            userId={userId}
+            onUse={runExtension}
+            snippets={snippets}
+            setSnippets={setSnippets}
+            flowId={flowId}
+            ownerId={flow.owner_id}
+          />
         )}
       </div>
 
-      {showShare && (
-        <ShareDialog flowId={flowId} ownerId={flow.owner_id} userId={userId} onClose={() => setShowShare(false)} />
+      {menu && (
+        <>
+          <div className="flow-menu__scrim" onClick={() => setMenu(null)} role="presentation" />
+          <div
+            className="flow-menu"
+            style={menu.kind === "more"
+              ? { top: menu.rect.bottom + 6, left: menu.rect.right, transform: "translateX(-100%)" }
+              : { top: menu.rect.bottom + 6, left: menu.rect.left }}
+            role="menu"
+          >
+            {menu.kind === "split" ? (
+              <>
+                <div className="flow-menu__label">Add view</div>
+                <button className="flow-menu__item" role="menuitem" onClick={() => { addPane("flow"); setMenu(null); }}>Flow</button>
+                <button className="flow-menu__item" role="menuitem" onClick={() => { addPane("speech"); setMenu(null); }}>Speech</button>
+                <button className="flow-menu__item" role="menuitem" onClick={() => { addPane("send"); setMenu(null); }}>Send doc</button>
+                <button className="flow-menu__item" role="menuitem" onClick={() => { addPane("read"); setMenu(null); }}>Read doc</button>
+                {siblings.filter((s) => !panes.some((p) => p.view === "flow" && p.flowId === s.id)).length > 0 && (
+                  <>
+                    <div className="flow-menu__label">Add flow</div>
+                    {siblings.filter((s) => !panes.some((p) => p.view === "flow" && p.flowId === s.id)).map((s) => (
+                      <button key={s.id} className="flow-menu__item" role="menuitem" onClick={() => { addPane("flow", s.id); setMenu(null); }} title={s.title}>{s.title}</button>
+                    ))}
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <button className={`flow-menu__item ${dock === "extensions" ? "is-on" : ""}`} role="menuitem" onClick={() => { setDock(dock === "extensions" ? null : "extensions"); setMenu(null); }}>
+                  <span>Extensions</span>{dock === "extensions" && <span className="flow-menu__check">✓</span>}
+                </button>
+                <button className={`flow-menu__item ${dock === "share" ? "is-on" : ""}`} role="menuitem" onClick={() => { setDock(dock === "share" ? null : "share"); setMenu(null); }}>
+                  <span>Share</span>{dock === "share" && <span className="flow-menu__check">✓</span>}
+                </button>
+                <button className={`flow-menu__item ${showTimers ? "is-on" : ""}`} role="menuitem" onClick={() => { setShowTimers(!showTimers); setMenu(null); }}>
+                  <span>⏱ Timers</span>{showTimers && <span className="flow-menu__check">✓</span>}
+                </button>
+                <div className="flow-menu__sep" />
+                <button className="flow-menu__item" role="menuitem" onClick={() => { setFullscreen((f) => !f); setMenu(null); }}>
+                  {fullscreen ? "⤡ Exit fullscreen" : "⤢ Fullscreen"}
+                </button>
+                <button className="flow-menu__item" role="menuitem" onClick={() => { setShowShortcuts(true); setMenu(null); }}>
+                  <span>Keyboard shortcuts</span><span className="flow-menu__kbd">?</span>
+                </button>
+              </>
+            )}
+          </div>
+        </>
       )}
+
+      {showShortcuts && <FlowShortcuts onClose={() => setShowShortcuts(false)} />}
     </div>
   );
 }

@@ -14,12 +14,13 @@ interface SnippetLibraryProps {
   onUse: (snippet: FlowSnippet) => void;   // add to flow + queue into Send doc
   snippets: FlowSnippet[];
   setSnippets: React.Dispatch<React.SetStateAction<FlowSnippet[]>>;
+  embedded?: boolean;   // rendered inside the dock (no own panel chrome / header)
 }
 
 // Extensions library. Import an "AT:" .docx → one extension per header section
 // (its Heading-4 items are the points). Using one breaks it into flow points and
 // queues its cards into the Send doc. Assign a key shortcut to fire it hands-free.
-export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSnippets }: SnippetLibraryProps) {
+export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSnippets, embedded }: SnippetLibraryProps) {
   const [label, setLabel] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
@@ -128,14 +129,16 @@ export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSn
   }
 
   return (
-    <aside className="flow-snip">
-      <div className="flow-snip__head">
-        <span className="flow-panel__title">Extensions</span>
-        <div className="flow-snip__headbtns">
-          <Link className="flow-icon-btn" href="/flow/extensions" title="Open full library" aria-label="Open full library">⤢</Link>
-          <button className="flow-icon-btn" onClick={onClose} aria-label="Close">×</button>
+    <div className={embedded ? "flow-snip flow-snip--embedded" : "flow-snip"}>
+      {!embedded && (
+        <div className="flow-snip__head">
+          <span className="flow-panel__title">Extensions</span>
+          <div className="flow-snip__headbtns">
+            <Link className="flow-icon-btn" href="/flow/extensions" title="Open full library" aria-label="Open full library">⤢</Link>
+            <button className="flow-icon-btn" onClick={onClose} aria-label="Close">×</button>
+          </div>
         </div>
-      </div>
+      )}
 
       <button className="flow-rail__import" onClick={() => fileRef.current?.click()} disabled={busy}>
         ⬆ Import AT doc (.docx)
@@ -175,6 +178,6 @@ export default function SnippetLibrary({ userId, onClose, onUse, snippets, setSn
           view.map((s) => item(s))
         )}
       </div>
-    </aside>
+    </div>
   );
 }

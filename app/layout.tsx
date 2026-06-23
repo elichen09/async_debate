@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Fraunces, Lora } from "next/font/google";
+import { Geist_Mono, Fraunces, Lora, Libre_Caslon_Display, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 import NavBar from "./components/NavBar";
 import ParticleField from "./components/ParticleField";
@@ -27,6 +27,20 @@ const lora = Lora({
   style: ["normal", "italic"],
 });
 
+// Flow workspace premium pairing (scoped to .flow-shell in globals.css):
+// Libre Caslon Display for the heading/masthead moments, Hanken Grotesk for the
+// functional chrome. Calibri still owns the document surfaces.
+const libreCaslon = Libre_Caslon_Display({
+  variable: "--font-caslon",
+  subsets: ["latin"],
+  weight: "400",
+});
+
+const hankenGrotesk = Hanken_Grotesk({
+  variable: "--font-hanken",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "debate.fish",
   description:
@@ -41,7 +55,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistMono.variable} ${fraunces.variable} ${lora.variable} antialiased`}
+      className={`${geistMono.variable} ${fraunces.variable} ${lora.variable} ${libreCaslon.variable} ${hankenGrotesk.variable} antialiased`}
     >
       <head>
         <script

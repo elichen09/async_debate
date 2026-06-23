@@ -8,6 +8,7 @@ interface ShareDialogProps {
   ownerId: string;
   userId: string;
   onClose: () => void;
+  embedded?: boolean;   // rendered inside the dock (no modal backdrop / header)
 }
 
 interface Collaborator {
@@ -17,7 +18,7 @@ interface Collaborator {
 
 // Per-flow sharing: the owner invites partners by @username (mirrors the round
 // pro_id/con_id model). Collaborators get full read/write via RLS.
-export default function ShareDialog({ flowId, ownerId, userId, onClose }: ShareDialogProps) {
+export default function ShareDialog({ flowId, ownerId, userId, onClose, embedded }: ShareDialogProps) {
   const [collabs, setCollabs] = useState<Collaborator[]>([]);
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
@@ -67,6 +68,46 @@ export default function ShareDialog({ flowId, ownerId, userId, onClose }: ShareD
     await supabase.from("flow_collaborators").delete().eq("flow_id", flowId).eq("user_id", uid);
   }
 
+  const inner = (
+    <>
+      {isOwner && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <input
+              className="db-input"
+              placeholder="@username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+              style={{ height: 42 }}
+            />
+            <button className="db-btn db-btn--accent" onClick={add} disabled={busy || !username.trim()} style={{ height: 42, flexShrink: 0 }}>
+              {busy ? "…" : "Add"}
+            </button>
+          </div>
+          {error && <p style={{ fontSize: 12, color: "var(--loss)", margin: "8px 0 0" }}>⚑ {error}</p>}
+        </>
+      )}
+
+      <div className="flow-share__list">
+        {collabs.length === 0 ? (
+          <p className="flow-snip__empty">Not shared with anyone yet.</p>
+        ) : (
+          collabs.map((c) => (
+            <div className="flow-share__row" key={c.user_id}>
+              <span>@{c.profile?.username ?? "user"}</span>
+              {isOwner && (
+                <button className="flow-icon-btn" onClick={() => remove(c.user_id)} aria-label="Remove">×</button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </>
+  );
+
+  if (embedded) return <div className="flow-share flow-share--embedded">{inner}</div>;
+
   return (
     <div className="flow-modal-backdrop" onClick={onClose}>
       <div className="flow-modal db-card" onClick={(e) => e.stopPropagation()}>
@@ -74,40 +115,7 @@ export default function ShareDialog({ flowId, ownerId, userId, onClose }: ShareD
           <span className="flow-panel__title">Share flow</span>
           <button className="flow-icon-btn" onClick={onClose} aria-label="Close">×</button>
         </div>
-
-        {isOwner && (
-          <>
-            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-              <input
-                className="db-input"
-                placeholder="@username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") add(); }}
-                style={{ height: 42 }}
-              />
-              <button className="db-btn db-btn--accent" onClick={add} disabled={busy || !username.trim()} style={{ height: 42, flexShrink: 0 }}>
-                {busy ? "…" : "Add"}
-              </button>
-            </div>
-            {error && <p style={{ fontSize: 12, color: "var(--loss)", margin: "8px 0 0" }}>⚑ {error}</p>}
-          </>
-        )}
-
-        <div className="flow-share__list">
-          {collabs.length === 0 ? (
-            <p className="flow-snip__empty">Not shared with anyone yet.</p>
-          ) : (
-            collabs.map((c) => (
-              <div className="flow-share__row" key={c.user_id}>
-                <span>@{c.profile?.username ?? "user"}</span>
-                {isOwner && (
-                  <button className="flow-icon-btn" onClick={() => remove(c.user_id)} aria-label="Remove">×</button>
-                )}
-              </div>
-            ))
-          )}
-        </div>
+        {inner}
       </div>
     </div>
   );
