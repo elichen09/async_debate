@@ -15,10 +15,12 @@ function shuffle<T>(arr: readonly T[]): T[] {
 }
 
 const RATES_KEY = "flow.readRates.v1";
-interface Rates { cardWpm: number; tagWpm: number; }
+interface Settings { cardWpm: number; tagWpm: number; fatiguePct: number }
 // Reading aloud for delivery: card text flows faster than tags/cites, which you
-// slow down on for clarity. Used until you calibrate your own pace.
-const DEFAULT_RATES: Rates = { cardWpm: 160, tagWpm: 110 };
+// slow down on for clarity. fatiguePct = how much slower the card text reads by
+// the 4-min mark (PF's longest speech). Used until you calibrate / edit.
+const DEFAULT_SETTINGS: Settings = { cardWpm: 160, tagWpm: 110, fatiguePct: 12 };
+const FATIGUE_MAX_PCT = 30; // slider ceiling
 
 // Reading-test material: real highlighted card reads (CARD_POOL) and real
 // tag + author/date lines (TAG_POOL) pulled from a 1NC. The test pulls a random
@@ -64,20 +66,16 @@ function avgWordLen(s: string): number {
   if (!words.length) return 0;
   return words.reduce((n, w) => n + w.length, 0) / words.length;
 }
-
 // Baseline word length of the calibration material. The rates were measured on
 // it, so a doc with longer words than this reads slower (and shorter, faster).
 const CARD_CAL_LEN = avgWordLen(CARD_POOL.join(" "));
 const TAG_CAL_LEN = avgWordLen(TAG_POOL.join(" "));
 
 // Reading slows on (a) longer words and (b) long stretches (fatigue).
-const WORDLEN_ALPHA = 0.6;     // how strongly word length matters (0 = not at all)
-// Tuned for PF, where the longest speech is 4 min: the log curve does its work
-// inside that window (≈+12% by the 4-min mark) rather than ramping over 15+ min.
-const FRESH_SEC = 20;       // the first 30s read at the fresh, calibrated pace
-const FATIGUE_COEF = 0.06;  // strength of the slow-down — fatigue grows logarithmically
+const WORDLEN_ALPHA = 0.6;  // how strongly word length matters (0 = not at all)
+const FRESH_SEC = 20;       // the first seconds read at the fresh, calibrated pace
 const FATIGUE_SCALE = 35;   // seconds; how quickly the log curve ramps in
-const MAX_FATIGUE = 1.15;   // cap the fatigue penalty at +15%
+const FOUR_MIN = 240;       // PF's longest speech — fatiguePct is the slowdown by here
 
 // WPM multiplier for word length: <1 when the doc's words run longer than the
 // calibration words. Dampened (^alpha) and clamped so it can't run away.
@@ -85,23 +83,29 @@ function lenFactor(docLen: number, calLen: number): number {
   if (!docLen || !calLen) return 1;
   return Math.min(1.2, Math.max(0.6, Math.pow(calLen / docLen, WORDLEN_ALPHA)));
 }
+// Solve the log coefficient so the penalty hits exactly fatiguePct at 4:00.
+function fatigueCoef(pct: number): number {
+  const denom = Math.log(1 + Math.max(0, FOUR_MIN - FRESH_SEC) / FATIGUE_SCALE);
+  return denom > 0 ? (pct / 100) / denom : 0;
+}
 
-// Estimated read time (seconds): apply each calibrated rate, adjusted for word
-// length. Fatigue (driven by total time on feet) then inflates ONLY the card
+// Estimated read time (seconds): apply each rate, adjusted for word length.
+// Fatigue (driven by total time on feet, log growth) then inflates ONLY the card
 // text — tags/cites are read deliberately for clarity and don't fatigue.
-function estimateSeconds(bodyWords: number, tagWords: number, bodyLen: number, tagLen: number, rates: Rates): number {
-  const cardRate = rates.cardWpm * lenFactor(bodyLen, CARD_CAL_LEN);
-  const tagRate = rates.tagWpm * lenFactor(tagLen, TAG_CAL_LEN);
+function estimateSeconds(bodyWords: number, tagWords: number, bodyLen: number, tagLen: number, s: Settings): number {
+  const cardRate = s.cardWpm * lenFactor(bodyLen, CARD_CAL_LEN);
+  const tagRate = s.tagWpm * lenFactor(tagLen, TAG_CAL_LEN);
   const baseCard = cardRate ? bodyWords / cardRate * 60 : 0;
   const baseTag = tagRate ? tagWords / tagRate * 60 : 0;
-  const fatigue = Math.min(MAX_FATIGUE, 1 + FATIGUE_COEF * Math.log(1 + Math.max(0, baseCard + baseTag - FRESH_SEC) / FATIGUE_SCALE));
+  const raw = 1 + fatigueCoef(s.fatiguePct) * Math.log(1 + Math.max(0, baseCard + baseTag - FRESH_SEC) / FATIGUE_SCALE);
+  const fatigue = Math.min(1 + s.fatiguePct / 100, raw); // can't exceed the 4-min penalty
   return baseCard * fatigue + baseTag;
 }
 
 // Count the read-doc words you read slowly (tags + cites) vs at card pace (body),
 // plus each group's average word length, so the estimate can adjust per group.
 function analyze(readHtml: string) {
-  if (typeof DOMParser === "undefined") return { bodyWords: 0, tagWords: 0, bodyLen: 0, tagLen: 0 };
+  if (typeof DOMParser === "undefined") return { bodyWords: 0, tagWords: 0, bodyLen: 0, tagLen: 0, bodyText: "", tagText: "" };
   const dom = new DOMParser().parseFromString(readHtml || "", "text/html");
   const body: string[] = [];
   const tags: string[] = [];
@@ -113,31 +117,34 @@ function analyze(readHtml: string) {
   });
   const b = body.join(" ");
   const t = tags.join(" ");
-  return { bodyWords: countWords(b), tagWords: countWords(t), bodyLen: avgWordLen(b), tagLen: avgWordLen(t) };
+  return { bodyWords: countWords(b), tagWords: countWords(t), bodyLen: avgWordLen(b), tagLen: avgWordLen(t), bodyText: b, tagText: t };
 }
 
 export default function ReadTimer({ readHtml }: { readHtml: string }) {
-  const { bodyWords, tagWords, bodyLen, tagLen } = useMemo(() => analyze(readHtml), [readHtml]);
+  const { bodyWords, tagWords, bodyLen, tagLen, bodyText, tagText } = useMemo(() => analyze(readHtml), [readHtml]);
   const totalWords = bodyWords + tagWords;
-  // Read the saved pace once, on first (client) render — this view only mounts
-  // client-side, so localStorage is available and there's no SSR mismatch.
-  const [rates, setRates] = useState<Rates | null>(() => {
+  // Read the saved settings once, on first (client) render — this view only
+  // mounts client-side, so localStorage is available and there's no SSR mismatch.
+  const [settings, setSettings] = useState<Settings | null>(() => {
     if (typeof window === "undefined") return null;
     try {
       const raw = localStorage.getItem(RATES_KEY);
       const r = raw ? JSON.parse(raw) : null;
-      if (r && r.cardWpm && r.tagWpm) return { cardWpm: r.cardWpm, tagWpm: r.tagWpm };
+      if (r && r.cardWpm && r.tagWpm) {
+        return { cardWpm: r.cardWpm, tagWpm: r.tagWpm, fatiguePct: typeof r.fatiguePct === "number" ? r.fatiguePct : DEFAULT_SETTINGS.fatiguePct };
+      }
     } catch { /* ignore */ }
     return null;
   });
   const [open, setOpen] = useState(false);
 
-  const eff = rates ?? DEFAULT_RATES;
+  const eff = settings ?? DEFAULT_SETTINGS;
   const estSec = estimateSeconds(bodyWords, tagWords, bodyLen, tagLen, eff);
 
-  function saveRates(r: Rates) {
-    setRates(r);
-    try { localStorage.setItem(RATES_KEY, JSON.stringify(r)); } catch { /* ignore */ }
+  function save(s: Settings) {
+    const clean: Settings = { cardWpm: clampWpm(s.cardWpm), tagWpm: clampWpm(s.tagWpm), fatiguePct: Math.min(FATIGUE_MAX_PCT, Math.max(0, Math.round(s.fatiguePct))) };
+    setSettings(clean);
+    try { localStorage.setItem(RATES_KEY, JSON.stringify(clean)); } catch { /* ignore */ }
   }
 
   return (
@@ -147,26 +154,33 @@ export default function ReadTimer({ readHtml }: { readHtml: string }) {
       </span>
       <span
         className="flow-readstat"
-        title={rates
-          ? `Calibrated: ${rates.cardWpm} wpm card text, ${rates.tagWpm} wpm tags/cites — adjusted for word length and fatigue on long reads`
+        title={settings
+          ? `${eff.cardWpm} wpm card · ${eff.tagWpm} wpm tags · +${eff.fatiguePct}% fatigue by 4:00 — also adjusted for word length`
           : "Estimate at a default pace, adjusted for word length and fatigue — calibrate for your own speed"}
       >
-        ~<b>{fmt(estSec)}</b> to read{rates ? "" : " (est.)"}
+        ~<b>{fmt(estSec)}</b> to read{settings ? "" : " (est.)"}
       </span>
       <button className="db-btn db-btn--glass db-btn--sm" onClick={() => setOpen(true)}>
-        {rates ? "Recalibrate" : "Calibrate read speed"}
+        {settings ? "Calibrate" : "Calibrate read speed"}
       </button>
-      {open && <CalModal onClose={() => setOpen(false)} onDone={saveRates} />}
+      {open && <CalModal settings={eff} docCard={bodyText} docTag={tagText} onSave={save} onClose={() => setOpen(false)} />}
     </>
   );
 }
 
-type Phase = "card" | "tag" | "done";
+type Phase = "menu" | "card" | "tag" | "done" | "edit";
+const isReadingPhase = (p: Phase) => p === "card" || p === "tag";
 
-// Two-step timed reading test on random sections of a real 1NC: read the card
-// text, then the tags & cites. Elapsed time per step becomes a words/min rate.
-function CalModal({ onClose, onDone }: { onClose: () => void; onDone: (r: Rates) => void }) {
-  const [phase, setPhase] = useState<Phase>("card");
+function CalModal({ settings, docCard, docTag, onSave, onClose }: {
+  settings: Settings;
+  docCard: string;   // the read doc's own card text
+  docTag: string;    // the read doc's own tags + cites
+  onSave: (s: Settings) => void;
+  onClose: () => void;
+}) {
+  const [phase, setPhase] = useState<Phase>("menu");
+  // Where the two-step test reads from: random practice sections or this read doc.
+  const [source, setSource] = useState<"pool" | "doc">("pool");
   const [reading, setReading] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
@@ -175,6 +189,10 @@ function CalModal({ onClose, onDone }: { onClose: () => void; onDone: (r: Rates)
   const cardWpmRef = useRef(0);
   const [cardWpm, setCardWpm] = useState(0);
   const [tagWpm, setTagWpm] = useState(0);
+  // Manual-edit working copy.
+  const [eCard, setECard] = useState(settings.cardWpm);
+  const [eTag, setETag] = useState(settings.tagWpm);
+  const [eFat, setEFat] = useState(settings.fatiguePct);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -188,9 +206,8 @@ function CalModal({ onClose, onDone }: { onClose: () => void; onDone: (r: Rates)
     return () => clearInterval(id);
   }, [reading]);
 
-  // 3-2-1 countdown: tick down once a second, then reveal the passage and start
-  // timing. All state changes happen in the timeout callback (not synchronously
-  // in the effect body) so they don't trigger cascading-render lint.
+  // 3-2-1 countdown, then reveal the passage and start timing. State changes live
+  // in the timeout callback (not the effect body) to avoid cascading-render lint.
   useEffect(() => {
     if (countdown === null) return;
     const id = setTimeout(() => {
@@ -206,45 +223,76 @@ function CalModal({ onClose, onDone }: { onClose: () => void; onDone: (r: Rates)
     return () => clearTimeout(id);
   }, [countdown]);
 
-  const isCard = phase === "card";
-
-  // Pick fresh random material, then run the countdown before timing begins.
   function startReading() {
-    setSample(isCard ? pickCardSample() : pickTagSample());
+    const card = source === "doc" ? docCard : pickCardSample();
+    const tag = source === "doc" ? docTag : pickTagSample();
+    setSample(phase === "card" ? card : tag);
     setCountdown(3);
   }
   function done() {
     const wpm = clampWpm(countWords(sample) / ((nowMs() - startRef.current) / 60000));
     setReading(false);
-    if (isCard) {
+    if (phase === "card") {
       cardWpmRef.current = wpm; setCardWpm(wpm); setPhase("tag");
     } else {
-      setTagWpm(wpm); setPhase("done");
-      onDone({ cardWpm: cardWpmRef.current, tagWpm: wpm });
+      setTagWpm(wpm); onSave({ cardWpm: cardWpmRef.current, tagWpm: wpm, fatiguePct: settings.fatiguePct }); setPhase("done");
     }
   }
-  function retest() { setReading(false); setCountdown(null); setSample(""); setCardWpm(0); setTagWpm(0); cardWpmRef.current = 0; setPhase("card"); }
+  function toMenu() { setReading(false); setCountdown(null); setSample(""); setCardWpm(0); setTagWpm(0); cardWpmRef.current = 0; setPhase("menu"); }
+
+  const canDoc = countWords(docCard) >= 20 && countWords(docTag) >= 3;
+  const onDoc = source === "doc";
+  const stepLabel = phase === "card" ? "Step 1 of 2" : "Step 2 of 2";
+  const stepTitle = phase === "card" ? "Read the card text" : "Read the tags & cites";
+  const stepSub = phase === "card"
+    ? `Read ${onDoc ? "your read doc's card text" : "it"} aloud at the pace you'd actually deliver it.`
+    : `Read ${onDoc ? "your read doc's tags & cites" : "these"} aloud — a touch slower, the way you would for clarity.`;
 
   return (
     <div className="flow-rtcal-backdrop" onClick={onClose} role="presentation">
-      <div className="flow-rtcal" role="dialog" aria-modal="true" aria-label="Calibrate read speed" onClick={(e) => e.stopPropagation()}>
-        {phase !== "done" ? (
+      <div className="flow-rtcal" role="dialog" aria-modal="true" aria-label="Read speed" onClick={(e) => e.stopPropagation()}>
+        {phase === "menu" && (
+          <>
+            <span className="flow-rtcal__step">Read speed</span>
+            <h3>Calibrate or edit</h3>
+            <p className="flow-rtcal__sub">
+              Now: <b>{settings.cardWpm}</b> wpm card · <b>{settings.tagWpm}</b> wpm tags · <b>+{settings.fatiguePct}%</b> fatigue.
+            </p>
+            <div className="flow-rtcal__menu">
+              <button className="flow-rtcal__opt" onClick={() => { setSource("pool"); setPhase("card"); }}>
+                <b>Timed practice test</b>
+                <span>Read two random card sections + a set of tags. Good when the read doc is empty.</span>
+              </button>
+              <button className="flow-rtcal__opt" onClick={() => { if (canDoc) { setSource("doc"); setPhase("card"); } }} disabled={!canDoc}>
+                <b>Read this read doc</b>
+                <span>{canDoc ? "Time yourself on your own read doc — card text, then tags & cites." : "Highlight some cards in the Send doc first."}</span>
+              </button>
+              <button className="flow-rtcal__opt" onClick={() => { setECard(settings.cardWpm); setETag(settings.tagWpm); setEFat(settings.fatiguePct); setPhase("edit"); }}>
+                <b>Edit stats manually</b>
+                <span>Type your WPM and set the fatigue slider yourself.</span>
+              </button>
+            </div>
+            <div className="flow-rtcal__actions">
+              <button className="db-btn db-btn--glass db-btn--sm" onClick={onClose}>Close</button>
+            </div>
+          </>
+        )}
+
+        {isReadingPhase(phase) && (
           <>
             <div className="flow-rtcal__head">
               <div>
-                <span className="flow-rtcal__step">Step {isCard ? 1 : 2} of 2</span>
-                <h3>{isCard ? "Read the card text" : "Read the tags & cites"}</h3>
+                <span className="flow-rtcal__step">{stepLabel}</span>
+                <h3>{stepTitle}</h3>
               </div>
-              <div className="flow-rtcal__dots" aria-hidden>
-                <span className={`flow-rtcal__dot ${isCard ? "is-on" : "is-done"}`} />
-                <span className={`flow-rtcal__dot ${!isCard ? "is-on" : ""}`} />
-              </div>
+              {(phase === "card" || phase === "tag") && (
+                <div className="flow-rtcal__dots" aria-hidden>
+                  <span className={`flow-rtcal__dot ${phase === "card" ? "is-on" : "is-done"}`} />
+                  <span className={`flow-rtcal__dot ${phase === "tag" ? "is-on" : ""}`} />
+                </div>
+              )}
             </div>
-            <p className="flow-rtcal__sub">
-              {isCard
-                ? "Read it aloud at the pace you'd actually deliver it."
-                : "Read these aloud — a touch slower, the way you would for clarity."}
-            </p>
+            <p className="flow-rtcal__sub">{stepSub}</p>
             <div className="flow-rtcal__stage">
               {countdown !== null
                 ? <div key={countdown} className="flow-rtcal__count" aria-live="assertive">{countdown}</div>
@@ -257,16 +305,50 @@ function CalModal({ onClose, onDone }: { onClose: () => void; onDone: (r: Rates)
               {reading ? (
                 <button className="db-btn db-btn--accent db-btn--sm" onClick={done}>Done reading</button>
               ) : countdown !== null ? (
-                <button className="db-btn db-btn--glass db-btn--sm" onClick={onClose}>Cancel</button>
+                <button className="db-btn db-btn--glass db-btn--sm" onClick={toMenu}>Cancel</button>
               ) : (
                 <>
-                  <button className="db-btn db-btn--glass db-btn--sm" onClick={onClose}>Cancel</button>
+                  <button className="db-btn db-btn--glass db-btn--sm" onClick={toMenu}>Back</button>
                   <button className="db-btn db-btn--accent db-btn--sm" onClick={startReading}>Start</button>
                 </>
               )}
             </div>
           </>
-        ) : (
+        )}
+
+        {phase === "edit" && (
+          <>
+            <span className="flow-rtcal__step">Edit stats</span>
+            <h3>Your reading pace</h3>
+            <div className="flow-rtcal__field">
+              <label htmlFor="rt-card">Card text speed</label>
+              <div className="flow-rtcal__numwrap">
+                <input id="rt-card" className="flow-rtcal__num" type="number" min={40} max={600} value={eCard}
+                  onChange={(e) => setECard(parseInt(e.target.value, 10) || 0)} />
+                <span>wpm</span>
+              </div>
+            </div>
+            <div className="flow-rtcal__field">
+              <label htmlFor="rt-tag">Tags &amp; cites speed</label>
+              <div className="flow-rtcal__numwrap">
+                <input id="rt-tag" className="flow-rtcal__num" type="number" min={40} max={600} value={eTag}
+                  onChange={(e) => setETag(parseInt(e.target.value, 10) || 0)} />
+                <span>wpm</span>
+              </div>
+            </div>
+            <div className="flow-rtcal__field flow-rtcal__field--col">
+              <label htmlFor="rt-fat">Fatigue <span className="flow-rtcal__fatval">+{eFat}% slower by 4:00</span></label>
+              <input id="rt-fat" className="flow-rtcal__range" type="range" min={0} max={FATIGUE_MAX_PCT} step={1} value={eFat}
+                onChange={(e) => setEFat(parseInt(e.target.value, 10))} />
+            </div>
+            <div className="flow-rtcal__actions">
+              <button className="db-btn db-btn--glass db-btn--sm" onClick={toMenu}>Back</button>
+              <button className="db-btn db-btn--accent db-btn--sm" onClick={() => { onSave({ cardWpm: eCard, tagWpm: eTag, fatiguePct: eFat }); onClose(); }}>Save</button>
+            </div>
+          </>
+        )}
+
+        {phase === "done" && (
           <>
             <span className="flow-rtcal__step">All set</span>
             <h3>Your reading pace</h3>
@@ -282,7 +364,7 @@ function CalModal({ onClose, onDone }: { onClose: () => void; onDone: (r: Rates)
             </div>
             <p className="flow-rtcal__sub">Your read doc estimate now uses these rates.</p>
             <div className="flow-rtcal__actions">
-              <button className="db-btn db-btn--glass db-btn--sm" onClick={retest}>Retest</button>
+              <button className="db-btn db-btn--glass db-btn--sm" onClick={toMenu}>Retest</button>
               <button className="db-btn db-btn--accent db-btn--sm" onClick={onClose}>Done</button>
             </div>
           </>
