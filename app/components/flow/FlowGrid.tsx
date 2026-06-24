@@ -783,7 +783,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
           <button className="db-btn db-btn--glass db-btn--sm" onClick={() => (anyCollapsed ? setCollapsed(new Set()) : setCollapsed(new Set(labeled.filter((l) => l.hasKids).map((l) => l.cell.id))))}>
             {anyCollapsed ? "Expand all" : "Collapse all"}
           </button>
-          <span className="flow-outline__bar-hint">Click or drag the numbers to select, then hide, delete, or drag the handle to move them</span>
+          <span className="flow-outline__bar-hint">Click or drag the numbers to select</span>
           <button className="db-btn db-btn--glass db-btn--sm" onClick={clearAll}>Clear flow</button>
         </div>
       )}
