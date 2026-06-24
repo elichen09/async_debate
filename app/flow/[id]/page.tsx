@@ -11,6 +11,7 @@ import ReadDocView from "@/app/components/flow/ReadDocView";
 import FlowTimers, { type TimerSnap } from "@/app/components/flow/FlowTimers";
 import FlowDock from "@/app/components/flow/FlowDock";
 import FlowShortcuts from "@/app/components/flow/FlowShortcuts";
+import FlowPalette, { type PaletteCommand } from "@/app/components/flow/FlowPalette";
 import { Columns2, Ellipsis, X } from "lucide-react";
 import type { EditorInsert, Flow, FlowSnippet, FlowCell } from "@/app/flow/shared";
 
@@ -188,6 +189,7 @@ export default function FlowWorkspace() {
   const [showTimers, setShowTimersState] = useState(() => loadUi().timers);
   const [menu, setMenu] = useState<{ kind: "split" | "more"; rect: DOMRect } | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showPalette, setShowPalette] = useState(false);
   const [timerSnap, setTimerSnap] = useState<TimerSnap | null>(null);  // live speech clock for the Read-doc pace chip
   // Last "cut card" action, so it can be undone from a short-lived toast.
   const [cutUndo, setCutUndo] = useState<{ sendHtml: string; rows: FlowCell[]; label: string } | null>(null);
@@ -597,6 +599,19 @@ export default function FlowWorkspace() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // Ctrl+K (Windows/Linux) or Cmd+K (Mac) toggles the command palette. preventDefault
+  // overrides the browser's own Ctrl+K, and it works even while typing in a cell.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setShowPalette((s) => !s);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   if (loading || !flow) {
     return (
       <div className="flow-loading">
@@ -604,6 +619,28 @@ export default function FlowWorkspace() {
       </div>
     );
   }
+
+  // Everything reachable from the command palette (Ctrl/Cmd+K): views, splits,
+  // tools, and a jump to any other flow in this folder.
+  const paletteCommands: PaletteCommand[] = [
+    { trigger: "flow outline points", label: "Go to Flow", group: "View", run: () => setView("flow") },
+    { trigger: "speech write", label: "Go to Speech", group: "View", run: () => setView("speech") },
+    { trigger: "send doc cards", label: "Go to Send doc", group: "View", run: () => setView("send") },
+    { trigger: "read doc speech ready", label: "Go to Read doc", group: "View", run: () => setView("read") },
+    { trigger: "split add flow", label: "Split: add Flow", group: "Split", run: () => addPane("flow") },
+    { trigger: "split add speech", label: "Split: add Speech", group: "Split", run: () => addPane("speech") },
+    { trigger: "split add send doc", label: "Split: add Send doc", group: "Split", run: () => addPane("send") },
+    { trigger: "split add read doc", label: "Split: add Read doc", group: "Split", run: () => addPane("read") },
+    { trigger: "timers clock prep speech", label: showTimers ? "Hide timers" : "Show timers", group: "Tools", run: () => setShowTimers(!showTimers) },
+    { trigger: "extensions blocks library panel", label: dock === "extensions" ? "Close Extensions" : "Open Extensions", group: "Tools", run: () => setDock(dock === "extensions" ? null : "extensions") },
+    { trigger: "share collaborators invite partner", label: dock === "share" ? "Close Share" : "Open Share", group: "Tools", run: () => setDock(dock === "share" ? null : "share") },
+    { trigger: "fullscreen focus", label: fullscreen ? "Exit fullscreen" : "Fullscreen", group: "Tools", run: () => setFullscreen((f) => !f) },
+    { trigger: "keyboard shortcuts help", label: "Keyboard shortcuts", group: "Tools", hint: "?", run: () => setShowShortcuts(true) },
+    { trigger: "extensions library manage full page", label: "Open Extensions library", group: "Tools", run: () => router.push("/flow/extensions") },
+    ...siblings.flatMap((s) => s.id === flowId ? [] : [{
+      trigger: `flow ${s.title}`, label: `Open flow: ${s.title}`, group: "Flows", run: () => router.push(`/flow/${s.id}`),
+    }]),
+  ];
 
   return (
     <div className={`flow-work ${fullscreen ? "flow-work--full" : ""}`}>
@@ -759,6 +796,8 @@ export default function FlowWorkspace() {
       )}
 
       {showShortcuts && <FlowShortcuts onClose={() => setShowShortcuts(false)} />}
+
+      {showPalette && <FlowPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />}
 
       {cutUndo && (
         <div className="flow-undo" role="status">
