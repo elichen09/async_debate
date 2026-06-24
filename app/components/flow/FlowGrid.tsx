@@ -83,6 +83,8 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   const editingId = useRef<string | null>(null);
   const activeEl = useRef<HTMLTextAreaElement | null>(null);
   const focusId = useRef<string | null>(null);
+  // Live textarea element per cell id — lets arrow keys move focus between points.
+  const taRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
   // Per-cell pending autosaves (debounced); flushed on unmount so switching tabs
   // mid-type never drops what you wrote.
   const pending = useRef<Map<string, string>>(new Map());
@@ -745,6 +747,21 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   const visible = labeled.filter(({ cell }) => !hidden.has(cell.id) && !hiddenPts.has(cell.id) && (!flaggedOnly || cell.status === "flag"));
   const anyCollapsed = collapsed.size > 0;
 
+  // Arrow Up/Down between points: focus the previous/next visible point and keep
+  // roughly the same caret column. Returns false at the ends of the list.
+  const focusSibling = (cell: FlowCell, dir: 1 | -1, col: number): boolean => {
+    const idx = visible.findIndex((v) => v.cell.id === cell.id);
+    if (idx === -1) return false;
+    const target = visible[idx + dir];
+    if (!target) return false;
+    const el = taRefs.current.get(target.cell.id);
+    if (!el) return false;
+    el.focus();
+    const pos = Math.min(col, el.value.length);
+    try { el.setSelectionRange(pos, pos); } catch { /* selection not always settable */ }
+    return true;
+  };
+
   return (
     <div
       className={`flow-outline ${extDrop ? "is-extdrop" : ""}`}
@@ -855,6 +872,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             value={cell.content}
             rows={1}
             ref={(el) => {
+              if (el) taRefs.current.set(cell.id, el); else taRefs.current.delete(cell.id);
               autoGrow(el);
               if (el && focusId.current === cell.id) { el.focus(); focusId.current = null; }
             }}
@@ -877,6 +895,19 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
                 return;
               }
               if (dropOpen && e.key === "Escape") { e.preventDefault(); setSlash(null); return; }
+              // Arrow Up/Down hop between points when the caret sits on the edge
+              // line — so a multi-line point still moves internally first. Skipped
+              // while selecting text (Shift) or holding a modifier.
+              if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && ta.selectionStart === ta.selectionEnd) {
+                const s = ta.selectionStart;
+                const onEdge = e.key === "ArrowUp"
+                  ? ta.value.lastIndexOf("\n", s - 1) === -1   // caret on the first line
+                  : ta.value.indexOf("\n", s) === -1;          // caret on the last line
+                if (onEdge && focusSibling(cell, e.key === "ArrowUp" ? -1 : 1, s)) {
+                  e.preventDefault();
+                  return;
+                }
+              }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 // "/send" at the end of the line (or alone) → push this line (and any
