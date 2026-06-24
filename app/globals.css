@@ -3266,14 +3266,13 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
   position: relative;
   z-index: 1;
 
-  /* Premium typography, scoped to the flow workspace only. The site keeps
-     Fraunces/Lora; here the functional chrome runs on Hanken Grotesk (a refined
-     humanist sans) and the display/masthead moments on Libre Caslon Display.
-     Document surfaces (Send doc, Speech, Read doc, calibrate sample) pin
-     --font-calibri directly, so this swap never touches them. */
-  --font-display: var(--font-hanken), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
-  --font-body:    var(--font-hanken), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
-  --font-serif:   var(--font-caslon), "Fraunces", Georgia, "Times New Roman", serif;
+  /* Typography, scoped to the flow workspace only. The site keeps Fraunces/Lora;
+     here the whole functional chrome runs on Inter. Document surfaces (Send doc,
+     Speech, Read doc, calibrate sample) pin --font-calibri directly, so this swap
+     never touches them. */
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-body:    var(--font-inter), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --font-serif:   var(--font-inter), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
 }
 
 /* Caslon Display ships a single 400 cut (already a display weight), so the
@@ -5188,3 +5187,286 @@ html.gh-light .flow-target__caret { color: #a98a5e; }
 }
 .flow-keys__desc { font-size: 13.5px; color: #574b39; line-height: 1.45; }
 @media (min-width: 520px) { .flow-keys__groups { grid-template-columns: 1fr 1fr; } }
+
+/* =========================================================================
+   FLOW — "INDEX" REDESIGN
+   A quiet, monochrome work surface: a neutral light-gray canvas under moving
+   film grain, Inter throughout the chrome, near-black "selected" state, and
+   bracketed [ nav ] labels. The only color left is the meaningful aff/neg blue
+   and red. Everything below is scoped to the flow workspace and source-ordered
+   last; visual selectors carry `html.gh-light .flow-shell` (the flow always
+   pins gh-light) so they win without !important. Document surfaces stay Calibri.
+   ========================================================================= */
+
+/* ---- Tokens: repoint the shared design variables the existing rules read ---- */
+.flow-shell {
+  --fl-bg:     oklch(0.928 0.0015 270);
+  --fl-paper:  oklch(0.992 0.001 270);
+  --fl-ink:    oklch(0.225 0.004 270);
+  --fl-soft:   oklch(0.430 0.005 270);
+  --fl-muted:  oklch(0.520 0.005 270);
+  --fl-line:   oklch(0.22 0.004 270 / 0.12);
+  --fl-line-2: oklch(0.22 0.004 270 / 0.26);
+  --fl-hover:  oklch(0.22 0.004 270 / 0.05);
+
+  --ink:         var(--fl-ink);
+  --ink-soft:    var(--fl-soft);
+  --muted:       var(--fl-muted);
+  --line:        var(--fl-line);
+  --line-strong: var(--fl-line-2);
+  --card:        var(--fl-paper);
+
+  /* The "selected" accent is near-black ink — color is reserved for meaning. */
+  --accent:      oklch(0.235 0.005 270);
+  --accent-deep: oklch(0.140 0.005 270);
+  --accent-ink:  oklch(0.985 0 0);
+  --accent-tint: oklch(0.235 0.005 270 / 0.07);
+  --accent-ring: oklch(0.235 0.005 270 / 0.22);
+  --accent-glow: oklch(0.235 0.005 270 / 0.30);
+  --accent-soft: oklch(0.235 0.005 270 / 0.07);
+
+  background: var(--fl-bg);
+}
+
+/* ---- Moving film-grain layer + the gray canvas ---- */
+.flow-grain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;            /* above the shell's gray bg, beneath all content */
+  pointer-events: none;
+  opacity: 0.8;
+}
+html.gh-light .flow-shell .flow-work { background: none; }
+html.gh-light .flow-shell .flow-work--full { background: var(--fl-bg); }
+html.gh-light .flow-shell .flow-work__head { border-bottom-color: var(--fl-line); }
+html.gh-light .flow-shell .flow-work__title { color: var(--fl-ink); font-weight: 700; letter-spacing: -0.01em; }
+
+/* ---- View switcher: a flat row of bracketed [ Flow ] [ Speech ] labels ---- */
+html.gh-light .flow-shell .flow-work__tabs { background: none; border: none; padding: 0; gap: 1px; }
+html.gh-light .flow-shell .flow-tab {
+  background: none; box-shadow: none; border: none; border-radius: 7px;
+  padding: 5px 9px; color: var(--fl-muted); font-weight: 500; letter-spacing: 0.005em;
+}
+html.gh-light .flow-shell .flow-tab:hover { color: var(--fl-ink); background: var(--fl-hover); box-shadow: none; }
+html.gh-light .flow-shell .flow-tab.is-active { color: var(--fl-ink); background: var(--fl-hover); box-shadow: none; font-weight: 650; }
+html.gh-light .flow-shell .flow-tab:not(.flow-tab--split)::before { content: "["; margin-right: 4px; color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-tab:not(.flow-tab--split)::after  { content: "]"; margin-left: 4px; color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-tab.is-active::before,
+html.gh-light .flow-shell .flow-tab.is-active::after { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-tab--split { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-tab--split:hover { color: var(--fl-ink); }
+
+/* ---- Pills (Tools / Split menu) + folder-flow chips ---- */
+html.gh-light .flow-shell .flow-pill,
+html.gh-light .flow-shell .flow-addflow {
+  background: oklch(1 0 0 / 0.5); border: 1px solid var(--fl-line-2);
+  color: var(--fl-soft); box-shadow: none; border-radius: 7px;
+}
+html.gh-light .flow-shell .flow-pill:hover,
+html.gh-light .flow-shell .flow-addflow:hover { color: var(--fl-ink); background: #fff; border-color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-pill.is-active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+html.gh-light .flow-shell .flow-foldertab { background: oklch(1 0 0 / 0.45); border-color: var(--fl-line-2); color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-foldertab:hover { color: var(--fl-ink); background: #fff; }
+html.gh-light .flow-shell .flow-foldertab.is-active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* ---- Left rail: a light panel, ink text, bracketed [ flows ] masthead ---- */
+html.gh-light .flow-shell .flow-rail {
+  background: oklch(0.965 0.001 270 / 0.92);
+  backdrop-filter: blur(20px) saturate(1.05);
+  -webkit-backdrop-filter: blur(20px) saturate(1.05);
+  border-right: 1px solid var(--fl-line-2);
+  color: var(--fl-soft);
+  box-shadow: 14px 0 50px oklch(0.2 0 0 / 0.10);
+}
+html.gh-light .flow-shell .flow-rail__brand {
+  color: var(--fl-muted); font-weight: 600; font-size: 12px;
+  letter-spacing: 0.06em; text-transform: lowercase;
+}
+html.gh-light .flow-shell .flow-rail__brand::before { content: "[ "; color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-rail__brand::after  { content: " ]"; color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-rail__group-label { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-rail__link { color: var(--fl-soft); font-weight: 500; }
+html.gh-light .flow-shell .flow-rail__link:hover { background: var(--fl-hover); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-rail__item.is-active { background: oklch(0.2 0 0 / 0.06); }
+html.gh-light .flow-shell .flow-rail__item.is-active .flow-rail__link { color: var(--fl-ink); font-weight: 600; }
+html.gh-light .flow-shell .flow-rail__rename { background: #fff; border-color: var(--accent); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-rail__folder-name { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-rail__folder-head:hover { background: var(--fl-hover); }
+html.gh-light .flow-shell .flow-rail__caret,
+html.gh-light .flow-shell .flow-rail__count { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-rail__create { border-top-color: var(--fl-line); }
+html.gh-light .flow-shell .flow-rail__new {
+  background: none; border: 1px solid var(--fl-line-2); color: var(--fl-soft);
+  font-weight: 600; letter-spacing: 0.01em;
+}
+html.gh-light .flow-shell .flow-rail__new:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+html.gh-light .flow-shell .flow-rail__import { color: var(--fl-muted); border-color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-rail__import:hover:not(:disabled) { background: var(--fl-hover); border-color: var(--fl-line-2); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-rail__move { background: #fff; color: var(--fl-soft); border-color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-rail__move option { background: #fff; color: var(--fl-ink); }
+/* the left-edge reveal handle reads as a quiet ink tab, not coral */
+html.gh-light .flow-shell .flow-nav-hotzone::after { background: var(--fl-line-2); }
+
+/* ---- Panes: clean paper sheets; solo view sits bare on the grain canvas ---- */
+html.gh-light .flow-shell .flow-pane { background: var(--fl-paper); border-color: var(--fl-line-2); box-shadow: 0 10px 34px oklch(0.2 0 0 / 0.08); backdrop-filter: none; }
+html.gh-light .flow-shell .flow-pane--solo { background: transparent; border-color: transparent; box-shadow: none; }
+html.gh-light .flow-shell .flow-pane__head { background: oklch(0.2 0 0 / 0.02); border-bottom-color: var(--fl-line); }
+html.gh-light .flow-shell .flow-pane__title { color: var(--fl-muted); font-weight: 600; letter-spacing: 0.09em; }
+html.gh-light .flow-shell .flow-pane__close { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-pane__close:hover { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-pane__resizer::before { background: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-pane__resizer:hover::before,
+html.gh-light .flow-shell .flow-pane__resizer.is-active::before { background: var(--accent); }
+
+/* ---- Empty state ---- */
+html.gh-light .flow-shell .flow-empty__eyebrow { color: var(--fl-muted); font-weight: 600; letter-spacing: 0.12em; text-transform: lowercase; }
+html.gh-light .flow-shell .flow-empty__eyebrow::before { content: "[ "; color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-empty__eyebrow::after  { content: " ]"; color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-empty__title { color: var(--fl-ink); font-weight: 700; letter-spacing: -0.02em; text-shadow: none; }
+html.gh-light .flow-shell .flow-empty__sub { color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-empty__sub b { color: var(--fl-ink); }
+
+/* ---- Timers bar ---- */
+html.gh-light .flow-shell .flow-timer { background: oklch(1 0 0 / 0.6); border-color: var(--fl-line-2); box-shadow: none; }
+html.gh-light .flow-shell .flow-timer__label { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-timer__time { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-timer.is-running { border-color: var(--accent); }
+html.gh-light .flow-shell .flow-timer__btn,
+html.gh-light .flow-shell .flow-timer__adj { background: var(--fl-hover); border-color: var(--fl-line-2); color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-timer__btn:hover,
+html.gh-light .flow-shell .flow-timer__adj:hover { background: oklch(0.2 0 0 / 0.1); color: var(--fl-ink); }
+
+/* ---- Right dock (Extensions / Share) + extensions panel ---- */
+html.gh-light .flow-shell .flow-dock {
+  background: oklch(0.965 0.001 270 / 0.94);
+  backdrop-filter: blur(20px) saturate(1.05);
+  -webkit-backdrop-filter: blur(20px) saturate(1.05);
+  border-left: 1px solid var(--fl-line-2); color: var(--fl-soft);
+}
+html.gh-light .flow-shell .flow-dock__tabs { background: none; border: none; padding: 0; }
+html.gh-light .flow-shell .flow-dock__tab { color: var(--fl-muted); font-weight: 500; }
+html.gh-light .flow-shell .flow-dock__tab:hover { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-dock__tab.is-active { color: var(--fl-ink); background: none; box-shadow: none; font-weight: 650; }
+html.gh-light .flow-shell .flow-dock__tab::before { content: "["; margin-right: 4px; color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-dock__tab::after  { content: "]"; margin-left: 4px; color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-dock__tab.is-active::before,
+html.gh-light .flow-shell .flow-dock__tab.is-active::after { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-snip:not(.flow-snip--embedded) {
+  background: oklch(0.965 0.001 270 / 0.94);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-left: 1px solid var(--fl-line-2); color: var(--fl-soft);
+}
+html.gh-light .flow-shell .flow-panel__title { color: var(--fl-ink); font-weight: 700; letter-spacing: 0.02em; }
+html.gh-light .flow-shell .flow-snip__insert { background: var(--fl-paper); border-color: var(--fl-line); }
+html.gh-light .flow-shell .flow-snip__insert:hover { background: #fff; border-color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-snip__label { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-snip__preview,
+html.gh-light .flow-shell .flow-snip__empty { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-snip__search,
+html.gh-light .flow-shell .flow-snip__trigger,
+html.gh-light .flow-shell .flow-snip__sortsel { background: #fff; border-color: var(--fl-line-2); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-snip__search::placeholder,
+html.gh-light .flow-shell .flow-snip__trigger::placeholder { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-snip__children { border-left-color: var(--fl-line); }
+html.gh-light .flow-shell .flow-snip__chev { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-snip__slash { color: var(--accent); }
+html.gh-light .flow-shell .flow-dock .flow-share__row { background: var(--fl-paper); border-color: var(--fl-line); color: var(--fl-ink); }
+
+/* ---- Outline (Flow grid) chrome — text stays Calibri, frame goes neutral ---- */
+/* Alternating indent levels: neutral ink + slate, not coral / blue. Kept in sync
+   with FLOW_DEPTH_COLORS so a copied flow pastes in the same two tones. */
+html.gh-light .flow-shell .flow-node--c0 { border-left-color: #1f202466; }
+html.gh-light .flow-shell .flow-node--c0 .flow-node__label,
+html.gh-light .flow-shell .flow-node--c0 .flow-node__text { color: #1f2024; }
+html.gh-light .flow-shell .flow-node--c1 { border-left-color: #6a71808c; }
+html.gh-light .flow-shell .flow-node--c1 .flow-node__label,
+html.gh-light .flow-shell .flow-node--c1 .flow-node__text { color: #6a7180; }
+html.gh-light .flow-shell .flow-outline__add { color: var(--fl-soft); border-color: var(--fl-line-2); background: var(--fl-hover); }
+html.gh-light .flow-shell .flow-outline__add:hover { background: oklch(0.2 0 0 / 0.08); border-color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-outline__bar-hint { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-sendedit__outline { border-right-color: var(--fl-line); }
+
+/* ---- Slash autocomplete ---- */
+html.gh-light .flow-shell .flow-slash { background: var(--fl-paper); border-color: var(--fl-line-2); box-shadow: 0 8px 24px oklch(0.2 0 0 / 0.14); }
+html.gh-light .flow-shell .flow-slash__opt { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-slash__opt:hover,
+html.gh-light .flow-shell .flow-slash__opt.is-active { background: var(--accent); color: var(--accent-ink); }
+html.gh-light .flow-shell .flow-slash__opt.is-active .flow-slash__label,
+html.gh-light .flow-shell .flow-slash__opt:hover .flow-slash__label { color: oklch(1 0 0 / 0.8); }
+html.gh-light .flow-shell .flow-slash__label { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-slash__trig { color: var(--accent); }
+
+/* ---- Dropdown menus (Split / Tools) ---- */
+html.gh-light .flow-shell .flow-menu { background: var(--fl-paper); border-color: var(--fl-line-2); box-shadow: 0 18px 44px oklch(0.2 0 0 / 0.18); }
+html.gh-light .flow-shell .flow-menu__label { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-menu__item { color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-menu__item:hover { background: var(--fl-hover); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-menu__item.is-on { color: var(--accent); }
+html.gh-light .flow-shell .flow-menu__check { color: var(--accent); }
+html.gh-light .flow-shell .flow-menu__kbd { background: oklch(0.2 0 0 / 0.07); color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-menu__sep { background: var(--fl-line); }
+
+/* ---- Command palette ---- */
+html.gh-light .flow-shell .flow-palette { background: var(--fl-paper); border-color: var(--fl-line-2); box-shadow: 0 24px 64px oklch(0.2 0 0 / 0.26); }
+html.gh-light .flow-shell .flow-palette__input { color: var(--fl-ink); border-bottom-color: var(--fl-line); }
+html.gh-light .flow-shell .flow-palette__input::placeholder { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-palette__opt { color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-palette__opt.is-active { background: var(--accent); color: var(--accent-ink); }
+html.gh-light .flow-shell .flow-palette__group,
+html.gh-light .flow-shell .flow-palette__hint,
+html.gh-light .flow-shell .flow-palette__empty { color: var(--fl-muted); }
+
+/* ---- Dialog cards: confirm, read-speed, keyboard shortcuts ---- */
+html.gh-light .flow-shell .flow-confirm,
+html.gh-light .flow-shell .flow-rtcal { background: var(--fl-paper); border-color: var(--fl-line-2); box-shadow: 0 24px 64px oklch(0.2 0 0 / 0.24); }
+html.gh-light .flow-shell .flow-confirm__title,
+html.gh-light .flow-shell .flow-rtcal h3 { color: var(--fl-ink); font-weight: 700; }
+html.gh-light .flow-shell .flow-confirm__msg,
+html.gh-light .flow-shell .flow-rtcal__sub { color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-rtcal__step,
+html.gh-light .flow-shell .flow-keys__gtitle { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-keys__desc { color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-keys__combo kbd { background: #fff; border-color: var(--fl-line-2); color: var(--fl-ink); box-shadow: 0 1px 0 var(--fl-line); }
+
+/* ---- Undo toast ---- */
+html.gh-light .flow-shell .flow-undo { background: oklch(0.225 0.004 270 / 0.96); border-color: oklch(1 0 0 / 0.12); }
+
+/* ---- Extensions full page (/flow/extensions) ---- */
+html.gh-light .flow-shell .extlib__add { background: var(--fl-paper); border-color: var(--fl-line-2); }
+html.gh-light .flow-shell .extcard { box-shadow: 0 8px 26px oklch(0.2 0 0 / 0.06); }
+html.gh-light .flow-shell .extcard:hover { box-shadow: 0 14px 34px oklch(0.2 0 0 / 0.12); }
+html.gh-light .flow-shell .extcard__count { color: var(--fl-soft); background: var(--fl-hover); border-color: var(--fl-line-2); }
+
+/* ---- Persistent keyboard legend (bottom-left, like the reference) ---- */
+.flow-legend {
+  position: fixed;
+  left: 16px;
+  bottom: 14px;
+  z-index: 40;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 3px;
+  pointer-events: none;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  color: var(--fl-muted);
+  opacity: 0.62;
+  transition: opacity 0.2s var(--ease-out-quint);
+  user-select: none;
+}
+.flow-shell:has(.flow-rail:hover) .flow-legend,
+.flow-shell:has(.flow-nav-hotzone:hover) .flow-legend { opacity: 0; }
+.flow-legend li { display: flex; align-items: center; gap: 8px; line-height: 1.4; }
+.flow-legend kbd {
+  font-family: inherit; font-size: 10.5px; font-weight: 600;
+  color: var(--fl-soft); letter-spacing: 0.02em; background: none; border: none;
+  padding: 0; box-shadow: none; white-space: nowrap;
+}
+.flow-legend kbd::before { content: "["; color: var(--fl-line-2); margin-right: 3px; }
+.flow-legend kbd::after  { content: "]"; color: var(--fl-line-2); margin-left: 3px; }
+@media (max-width: 900px) { .flow-legend { display: none; } }
+@media (prefers-reduced-motion: reduce) { .flow-legend { transition: none; } }

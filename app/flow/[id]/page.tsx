@@ -808,6 +808,14 @@ export default function FlowWorkspace() {
 
       {showPalette && <FlowPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />}
 
+      {/* Persistent shortcut legend — quick-navigate hints, like the reference. */}
+      <ul className="flow-legend" aria-hidden>
+        <li><kbd>⇧⇧</kbd> palette</li>
+        <li><kbd>?</kbd> shortcuts</li>
+        <li><kbd>⌥ ←→</kbd> switch flow</li>
+        <li><kbd>⇥</kbd> indent</li>
+      </ul>
+
       {cutUndo && (
         <div className="flow-undo" role="status">
           <span>{cutUndo.label}</span>

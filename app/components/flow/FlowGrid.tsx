@@ -635,7 +635,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // Copy the selected points (or the whole flow if none selected) to the clipboard.
   // We write BOTH plain text (tab-indented, for Docs/Word) and rich HTML whose
   // lines carry the same two indent colors as the outline — so pasting into the
-  // (rich) Speech tab keeps the color-coding. DEPTH_COLORS mirrors --c0/--c1 CSS.
+  // (rich) Speech tab keeps the color-coding via the shared FLOW_DEPTH_COLORS.
   async function copyFlow() {
     const list = sorted();
     const chosen = selected.size ? list.filter((c) => selected.has(c.id)) : list;
@@ -643,10 +643,9 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const min = Math.min(...chosen.map((c) => c.depth));
     const text = chosen.map((c) => "\t".repeat(c.depth - min) + c.content).join("\n");
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const DEPTH_COLORS = ["#ffa987", "#9cc3ff"];
     const html = chosen
       .map((c) => {
-        const color = DEPTH_COLORS[c.depth % 2];
+        const color = FLOW_DEPTH_COLORS[c.depth % 2];
         const indent = (c.depth - min) * 24;
         return `<div style="margin-left:${indent}px;color:${color}">${esc(c.content) || "<br>"}</div>`;
       })

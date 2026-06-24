@@ -119,4 +119,5 @@ export interface FlowDragPayload {
 
 // The two indent colors the outline alternates by depth (mirrors --c0/--c1 CSS).
 // Shared so Copy and cross-pane drag write the same color-coding into the Speech doc.
-export const FLOW_DEPTH_COLORS = ["#ffa987", "#9cc3ff"];
+// Neutral ink + slate to match the monochrome flow theme (and read on white paper).
+export const FLOW_DEPTH_COLORS = ["#1f2024", "#6a7180"];
