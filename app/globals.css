@@ -5228,16 +5228,29 @@ html.gh-light .flow-target__caret { color: #a98a5e; }
   background: var(--fl-bg);
 }
 
-/* ---- Moving film-grain layer + the gray canvas ---- */
+/* ---- Moving film-grain layer + the gray canvas ----
+   Full-viewport and opaque (its own gray base) so the texture runs unbroken
+   behind the site topnav too — the flow route reads as one continuous surface
+   rather than a gray panel below a lighter nav bar. Sits at z-index -1 within
+   the shell (root level 1), beneath the topnav (z 100) and all flow content. */
 .flow-grain {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;            /* above the shell's gray bg, beneath all content */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;            /* canvas is a replaced element — size it explicitly */
+  height: 100%;           /* (inset:0 alone leaves it at its intrinsic size) */
+  z-index: -1;
   pointer-events: none;
-  opacity: 0.9;
+  background: oklch(0.928 0.0015 270);
   filter: blur(0.5px);    /* soften the hard specks into a cloudy film grain */
+}
+/* Drop the topnav's warm gradient/shadow in the flow route so the grain shows
+   straight through it — no seam between the nav and the workspace. */
+html.flow-route .gh-topnav {
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 html.gh-light .flow-shell .flow-work { background: none; }
 html.gh-light .flow-shell .flow-work--full { background: var(--fl-bg); }
@@ -5392,11 +5405,15 @@ html.gh-light .flow-shell .flow-sendedit__outline { border-right-color: var(--fl
 /* ---- Slash autocomplete ---- */
 html.gh-light .flow-shell .flow-slash { background: var(--fl-paper); border-color: var(--fl-line-2); box-shadow: 0 8px 24px oklch(0.2 0 0 / 0.14); }
 html.gh-light .flow-shell .flow-slash__opt { color: var(--fl-ink); }
+/* Light hover/active tint so every part of the row (trigger + label) stays
+   readable — a near-black highlight hid the dark trigger text. */
+html.gh-light .flow-shell .flow-slash__opt:hover { background: oklch(0.22 0.004 270 / 0.07); }
+html.gh-light .flow-shell .flow-slash__opt.is-active { background: oklch(0.22 0.004 270 / 0.13); }
 html.gh-light .flow-shell .flow-slash__opt:hover,
-html.gh-light .flow-shell .flow-slash__opt.is-active { background: var(--accent); color: var(--accent-ink); }
-html.gh-light .flow-shell .flow-slash__opt.is-active .flow-slash__label,
-html.gh-light .flow-shell .flow-slash__opt:hover .flow-slash__label { color: oklch(1 0 0 / 0.8); }
+html.gh-light .flow-shell .flow-slash__opt.is-active { color: var(--fl-ink); }
 html.gh-light .flow-shell .flow-slash__label { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-slash__opt:hover .flow-slash__label,
+html.gh-light .flow-shell .flow-slash__opt.is-active .flow-slash__label { color: var(--fl-soft); }
 html.gh-light .flow-shell .flow-slash__trig { color: var(--accent); }
 
 /* ---- Dropdown menus (Split / Tools) ---- */

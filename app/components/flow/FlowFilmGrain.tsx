@@ -15,7 +15,7 @@ const TILE = 150; // grain tile size (px)
 const FRAMES = 8; // pre-baked noise frames to cycle through
 const FPS = 10; // slow flicker — present grain that barely moves
 const DENSITY = 0.9; // share of pixels that carry a speck — a full, fine field
-const MAX_ALPHA = 22; // peak speck opacity (0-255); softened further by CSS blur
+const MAX_ALPHA = 20; // peak speck opacity (0-255); softened further by CSS blur
 
 export default function FlowFilmGrain() {
   const ref = useRef<HTMLCanvasElement>(null);
