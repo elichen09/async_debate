@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { fuzzyRank } from "@/lib/fuzzy";
-import { GripVertical, ChevronRight, ChevronDown, Flag, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2 } from "lucide-react";
+import { GripVertical, ChevronRight, ChevronDown, Flag, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2, EyeOff, Eye } from "lucide-react";
 import { useConfirm } from "@/app/components/flow/ConfirmProvider";
 import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, type FlowCell, type EditorInsert, type FlowDragPayload } from "@/app/flow/shared";
 
@@ -90,6 +90,11 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // Multi-line selection (click a number / Shift-click a range) for copy/paste.
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const anchorRef = useRef<string | null>(null);
+  // Drag across the numbers to select a range; the click that ends the drag is skipped.
+  const selDrag = useRef<{ anchor: string; moved: boolean } | null>(null);
+  const suppressClick = useRef(false);
+  // Points hidden from view to declutter (not persisted — a focus aid, like collapse).
+  const [hiddenPts, setHiddenPts] = useState<Set<string>>(new Set());
   // Collapsed subtrees (local view state), status filter, and drag-reorder.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [flaggedOnly, setFlaggedOnly] = useState(false);
@@ -110,6 +115,17 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   const editorsRef = useRef<Map<string, { cellId: string; name: string; color: string; ts: number }>>(new Map());
   const editorsSigRef = useRef("");          // last rendered presence signature, to skip no-op re-renders
   useEffect(() => { selfNameRef.current = userName; }, [userName]);
+
+  // End a number drag-select on pointer-up anywhere; flag it so the trailing click
+  // (which would otherwise toggle the last number) is ignored.
+  useEffect(() => {
+    const onUp = () => {
+      if (selDrag.current?.moved) suppressClick.current = true;
+      selDrag.current = null;
+    };
+    window.addEventListener("pointerup", onUp);
+    return () => window.removeEventListener("pointerup", onUp);
+  }, []);
 
   useEffect(() => { cellsRef.current = cells; }, [cells]);
 
@@ -568,6 +584,34 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   }
   function clearSelection() { setSelected(new Set()); anchorRef.current = null; }
 
+  // Select every point from anchor to the given one (inclusive), document order.
+  function selectRange(aId: string, bId: string) {
+    const ids = sorted().map((c) => c.id);
+    const a = ids.indexOf(aId), b = ids.indexOf(bId);
+    if (a === -1 || b === -1) return;
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    setSelected(new Set(ids.slice(lo, hi + 1)));
+  }
+  // Pointer-down on a number starts a drag-select; entering other numbers extends it.
+  function startSelectDrag(cell: FlowCell) { suppressClick.current = false; selDrag.current = { anchor: cell.id, moved: false }; anchorRef.current = cell.id; }
+  function extendSelectDrag(cell: FlowCell) {
+    const d = selDrag.current;
+    if (!d || cell.id === d.anchor) return;
+    d.moved = true;
+    selectRange(d.anchor, cell.id);
+  }
+  // Hide the selected points (and their sub-points) from view; Show brings them back.
+  function hideSelected() {
+    if (!selected.size) return;
+    setHiddenPts((prev) => {
+      const n = new Set(prev);
+      for (const sid of selected) for (const d of subtreeIds(sid)) n.add(d);
+      return n;
+    });
+    clearSelection();
+  }
+  function showHidden() { setHiddenPts(new Set()); }
+
   // Copy the selected points (or the whole flow if none selected) to the clipboard.
   // We write BOTH plain text (tab-indented, for Docs/Word) and rich HTML whose
   // lines carry the same two indent colors as the outline — so pasting into the
@@ -679,7 +723,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     hideUnder = -1;
     if (collapsed.has(cell.id) && labeled[i].hasKids) hideUnder = cell.depth;
   }
-  const visible = labeled.filter(({ cell }) => !hidden.has(cell.id) && (!flaggedOnly || cell.status === "flag"));
+  const visible = labeled.filter(({ cell }) => !hidden.has(cell.id) && !hiddenPts.has(cell.id) && (!flaggedOnly || cell.status === "flag"));
   const anyCollapsed = collapsed.size > 0;
 
   return (
@@ -719,11 +763,19 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
           </button>
           {selected.size > 0 && (
             <>
+              <button className="db-btn db-btn--glass db-btn--sm" onClick={hideSelected} title="Hide selected points from view">
+                <EyeOff size={13} /> Hide {selected.size}
+              </button>
               <button className="db-btn db-btn--glass db-btn--sm flow-outline__del" onClick={deleteSelected} title="Delete selected points (Del)">
                 <Trash2 size={13} /> Delete {selected.size}
               </button>
               <button className="db-btn db-btn--glass db-btn--sm" onClick={clearSelection}>Deselect</button>
             </>
+          )}
+          {hiddenPts.size > 0 && (
+            <button className="db-btn db-btn--glass db-btn--sm" onClick={showHidden} title="Show points you've hidden">
+              <Eye size={13} /> Show {hiddenPts.size} hidden
+            </button>
           )}
           <button className={`db-btn db-btn--glass db-btn--sm ${flaggedOnly ? "is-active" : ""}`} onClick={() => setFlaggedOnly((f) => !f)} title="Show only flagged points">
             <Flag size={13} /> {flaggedOnly ? "Showing flagged" : "Only flagged"}
@@ -731,7 +783,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
           <button className="db-btn db-btn--glass db-btn--sm" onClick={() => (anyCollapsed ? setCollapsed(new Set()) : setCollapsed(new Set(labeled.filter((l) => l.hasKids).map((l) => l.cell.id))))}>
             {anyCollapsed ? "Expand all" : "Collapse all"}
           </button>
-          <span className="flow-outline__bar-hint">Select numbers, then drag the handle to move them as a group</span>
+          <span className="flow-outline__bar-hint">Click or drag the numbers to select, then hide, delete, or drag the handle to move them</span>
           <button className="db-btn db-btn--glass db-btn--sm" onClick={clearAll}>Clear flow</button>
         </div>
       )}
@@ -767,8 +819,10 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             className="flow-node__label"
             role="button"
             tabIndex={0}
-            title="Click to select • Shift-click for a range"
-            onClick={(e) => selectLabel(cell, e.shiftKey)}
+            title="Click to select • Shift-click for a range • Drag down the numbers to select many"
+            onPointerDown={() => startSelectDrag(cell)}
+            onPointerEnter={() => extendSelectDrag(cell)}
+            onClick={(e) => { if (suppressClick.current) { suppressClick.current = false; return; } selectLabel(cell, e.shiftKey); }}
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectLabel(cell, false); } }}
           >{label}</span>
           {cell.status === "flag" && (
