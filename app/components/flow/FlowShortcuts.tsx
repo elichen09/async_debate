@@ -23,7 +23,7 @@ const GROUPS: { title: string; rows: { keys: string[]; desc: string }[] }[] = [
   {
     title: "Workspace",
     rows: [
-      { keys: ["Ctrl", "K"], desc: "Command palette — search actions, views, and flows (⌘K on Mac)" },
+      { keys: ["⇧", "⇧"], desc: "Command palette — double-tap Shift to search actions, views, and flows" },
       { keys: ["＋"], desc: "Split: open another view or flow side-by-side (next to the tabs)" },
       { keys: ["⋯"], desc: "Tools & panels: Extensions, Share, Timers, Fullscreen" },
       { keys: ["?"], desc: "Open this shortcuts list" },

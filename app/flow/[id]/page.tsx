@@ -599,17 +599,23 @@ export default function FlowWorkspace() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Ctrl+K (Windows/Linux) or Cmd+K (Mac) toggles the command palette. preventDefault
-  // overrides the browser's own Ctrl+K, and it works even while typing in a cell.
+  // Double-tap Shift toggles the command palette (Ctrl+K is hijacked by the browser
+  // on the web). A "lone" Shift tap = Shift pressed and released with no other key
+  // in between, so typing capitals never triggers it. Works while typing in a cell.
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
-        e.preventDefault();
-        setShowPalette((s) => !s);
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    let lastTap = 0;
+    let other = false;   // another key was pressed during this Shift hold
+    const down = (e: KeyboardEvent) => { other = e.key !== "Shift"; };
+    const up = (e: KeyboardEvent) => {
+      if (e.key !== "Shift") return;
+      if (other) { other = false; return; }   // not a lone Shift tap
+      const now = Date.now();
+      if (now - lastTap < 400) { lastTap = 0; setShowPalette((s) => !s); }
+      else lastTap = now;
+    };
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
   }, []);
 
   if (loading || !flow) {
@@ -783,6 +789,9 @@ export default function FlowWorkspace() {
                   <span>Timers</span>{showTimers && <span className="flow-menu__check">✓</span>}
                 </button>
                 <div className="flow-menu__sep" />
+                <button className="flow-menu__item" role="menuitem" onClick={() => { setShowPalette(true); setMenu(null); }}>
+                  <span>Command palette</span><span className="flow-menu__kbd">⇧⇧</span>
+                </button>
                 <button className="flow-menu__item" role="menuitem" onClick={() => { setFullscreen((f) => !f); setMenu(null); }}>
                   {fullscreen ? "Exit fullscreen" : "Fullscreen"}
                 </button>
