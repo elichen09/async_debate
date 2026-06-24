@@ -12,7 +12,7 @@ import FlowTimers, { type TimerSnap } from "@/app/components/flow/FlowTimers";
 import FlowDock from "@/app/components/flow/FlowDock";
 import FlowShortcuts from "@/app/components/flow/FlowShortcuts";
 import { Columns2, Ellipsis, X } from "lucide-react";
-import type { EditorInsert, Flow, FlowSnippet } from "@/app/flow/shared";
+import type { EditorInsert, Flow, FlowSnippet, FlowCell } from "@/app/flow/shared";
 
 const SNIP_SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
 type Sibling = { id: string; title: string; folder_id: string | null };
@@ -189,6 +189,9 @@ export default function FlowWorkspace() {
   const [menu, setMenu] = useState<{ kind: "split" | "more"; rect: DOMRect } | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [timerSnap, setTimerSnap] = useState<TimerSnap | null>(null);  // live speech clock for the Read-doc pace chip
+  // Last "cut card" action, so it can be undone from a short-lived toast.
+  const [cutUndo, setCutUndo] = useState<{ sendHtml: string; rows: FlowCell[]; label: string } | null>(null);
+  const cutUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Toggle helpers that also remember the choice for next time.
   const setDock = (d: DockTab | null) => { setDockState(d); saveUi({ dock: d }); };
   const setShowTimers = (v: boolean) => { setShowTimersState(v); saveUi({ timers: v }); };
@@ -253,6 +256,9 @@ export default function FlowWorkspace() {
     document.body.classList.toggle("flow-work-full", fullscreen);
     return () => document.body.classList.remove("flow-work-full");
   }, [fullscreen]);
+
+  // Clear the pending undo timer if the workspace unmounts.
+  useEffect(() => () => { if (cutUndoTimer.current) clearTimeout(cutUndoTimer.current); }, []);
 
   // --- View / split controls ---
   // A tab brings its view on screen. If that view belonged to your last split, the
@@ -376,6 +382,73 @@ export default function FlowWorkspace() {
   function onCellsDeleted(ids: string[]) {
     const next = removeSendCards(sendHtmlRef.current, ids);
     if (next !== sendHtmlRef.current) commitSend(next, true);
+  }
+
+  // Double-click a card in the read doc → cut it. "delete" (plan mode) removes the
+  // card from the Send doc entirely; "red" (normal mode) flags it cut (red font +
+  // data-cut) so it drops from the read doc but stays, in red, in the Send doc.
+  // Either way the flow points the card is tied to (data-cell / data-block) are
+  // deleted from the outline. `ho` is the card's heading ordinal in the read doc.
+  async function cutReadCard(ho: number, mode: "delete" | "red") {
+    const prevHtml = sendHtmlRef.current;
+    if (!prevHtml) return;
+    let doc: Document;
+    try { doc = new DOMParser().parseFromString(prevHtml, "text/html"); } catch { return; }
+    // The read doc emits one heading per non-empty, non-cut Send heading, in order,
+    // so the Nth such heading here is the card that was double-clicked.
+    const heading = Array.from(doc.querySelectorAll("h1, h2, h3, h4, h5, h6"))
+      .filter((h) => (h.textContent ?? "").trim() && !h.hasAttribute("data-cut"))[ho];
+    if (!heading) return;
+    // The card = its heading + the following siblings up to the next heading.
+    const nodes: Element[] = [heading];
+    for (let n = heading.nextElementSibling; n && !/^H[1-6]$/.test(n.tagName); n = n.nextElementSibling) nodes.push(n);
+    const ids = new Set<string>();
+    for (const el of nodes) {
+      const dc = el.getAttribute("data-cell"); if (dc) ids.add(dc);
+      const db = el.getAttribute("data-block"); if (db) ids.add(db);
+    }
+    if (mode === "delete") {
+      for (const el of nodes) el.remove();
+    } else {
+      for (const el of nodes) { el.setAttribute("data-cut", "1"); (el as HTMLElement).style.color = "#c0392b"; }
+    }
+    commitSend(doc.body.innerHTML, true);
+    // Snapshot the flow rows BEFORE deleting them, so Undo can re-insert them with
+    // their original ids (keeping the Send doc's data-cell references valid).
+    let rows: FlowCell[] = [];
+    if (ids.size) {
+      const idList = [...ids];
+      const { data } = await supabase.from("flow_cells").select("*").in("id", idList);
+      rows = (data ?? []) as FlowCell[];
+      const { error } = await supabase.from("flow_cells").delete().in("id", idList);
+      if (error) console.error("Cut flow points failed:", error.message);
+    }
+    armUndo(prevHtml, rows, mode === "delete" ? "Card deleted" : "Card cut");
+  }
+
+  // A 7-second "Undo" window for the last cut: restore the Send doc and re-insert
+  // the deleted flow rows (same ids, so data-cell links still resolve).
+  function armUndo(sendHtml: string, rows: FlowCell[], label: string) {
+    if (cutUndoTimer.current) clearTimeout(cutUndoTimer.current);
+    setCutUndo({ sendHtml, rows, label });
+    cutUndoTimer.current = setTimeout(() => { cutUndoTimer.current = null; setCutUndo(null); }, 7000);
+  }
+  function undoCut() {
+    const u = cutUndo;
+    if (!u) return;
+    if (cutUndoTimer.current) { clearTimeout(cutUndoTimer.current); cutUndoTimer.current = null; }
+    setCutUndo(null);
+    commitSend(u.sendHtml, true);
+    if (u.rows.length) {
+      const restore = u.rows.map((r) => ({
+        id: r.id, flow_id: r.flow_id, col: r.col, row_index: r.row_index,
+        depth: r.depth, highlighted: r.highlighted, content: r.content,
+        status: r.status ?? null, updated_by: r.updated_by,
+      }));
+      supabase.from("flow_cells").insert(restore).then(({ error }) => {
+        if (error) console.error("Undo cut failed:", error.message);
+      });
+    }
   }
 
   // Flow points were dragged into a new order — reflow the Send doc cards to match.
@@ -611,7 +684,7 @@ export default function FlowWorkspace() {
                     <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} slashOptions={slashOptions} flowId={flowId} userId={userId} userName={userName} />
                   )}
                   {pane.view === "read" && (
-                    <ReadDocView sendHtml={sendHtml} timer={timerSnap} />
+                    <ReadDocView sendHtml={sendHtml} timer={timerSnap} onCutCard={cutReadCard} />
                   )}
                 </div>
               </section>
@@ -686,6 +759,13 @@ export default function FlowWorkspace() {
       )}
 
       {showShortcuts && <FlowShortcuts onClose={() => setShowShortcuts(false)} />}
+
+      {cutUndo && (
+        <div className="flow-undo" role="status">
+          <span>{cutUndo.label}</span>
+          <button className="flow-undo__btn" onClick={undoCut}>Undo</button>
+        </div>
+      )}
     </div>
   );
 }

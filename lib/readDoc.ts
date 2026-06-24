@@ -74,6 +74,7 @@ function flatten(node: Node, out: HTMLElement[]) {
   Array.from(node.childNodes).forEach((child) => {
     if (child.nodeType !== Node.ELEMENT_NODE) return;
     const el = child as HTMLElement;
+    if (el.hasAttribute("data-cut")) return;        // a card "cut" from the read doc (kept red in the Send doc)
     const tag = el.tagName.toLowerCase();
     if (HEADINGS.has(tag)) { out.push(el); return; }
     if (hasBlockChild(el)) { flatten(el, out); return; }
@@ -90,6 +91,7 @@ export function toReadDocHtml(html: string): string {
   flatten(dom.body, blocks);
   const out: string[] = [];
   let body: string[] = [];        // highlighted fragments collected for this card
+  let hi = 0;                     // heading ordinal — lets a read segment map back to its Send-doc card
   const flush = () => {
     const text = norm(body.join(" "));
     if (text) out.push(`<p>${esc(text)}</p>`);
@@ -100,7 +102,7 @@ export function toReadDocHtml(html: string): string {
     if (HEADINGS.has(tag)) {
       flush(); // end the previous card's body before the next tag
       const txt = norm(el.textContent ?? "");
-      if (txt) out.push(`<${tag}>${esc(txt)}</${tag}>`);
+      if (txt) out.push(`<${tag} data-ho="${hi++}">${esc(txt)}</${tag}>`);
       continue;
     }
     const base: Ctx = { hl: false, bold: false };

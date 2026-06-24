@@ -129,6 +129,7 @@ export function estimateSeconds(bodyWords: number, tagWords: number, bodyLen: nu
 export interface ReadSeg {
   key: string;
   heading: { level: number; text: string } | null;
+  ho?: number;             // heading ordinal in the read doc — maps back to the Send-doc card
   cite: string;            // author/date line, "" if none
   body: string;            // merged highlighted body, "" if a cut/title-only card
   bodyWords: number; tagWords: number; bodyLen: number; tagLen: number;
@@ -142,6 +143,7 @@ export function segmentRead(html: string): ReadSeg[] {
   const dom = new DOMParser().parseFromString(html || "", "text/html");
   const segs: ReadSeg[] = [];
   let cur: { level: number; text: string } | null = null;
+  let curHo: number | undefined;
   let cites: string[] = [];
   let bodies: string[] = [];
   let i = 0;
@@ -153,6 +155,7 @@ export function segmentRead(html: string): ReadSeg[] {
     segs.push({
       key: `s${i++}`,
       heading: cur,
+      ho: curHo,
       cite,
       body,
       bodyWords: countWords(body),
@@ -160,7 +163,7 @@ export function segmentRead(html: string): ReadSeg[] {
       bodyLen: avgWordLen(body),
       tagLen: avgWordLen(tagText),
     });
-    cur = null; cites = []; bodies = [];
+    cur = null; curHo = undefined; cites = []; bodies = [];
   };
   Array.from(dom.body.children).forEach((el) => {
     const tag = el.tagName.toLowerCase();
@@ -168,6 +171,8 @@ export function segmentRead(html: string): ReadSeg[] {
     if (/^h[1-6]$/.test(tag)) {
       flush();
       cur = { level: parseInt(tag[1], 10), text };
+      const ho = el.getAttribute("data-ho");
+      curHo = ho != null ? parseInt(ho, 10) : undefined;
     } else if (el.classList.contains("rd-cite")) {
       if (text) cites.push(text);
     } else if (text) {
