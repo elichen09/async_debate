@@ -612,6 +612,26 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   }
   function showHidden() { setHiddenPts(new Set()); }
 
+  // Indent (+1) or outdent (-1) every selected point together. Walks in document
+  // order so each point's new depth is capped at one past the (already-updated)
+  // point above it — keeping the outline valid as the whole group shifts.
+  function indentSelected(dir: 1 | -1) {
+    if (!selected.size) return;
+    const list = sorted();
+    const nd = new Map<string, number>();
+    for (let i = 0; i < list.length; i++) {
+      const c = list[i];
+      const above = i > 0 ? nd.get(list[i - 1].id)! : -1;
+      nd.set(c.id, selected.has(c.id)
+        ? (dir === 1 ? Math.min(c.depth + 1, above + 1) : Math.max(0, c.depth - 1))
+        : c.depth);
+    }
+    const changed = list.filter((c) => selected.has(c.id) && nd.get(c.id) !== c.depth);
+    if (!changed.length) return;
+    setCells((prev) => prev.map((c) => (selected.has(c.id) && nd.get(c.id) !== c.depth ? { ...c, depth: nd.get(c.id)! } : c)));
+    for (const c of changed) saveMeta(c.id, { depth: nd.get(c.id)! });
+  }
+
   // Copy the selected points (or the whole flow if none selected) to the clipboard.
   // We write BOTH plain text (tab-indented, for Docs/Word) and rich HTML whose
   // lines carry the same two indent colors as the outline — so pasting into the
@@ -730,13 +750,12 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     <div
       className={`flow-outline ${extDrop ? "is-extdrop" : ""}`}
       onKeyDown={(e) => {
-        // Del / Backspace clears the selected points — but never while typing in a cell.
-        if ((e.key === "Delete" || e.key === "Backspace") && selected.size) {
-          const t = e.target as HTMLElement;
-          if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-          e.preventDefault();
-          deleteSelected();
-        }
+        // Selection shortcuts — but never while typing in a cell (textarea handles its own).
+        if (!selected.size) return;
+        const t = e.target as HTMLElement;
+        if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+        if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); deleteSelected(); }
+        else if (e.key === "Tab") { e.preventDefault(); indentSelected(e.shiftKey ? -1 : 1); }
       }}
       onDragOver={(e) => { if (!dragId && e.dataTransfer.types.includes(FLOW_DRAG_MIME)) { e.preventDefault(); setExtDrop(true); } }}
       onDragLeave={(e) => { if (e.target === e.currentTarget) setExtDrop(false); }}
@@ -777,9 +796,11 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
               <Eye size={13} /> Show {hiddenPts.size} hidden
             </button>
           )}
-          <button className={`db-btn db-btn--glass db-btn--sm ${flaggedOnly ? "is-active" : ""}`} onClick={() => setFlaggedOnly((f) => !f)} title="Show only flagged points">
-            <Flag size={13} /> {flaggedOnly ? "Showing flagged" : "Only flagged"}
-          </button>
+          {selected.size === 0 && (
+            <button className={`db-btn db-btn--glass db-btn--sm ${flaggedOnly ? "is-active" : ""}`} onClick={() => setFlaggedOnly((f) => !f)} title="Show only flagged points">
+              <Flag size={13} /> {flaggedOnly ? "Showing flagged" : "Only flagged"}
+            </button>
+          )}
           <button className="db-btn db-btn--glass db-btn--sm" onClick={() => (anyCollapsed ? setCollapsed(new Set()) : setCollapsed(new Set(labeled.filter((l) => l.hasKids).map((l) => l.cell.id))))}>
             {anyCollapsed ? "Expand all" : "Collapse all"}
           </button>
