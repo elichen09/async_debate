@@ -5236,7 +5236,8 @@ html.gh-light .flow-target__caret { color: #a98a5e; }
   height: 100%;
   z-index: -1;            /* above the shell's gray bg, beneath all content */
   pointer-events: none;
-  opacity: 0.8;
+  opacity: 0.9;
+  filter: blur(0.5px);    /* soften the hard specks into a cloudy film grain */
 }
 html.gh-light .flow-shell .flow-work { background: none; }
 html.gh-light .flow-shell .flow-work--full { background: var(--fl-bg); }
