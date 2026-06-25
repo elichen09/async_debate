@@ -263,21 +263,22 @@ export default function FlowWorkspace() {
   useEffect(() => () => { if (cutUndoTimer.current) clearTimeout(cutUndoTimer.current); }, []);
 
   // --- View / split controls ---
-  // A tab brings its view on screen. If that view belonged to your last split, the
-  // whole split is rebuilt (so clicking away to Speech and back to Flow restores a
-  // Flow + Send doc split); otherwise it's a single pane for the URL flow.
+  // A tab switches to its view. Clicking it focuses that view — collapsing a split
+  // down to it — so "go to Flow" always shows Flow. It only no-ops when you're
+  // already showing exactly that view (a single pane of it, or for Flow the
+  // all-flow arrangement), so clicking the active tab never re-mounts the editor.
+  // Splits are created explicitly with the + (split) control.
   function setView(view: ViewKind) {
-    if (panes.some((p) => p.view === view)) return;   // already on screen — don't churn the panes
-    const ui = loadUi();
-    if (ui.split.length >= 2 && ui.split.some((s) => s.view === view)) {
-      const r = specsToPanes(ui.split, ui.splitWidths, ui.splitFlow, flowId);
-      setPanes(r.panes); setFlexes(r.flexes);
-      return;
-    }
+    const already = view === "flow"
+      ? panes.length > 0 && panes.every((p) => p.view === "flow")
+      : panes.length === 1 && panes[0].view === view;
+    if (already) return;
     setFlexes({});
     if (view === "flow") {
-      const restore = savedFlowPanesRef.current.length ? savedFlowPanesRef.current : [{ key: `p${paneSeq.current++}`, view: "flow" as ViewKind, flowId }];
-      setPanes(restore);
+      // Restore the last flow-pane arrangement (e.g. a 2-flow split), else a fresh
+      // single flow pane for the URL flow.
+      const fp = savedFlowPanesRef.current.filter((p) => p.view === "flow");
+      setPanes(fp.length ? fp : [{ key: `p${paneSeq.current++}`, view: "flow", flowId }]);
       return;
     }
     setPanes([{ key: `p${paneSeq.current++}`, view, flowId }]);
