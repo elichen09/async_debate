@@ -1,8 +1,12 @@
-// Export a flow (outline + speech + send doc) to a downloadable .docx.
-// Runs entirely in the browser; the `docx` dependency is only pulled in when an
-// export actually happens (page.tsx dynamic-imports this module on demand).
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
+// Export a flow folder (every flow's outline + speech, plus the shared send doc)
+// to a downloadable .docx. Runs entirely in the browser; the `docx` dependency is
+// only pulled in when an export happens (page.tsx dynamic-imports this on demand).
+import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 import type { FlowCell } from "@/app/flow/shared";
+
+// Half-point sizes (docx unit). BODY is the base; bump it to scale everything.
+const BODY = 26;            // 13pt body / outline / speech
+const H = { h1: 36, h2: 32, h3: 30, h4: 30, h5: 28, h6: 28 } as const;
 
 // ── Outline numbering (mirrors FlowGrid's 1. / a. / i. by depth) ──────────────
 function toAlpha(n: number): string {
@@ -24,7 +28,9 @@ function nodeLabel(count: number, depth: number): string {
 }
 
 // ── HTML → docx (handles the Speech contentEditable + Send doc rich HTML) ─────
-type Fmt = { bold?: boolean; italics?: boolean; underline?: boolean; color?: string; highlight?: "yellow" };
+// Headings render as explicit bold/sized black runs (NOT Word's built-in Heading
+// styles) so the download keeps the on-screen look instead of Word's blue theme.
+type Fmt = { bold?: boolean; italics?: boolean; underline?: boolean; color?: string; size?: number; highlight?: "yellow" };
 const BLOCK = new Set(["div", "p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "section"]);
 
 function cssToHex(c: string | undefined): string {
@@ -51,6 +57,7 @@ function run(text: string, fmt: Fmt, extra?: { break?: number }): TextRun {
     italics: fmt.italics,
     underline: fmt.underline ? {} : undefined,
     color: fmt.color,
+    size: fmt.size,
     highlight: fmt.highlight,
     ...extra,
   });
@@ -79,18 +86,6 @@ function collectRuns(node: Node, fmt: Fmt): TextRun[] {
   return runs;
 }
 
-function headingFor(tag: string) {
-  switch (tag) {
-    case "h1": return HeadingLevel.HEADING_1;
-    case "h2": return HeadingLevel.HEADING_2;
-    case "h3": return HeadingLevel.HEADING_3;
-    case "h4": return HeadingLevel.HEADING_4;
-    case "h5": return HeadingLevel.HEADING_5;
-    case "h6": return HeadingLevel.HEADING_6;
-    default: return undefined;
-  }
-}
-
 function pushBlock(node: Node, out: Paragraph[]): void {
   if (node.nodeType === Node.TEXT_NODE) {
     const t = node.textContent ?? "";
@@ -101,19 +96,22 @@ function pushBlock(node: Node, out: Paragraph[]): void {
   const el = node as HTMLElement;
   const tag = el.tagName.toLowerCase();
   if (tag === "br") { out.push(new Paragraph({})); return; }
-  // A wrapper holding its own block children: recurse so each becomes a paragraph.
-  const hasBlockKids = Array.from(el.childNodes).some((n) => n.nodeType === Node.ELEMENT_NODE && BLOCK.has((n as Element).tagName.toLowerCase()));
-  if (hasBlockKids && !/^h[1-6]$/.test(tag)) {
-    el.childNodes.forEach((c) => pushBlock(c, out));
-    return;
+  const isHeading = /^h[1-6]$/.test(tag);
+  // A non-heading wrapper holding its own block children: recurse so each becomes
+  // its own paragraph instead of one flattened blob.
+  if (!isHeading) {
+    const hasBlockKids = Array.from(el.childNodes).some(
+      (n) => n.nodeType === Node.ELEMENT_NODE && BLOCK.has((n as Element).tagName.toLowerCase()),
+    );
+    if (hasBlockKids) { el.childNodes.forEach((c) => pushBlock(c, out)); return; }
   }
-  const runs = collectRuns(el, {});
-  if (!runs.length) { if (!headingFor(tag)) out.push(new Paragraph({})); return; }
+  const headFmt: Fmt = isHeading ? { bold: true, size: H[tag as keyof typeof H] } : {};
+  const runs = collectRuns(el, headFmt);
+  if (!runs.length) { if (!isHeading) out.push(new Paragraph({})); return; }
   out.push(new Paragraph({
     children: runs,
-    heading: headingFor(tag),
     alignment: tag === "h3" ? AlignmentType.CENTER : undefined,  // Send doc centers block titles
-    spacing: { after: 80 },
+    spacing: isHeading ? { before: 120, after: 60 } : { after: 80 },
   }));
 }
 
@@ -155,12 +153,12 @@ function outlineToParagraphs(cells: FlowCell[]): Paragraph[] {
   });
 }
 
-function sectionHeading(text: string, breakBefore = false): Paragraph {
+function heading(text: string, size: number, opts: { center?: boolean; pageBreakBefore?: boolean } = {}): Paragraph {
   return new Paragraph({
-    heading: HeadingLevel.HEADING_1,
-    pageBreakBefore: breakBefore,
+    pageBreakBefore: opts.pageBreakBefore,
+    alignment: opts.center ? AlignmentType.CENTER : undefined,
     spacing: { before: 240, after: 120 },
-    children: [new TextRun({ text })],
+    children: [new TextRun({ text, bold: true, size })],
   });
 }
 
@@ -169,26 +167,29 @@ function sanitize(name: string): string {
 }
 
 export interface FlowExport {
-  title: string;
-  cells: FlowCell[];
-  speechBody: string;
-  sendHtml: string;
+  title: string;       // doc title (folder name, or the single flow's title)
+  sendHtml: string;    // the folder-shared send doc
+  flows: { title: string; speechBody: string; cells: FlowCell[] }[];
 }
 
-// Build the .docx and trigger a download. Sections: Flow, Speech, Send doc.
-export async function exportFlowDocx({ title, cells, speechBody, sendHtml }: FlowExport): Promise<void> {
-  const children: Paragraph[] = [
-    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: title || "Flow" })] }),
-    sectionHeading("Flow"),
-    ...outlineToParagraphs(cells),
-    sectionHeading("Speech", true),
-    ...htmlToParagraphs(speechToHtml(speechBody)),
-    sectionHeading("Send doc", true),
-    ...htmlToParagraphs(sendHtml),
-  ];
+// Build the .docx and trigger a download. One section per flow (outline + speech),
+// then the shared Send doc.
+export async function exportFlowDocx({ title, flows, sendHtml }: FlowExport): Promise<void> {
+  const multi = flows.length > 1;
+  const children: Paragraph[] = [heading(title || "Flow", 44)];
+
+  flows.forEach((f, i) => {
+    children.push(heading(multi ? f.title : "Flow", multi ? 36 : 32, { pageBreakBefore: multi && i > 0 }));
+    children.push(...outlineToParagraphs(f.cells));
+    children.push(heading("Speech", 30));
+    children.push(...htmlToParagraphs(speechToHtml(f.speechBody)));
+  });
+
+  children.push(heading("Send doc", 34, { pageBreakBefore: true }));
+  children.push(...htmlToParagraphs(sendHtml));
 
   const doc = new Document({
-    styles: { default: { document: { run: { font: "Calibri", size: 22 } } } },
+    styles: { default: { document: { run: { font: "Calibri", size: BODY } } } },
     sections: [{ children }],
   });
 

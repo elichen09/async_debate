@@ -486,16 +486,30 @@ export default function FlowWorkspace() {
     appendBlock(snip);
   }
 
-  // Download the whole flow (outline + speech + send doc) as a .docx. The outline
-  // is fetched fresh so it's current; the docx library loads only on first export.
+  // Download the flow(s) as a .docx: every flow in this folder (outline + speech),
+  // plus the folder-shared send doc. A loose flow exports on its own. Data is
+  // fetched fresh so it's current; the docx library loads only on first export.
   async function exportDocx() {
-    const { data } = await supabase.from("flow_cells").select("*").eq("flow_id", flowId);
+    if (!flow) return;
+    let docTitle = flow.title;
+    let flowRows: { id: string; title: string; speech_body: string }[] =
+      [{ id: flow.id, title: flow.title, speech_body: flow.speech_body }];
+    if (flow.folder_id) {
+      const [{ data: ff }, { data: folderRow }] = await Promise.all([
+        supabase.from("flows").select("id, title, speech_body, created_at").eq("folder_id", flow.folder_id).order("created_at", { ascending: true }),
+        supabase.from("flow_folders").select("name").eq("id", flow.folder_id).single(),
+      ]);
+      if (ff && ff.length) flowRows = ff as { id: string; title: string; speech_body: string }[];
+      if (folderRow?.name) docTitle = folderRow.name as string;
+    }
+    const ids = flowRows.map((f) => f.id);
+    const { data: cellData } = await supabase.from("flow_cells").select("*").in("flow_id", ids);
+    const cells = (cellData ?? []) as FlowCell[];
     const { exportFlowDocx } = await import("@/lib/flowDocx");
     await exportFlowDocx({
-      title: flow?.title ?? "Flow",
-      cells: (data ?? []) as FlowCell[],
-      speechBody: flow?.speech_body ?? "",
+      title: docTitle,
       sendHtml: sendHtmlRef.current,
+      flows: flowRows.map((f) => ({ title: f.title, speechBody: f.speech_body ?? "", cells: cells.filter((c) => c.flow_id === f.id) })),
     });
   }
 
