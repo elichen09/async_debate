@@ -13,6 +13,18 @@ import {
   loadSpeechSec, saveSpeechSec,
 } from "@/lib/readEstimate";
 
+// Calibrated seconds to read one word: its kind's WPM, lengthened a little for
+// long words and end-of-clause punctuation (mirrors the focus reader).
+function baseWordSec(w: FocusWord, s: Settings): number {
+  const wpm = w.kind === "tag" ? s.tagWpm : s.cardWpm;
+  let sec = wpm > 0 ? 60 / wpm : 0.4;
+  if (w.text.length > 9) sec *= 1.2;
+  else if (w.text.length <= 2) sec *= 0.85;
+  if (/[.!?]["'”’)\]]?$/.test(w.text)) sec *= 1.7;
+  else if (/[,;:—]$/.test(w.text)) sec *= 1.35;
+  return sec;
+}
+
 // Read-only "read doc" view: the speech-ready version of the Send doc — tags,
 // cites (author + date), and highlighted text only. Derived live from the Send
 // doc, so it updates as the Send doc changes; large, calm type to read off. Each
@@ -78,11 +90,12 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
   const belowCount = planData.cutIndex >= 0 ? segs.length - planData.cutIndex : 0;
 
   // ── Pace cursor ─────────────────────────────────────────────────────────────
-  // A line that descends the read doc at the calibrated reading speed, so you can
-  // glance and see whether you're ahead of or behind where you "should" be.
-  // Self-contained play/pause/reset; toggled on or off.
+  // A highlight that advances word-by-word at the calibrated reading speed — it
+  // travels horizontally along each line and wraps — so you can glance and see
+  // whether you're ahead of or behind where you "should" be. Self-contained
+  // play/pause/reset; toggled on or off.
   const docRef = useRef<HTMLDivElement>(null);
-  const lineRef = useRef<HTMLDivElement>(null);
+  const markRef = useRef<HTMLDivElement>(null);
   const [paceOn, setPaceOn] = useState(false);
   const [pacePlaying, setPacePlaying] = useState(false);
   const [paceElapsed, setPaceElapsed] = useState(0);
@@ -90,56 +103,50 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
   const rafRef = useRef(0);
   const lastTsRef = useRef(0);
   const lastSecRef = useRef(-1);
-  const measureRef = useRef<{ cards: { top: number; h: number }[]; clientH: number; scrollH: number }>({ cards: [], clientH: 0, scrollH: 0 });
-  const planRef = useRef(planData);
-  useEffect(() => { planRef.current = planData; }, [planData]);
 
-  // Cache card offsets + scroll metrics so the descent loop never forces a reflow.
-  const measure = useCallback(() => {
-    const doc = docRef.current;
-    if (!doc) { measureRef.current = { cards: [], clientH: 0, scrollH: 0 }; return; }
-    measureRef.current = {
-      cards: Array.from(doc.querySelectorAll<HTMLElement>(".rd-seg")).map((el) => ({ top: el.offsetTop, h: el.offsetHeight })),
-      clientH: doc.clientHeight,
-      scrollH: doc.scrollHeight,
-    };
-  }, []);
+  // Per-word cumulative seconds at the calibrated pace, aligned with the word
+  // spans rendered in the doc (by data-wi index) when the pacer is on.
+  const wordCum = useMemo(() => {
+    const out: number[] = [];
+    let acc = 0;
+    for (const w of focusWords) { acc += baseWordSec(w, eff); out.push(acc); }
+    return out;
+  }, [focusWords, eff]);
+  const paceTotal = wordCum.length ? wordCum[wordCum.length - 1] : 0;
+  const wordCumRef = useRef(wordCum);
+  useEffect(() => { wordCumRef.current = wordCum; }, [wordCum]);
 
-  // Map calibrated elapsed seconds → a vertical position (which card, how far into
-  // it), then move the line there and keep it in view.
-  const positionLine = useCallback((elapsed: number, scroll: boolean) => {
-    const line = lineRef.current, doc = docRef.current;
-    if (!line || !doc) return;
-    const cum = planRef.current.cum;
-    const { cards, clientH, scrollH } = measureRef.current;
-    if (!cum.length || !cards.length) return;
+  // Move the highlight onto the word you should be reading now; keep it in view.
+  const positionMark = useCallback((elapsed: number, scroll: boolean) => {
+    const mark = markRef.current, doc = docRef.current;
+    if (!mark || !doc) return;
+    const cum = wordCumRef.current;
+    if (!cum.length) { mark.style.opacity = "0"; return; }
     let i = cum.findIndex((c) => c > elapsed);
     if (i === -1) i = cum.length - 1;
-    i = Math.min(i, cards.length - 1);
-    const start = i > 0 ? cum[i - 1] : 0;
-    const dur = (cum[i] - start) || 1;
-    const frac = Math.min(1, Math.max(0, (elapsed - start) / dur));
-    const y = cards[i].top + frac * cards[i].h;
-    line.style.transform = `translateY(${y}px)`;
-    if (scroll) doc.scrollTop = Math.max(0, Math.min(scrollH - clientH, y - clientH * 0.42));
+    const span = doc.querySelector<HTMLElement>(`[data-wi="${i}"]`);
+    if (!span) { mark.style.opacity = "0"; return; }
+    mark.style.opacity = "1";
+    mark.style.transform = `translate(${span.offsetLeft}px, ${span.offsetTop}px)`;
+    mark.style.width = `${span.offsetWidth}px`;
+    mark.style.height = `${span.offsetHeight}px`;
+    if (scroll) {
+      const target = span.offsetTop + span.offsetHeight / 2 - doc.clientHeight * 0.42;
+      doc.scrollTop = Math.max(0, Math.min(doc.scrollHeight - doc.clientHeight, target));
+    }
   }, []);
 
-  // Re-measure + reposition when enabled, or when content / plan layout changes.
+  // Reposition when enabled, or when content / plan layout / size changes.
+  useEffect(() => { if (paceOn) positionMark(elapsedRef.current, false); }, [paceOn, read, plan, positionMark]);
   useEffect(() => {
     if (!paceOn) return;
-    measure();
-    positionLine(elapsedRef.current, false);
-  }, [paceOn, read, plan, measure, positionLine]);
-
-  useEffect(() => {
-    if (!paceOn) return;
-    const onResize = () => { measure(); positionLine(elapsedRef.current, false); };
+    const onResize = () => positionMark(elapsedRef.current, false);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [paceOn, measure, positionLine]);
+  }, [paceOn, positionMark]);
 
-  // The descent loop: real elapsed time advances the line at the calibrated pace.
-  // The line moves via direct DOM (smooth); the readout re-renders only per second.
+  // The pacing loop: real elapsed time advances the highlight word-by-word at the
+  // calibrated pace. The mark moves via direct DOM; the readout updates per second.
   useEffect(() => {
     if (!pacePlaying) return;
     lastTsRef.current = 0;
@@ -147,9 +154,10 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
       if (!lastTsRef.current) lastTsRef.current = ts;
       const dt = (ts - lastTsRef.current) / 1000;
       lastTsRef.current = ts;
-      const total = planRef.current.total || 0;
+      const cum = wordCumRef.current;
+      const total = cum.length ? cum[cum.length - 1] : 0;
       elapsedRef.current = Math.min(total, elapsedRef.current + dt);
-      positionLine(elapsedRef.current, true);
+      positionMark(elapsedRef.current, true);
       const sec = Math.floor(elapsedRef.current);
       if (sec !== lastSecRef.current) { lastSecRef.current = sec; setPaceElapsed(elapsedRef.current); }
       if (elapsedRef.current >= total) { setPacePlaying(false); return; }
@@ -157,18 +165,28 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
     };
     rafRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [pacePlaying, positionLine]);
+  }, [pacePlaying, positionMark]);
 
   const togglePace = () => setPaceOn((on) => { if (on) setPacePlaying(false); return !on; });
   const pacePlayPause = () => {
-    if (elapsedRef.current >= (planRef.current.total || 0)) { elapsedRef.current = 0; setPaceElapsed(0); lastSecRef.current = -1; }
-    measure();
+    const cum = wordCumRef.current;
+    if (elapsedRef.current >= (cum.length ? cum[cum.length - 1] : 0)) { elapsedRef.current = 0; setPaceElapsed(0); lastSecRef.current = -1; }
     setPacePlaying((p) => !p);
   };
   const paceReset = () => {
     elapsedRef.current = 0; setPaceElapsed(0); lastSecRef.current = -1;
-    measure(); positionLine(0, true);
+    positionMark(0, true);
   };
+
+  // Tokenize a text part into indexed word spans (only used when the pacer is on),
+  // so the highlight can land on a specific word. `wi` runs across the whole doc in
+  // the same order as wordCum (each card's tag, then cite, then body).
+  let wi = 0;
+  const renderWords = (text: string) =>
+    (text.trim().match(/\S+/g) ?? []).map((w, k) => {
+      const idx = wi++;
+      return <Fragment key={idx}>{k > 0 ? " " : ""}<span className="rd-w" data-wi={idx}>{w}</span></Fragment>;
+    });
 
   return (
     <div className="flow-readview">
@@ -213,7 +231,7 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
         </p>
       ) : (
         <div className="flow-readview__doc" ref={docRef}>
-          {paceOn && <div className="rd-paceline" ref={lineRef} aria-hidden />}
+          {paceOn && <div className="rd-pacemark" ref={markRef} aria-hidden />}
           {segs.map((seg, i) => {
             const showChip = seg.bodyWords > 0 || !!seg.cite;
             const sec = estimateSeconds(seg.bodyWords, seg.tagWords, seg.bodyLen, seg.tagLen, eff);
@@ -243,13 +261,13 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
                   {seg.heading && createElement(
                     `h${level}`,
                     { className: chip ? "rd-head" : undefined },
-                    seg.heading.text, chip,
+                    paceOn ? <span className="rd-hw">{renderWords(seg.heading.text)}</span> : seg.heading.text, chip,
                   )}
-                  {seg.cite && <p className="rd-cite"><b>{seg.cite}</b></p>}
+                  {seg.cite && <p className="rd-cite"><b>{paceOn ? renderWords(seg.cite) : seg.cite}</b></p>}
                   {seg.body && (
                     <p>
                       {!seg.heading && chip}
-                      {seg.body}
+                      {paceOn ? renderWords(seg.body) : seg.body}
                     </p>
                   )}
                 </div>
@@ -264,7 +282,7 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
             {pacePlaying ? <Pause size={15} /> : <Play size={15} />}
           </button>
           <button className="rd-pacebar__btn" onClick={paceReset} aria-label="Reset to top" title="Reset to top"><RotateCcw size={14} /></button>
-          <span className="rd-pacebar__time">{fmt(paceElapsed)} <i>/ {fmt(planData.total)}</i></span>
+          <span className="rd-pacebar__time">{fmt(paceElapsed)} <i>/ {fmt(paceTotal)}</i></span>
         </div>
       )}
       {focusOpen && <ReadFocus words={focusWords} settings={eff} onClose={() => setFocusOpen(false)} />}

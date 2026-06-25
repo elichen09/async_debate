@@ -101,6 +101,16 @@ export interface FlowSnippetFolder {
 // snippet library can insert text into whatever the user last touched.
 export type EditorInsert = (text: string) => void;
 
+// One option in the "/trigger" autocomplete: the block's shortcut + name, a small
+// chip (its "---tag" speech suffix like "1NC", else the trigger), and a nesting
+// depth so sub-blocks indent under their parent.
+export interface SlashOption {
+  trigger: string;
+  label: string;
+  chip?: string;
+  depth?: number;
+}
+
 // Cross-pane drag of flow points: when split-screening you can drag a point (and
 // its sub-points) from one flow into another, or onto the Speech tab. The dragged
 // group rides the native dataTransfer so a different pane (a separate component

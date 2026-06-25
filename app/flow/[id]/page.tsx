@@ -13,7 +13,7 @@ import FlowDock from "@/app/components/flow/FlowDock";
 import FlowShortcuts from "@/app/components/flow/FlowShortcuts";
 import FlowPalette, { type PaletteCommand } from "@/app/components/flow/FlowPalette";
 import { Columns2, Ellipsis, X } from "lucide-react";
-import type { EditorInsert, Flow, FlowSnippet, FlowCell } from "@/app/flow/shared";
+import type { EditorInsert, Flow, FlowSnippet, FlowCell, SlashOption } from "@/app/flow/shared";
 
 const SNIP_SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
 type Sibling = { id: string; title: string; folder_id: string | null };
@@ -473,10 +473,28 @@ export default function FlowWorkspace() {
     if (added) commitSend(html, true);
   }
 
-  // The "/trigger" options available for the flow's slash autocomplete.
-  const slashOptions = snippets
-    .filter((s) => (s.shortcut ?? "").trim())
-    .map((s) => ({ trigger: (s.shortcut as string).trim().toLowerCase(), label: s.label }));
+  // The "/trigger" options for the slash autocomplete: each block's shortcut +
+  // name, a chip (the "---tag" speech suffix, else the trigger), and a depth so
+  // sub-blocks nest under their parent. Built in tree order (parent then children).
+  const slashOptions: SlashOption[] = (() => {
+    const withSc = snippets.filter((s) => (s.shortcut ?? "").trim());
+    const speechTag = (label: string) => { const m = /---\s*(.+?)\s*$/.exec(label); return m ? m[1] : undefined; };
+    const childrenOf = new Map<string, FlowSnippet[]>();
+    for (const s of withSc) if (s.parent_id) (childrenOf.get(s.parent_id) ?? childrenOf.set(s.parent_id, []).get(s.parent_id)!).push(s);
+    const out: SlashOption[] = [];
+    const seen = new Set<string>();
+    const emit = (s: FlowSnippet, depth: number) => {
+      const trig = (s.shortcut as string).trim().toLowerCase();
+      if (seen.has(s.id)) return;
+      seen.add(s.id);
+      out.push({ trigger: trig, label: s.label, chip: speechTag(s.label) ?? trig, depth });
+      for (const c of childrenOf.get(s.id) ?? []) emit(c, depth + 1);
+    };
+    for (const s of withSc) if (!s.parent_id) emit(s, 0);
+    // Children whose parent has no shortcut (so wasn't a root above).
+    for (const s of withSc) if (!seen.has(s.id)) emit(s, 1);
+    return out;
+  })();
 
   // Extensions "use" button: add points to the flow (when flowing) + queue Send doc.
   function runExtension(snip: FlowSnippet) {

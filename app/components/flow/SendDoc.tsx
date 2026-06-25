@@ -5,7 +5,9 @@ import { downloadHtmlAsDocx } from "@/lib/sendDocExport";
 import { usePanePresence } from "@/lib/presence";
 import { caretOffsetIn } from "@/lib/caret";
 import { fuzzyRank } from "@/lib/fuzzy";
-import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Download, Maximize2, Minimize2 } from "lucide-react";
+import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Download, Maximize2, Minimize2, ChevronLeft, ChevronRight, ChevronDown } from "lucide-react";
+import { SlashList } from "@/app/components/flow/SlashMenu";
+import type { SlashOption } from "@/app/flow/shared";
 import RemoteCarets from "@/app/components/flow/RemoteCarets";
 
 interface SendDocProps {
@@ -13,7 +15,7 @@ interface SendDocProps {
   version: number;          // bumped when an extension appends, to re-sync the DOM
   onChange: (html: string) => void;
   resolveSlashHtml?: (trigger: string) => string | null;
-  slashOptions?: { trigger: string; label: string }[];
+  slashOptions?: SlashOption[];
   flowId?: string;
   userId?: string;
   userName?: string;
@@ -29,7 +31,23 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, sla
   const ref = useRef<HTMLDivElement>(null);
   const savedRange = useRef<Range | null>(null);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
+  // Remember whether the outline panel is collapsed, across reloads.
+  const [outlineOpen, setOutlineOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    try { return localStorage.getItem("flow.sendOutline.v1") !== "0"; } catch { return true; }
+  });
   const [fullscreen, setFullscreen] = useState(false);
+
+  const toggleOutline = () => setOutlineOpen((o) => {
+    const next = !o;
+    try { localStorage.setItem("flow.sendOutline.v1", next ? "1" : "0"); } catch { /* ignore */ }
+    return next;
+  });
+  // Headings whose deeper sub-headings are collapsed (hidden) in the outline tree.
+  const [collapsedHeads, setCollapsedHeads] = useState<Set<number>>(new Set());
+  const toggleHead = (i: number) => setCollapsedHeads((prev) => {
+    const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n;
+  });
   // Slash autocomplete (mirrors FlowSpeech): the partial "/trigger" being typed at
   // the caret + its screen position, plus the highlighted suggestion.
   const [slash, setSlash] = useState<{ query: string; top: number; left: number } | null>(null);
@@ -174,8 +192,19 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, sla
     if (ref.current) onChange(ref.current.innerHTML);
   }
 
-  const slashMatches = slash ? fuzzyRank(slash.query, slashOptions).slice(0, 50) : [];
+  const slashMatches = slash ? (slash.query.trim() ? fuzzyRank(slash.query, slashOptions) : slashOptions).slice(0, 50) : [];
   const dropOpen = !!slash && slashMatches.length > 0;
+
+  // Outline tree: a heading hides its deeper sub-headings when collapsed. `hidden`
+  // marks rows under any collapsed ancestor; `headHasChildren` shows the chevron.
+  const headHasChildren = (i: number) => i + 1 < outline.length && outline[i + 1].level > outline[i].level;
+  const hiddenHeads = new Set<number>();
+  let cutLevel = Infinity;
+  for (let i = 0; i < outline.length; i++) {
+    if (outline[i].level > cutLevel) { hiddenHeads.add(i); continue; }
+    cutLevel = Infinity;
+    if (collapsedHeads.has(i) && headHasChildren(i)) cutLevel = outline[i].level;
+  }
 
   return (
     <div className={`flow-sendedit ${fullscreen ? "flow-sendedit--full" : ""}`}>
@@ -234,23 +263,43 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, sla
       </div>
 
       <div className="flow-sendedit__row">
-        <nav className="flow-sendedit__outline" aria-label="Outline">
-          <p className="flow-sendedit__outline-title">Outline</p>
-          {outline.length === 0 ? (
+        <nav className={`flow-sendedit__outline ${outlineOpen ? "" : "is-collapsed"}`} aria-label="Outline">
+          <button
+            className="flow-sendedit__outline-toggle"
+            onClick={toggleOutline}
+            title={outlineOpen ? "Collapse outline" : "Expand outline"}
+            aria-expanded={outlineOpen}
+          >
+            {outlineOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+            <span className="flow-sendedit__outline-titletext">Outline</span>
+          </button>
+          {outlineOpen && (outline.length === 0 ? (
             <p className="flow-sendedit__outline-empty">Headings appear here.</p>
           ) : (
-            outline.map((o, i) => (
-              <button
-                key={i}
-                className={`flow-sendedit__outline-item lvl${o.level}`}
-                style={{ paddingLeft: 6 + (o.level - 1) * 12 }}
-                onClick={() => jump(i)}
-                title={o.text}
-              >
-                {o.text}
-              </button>
+            outline.map((o, i) => hiddenHeads.has(i) ? null : (
+              <div key={i} className="flow-sendedit__outline-row" style={{ paddingLeft: 2 + (o.level - 1) * 14 }}>
+                {headHasChildren(i) ? (
+                  <button
+                    className="flow-sendedit__outline-caret"
+                    onClick={() => toggleHead(i)}
+                    aria-label={collapsedHeads.has(i) ? "Expand sub-headings" : "Collapse sub-headings"}
+                    title={collapsedHeads.has(i) ? "Expand" : "Collapse"}
+                  >
+                    {collapsedHeads.has(i) ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                  </button>
+                ) : (
+                  <span className="flow-sendedit__outline-caret flow-sendedit__outline-caret--leaf" />
+                )}
+                <button
+                  className={`flow-sendedit__outline-item lvl${o.level}`}
+                  onClick={() => jump(i)}
+                  title={o.text}
+                >
+                  {o.text}
+                </button>
+              </div>
             ))
-          )}
+          ))}
         </nav>
 
         <div className="flow-sendedit__docwrap">
@@ -306,21 +355,7 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, sla
       </div>
 
       {dropOpen && slash && (
-        <ul className="flow-slash flow-slash--fixed" role="listbox" style={{ top: slash.top + 4, left: slash.left }}>
-          {slashMatches.map((o, i) => (
-            <li key={o.trigger} role="option" aria-selected={i === slashActive}>
-              <button
-                type="button"
-                ref={i === slashActive ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
-                className={`flow-slash__opt ${i === slashActive ? "is-active" : ""}`}
-                onMouseDown={(e) => { e.preventDefault(); completeSlash(o.trigger); }}
-              >
-                <span className="flow-slash__trig">/{o.trigger}</span>
-                <span className="flow-slash__label">{o.label}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <SlashList matches={slashMatches} active={slashActive} fixed style={{ top: slash.top + 4, left: slash.left }} onPick={completeSlash} />
       )}
     </div>
   );

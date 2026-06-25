@@ -7,14 +7,15 @@ import { usePanePresence } from "@/lib/presence";
 import { caretOffsetIn } from "@/lib/caret";
 import { useConfirm } from "@/app/components/flow/ConfirmProvider";
 import RemoteCarets from "@/app/components/flow/RemoteCarets";
-import { FLOW_DRAG_MIME, type EditorInsert } from "@/app/flow/shared";
+import { SlashList } from "@/app/components/flow/SlashMenu";
+import { FLOW_DRAG_MIME, type EditorInsert, type SlashOption } from "@/app/flow/shared";
 
 interface FlowSpeechProps {
   flowId: string;
   initialBody: string;
   registerInsert: (fn: EditorInsert | null) => void;
   resolveSlashText?: (trigger: string) => string | null;
-  slashOptions?: { trigger: string; label: string }[];
+  slashOptions?: SlashOption[];
   userId?: string;
   userName?: string;
 }
@@ -205,7 +206,7 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
     save("");
   }
 
-  const slashMatches = slash ? fuzzyRank(slash.query, slashOptions).slice(0, 50) : [];
+  const slashMatches = slash ? (slash.query.trim() ? fuzzyRank(slash.query, slashOptions) : slashOptions).slice(0, 50) : [];
   const dropOpen = !!slash && slashMatches.length > 0;
 
   return (
@@ -265,21 +266,7 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
       <RemoteCarets editorRef={ref} editors={others} />
       </div>
       {dropOpen && slash && (
-        <ul className="flow-slash flow-slash--fixed" role="listbox" style={{ top: slash.top + 4, left: slash.left }}>
-          {slashMatches.map((o, i) => (
-            <li key={o.trigger} role="option" aria-selected={i === slashActive}>
-              <button
-                type="button"
-                ref={i === slashActive ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
-                className={`flow-slash__opt ${i === slashActive ? "is-active" : ""}`}
-                onMouseDown={(e) => { e.preventDefault(); completeSlash(o.trigger); }}
-              >
-                <span className="flow-slash__trig">/{o.trigger}</span>
-                <span className="flow-slash__label">{o.label}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <SlashList matches={slashMatches} active={slashActive} fixed style={{ top: slash.top + 4, left: slash.left }} onPick={completeSlash} />
       )}
     </div>
   );

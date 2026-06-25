@@ -5,7 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { fuzzyRank } from "@/lib/fuzzy";
 import { GripVertical, ChevronRight, ChevronDown, Flag, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2, EyeOff, Eye } from "lucide-react";
 import { useConfirm } from "@/app/components/flow/ConfirmProvider";
-import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, type FlowCell, type EditorInsert, type FlowDragPayload } from "@/app/flow/shared";
+import { SlashList } from "@/app/components/flow/SlashMenu";
+import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, type FlowCell, type EditorInsert, type FlowDragPayload, type SlashOption } from "@/app/flow/shared";
 
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -40,7 +41,7 @@ interface FlowGridProps {
   // Cells were deleted — drop any Send doc cards tied to them.
   onCellsDeleted?: (cellIds: string[]) => void;
   // Available "/trigger" options, for the slash autocomplete dropdown.
-  slashOptions?: { trigger: string; label: string }[];
+  slashOptions?: SlashOption[];
   // Send one or more flow points to the Send doc as Heading-4 cards (via "/send").
   onSendPoints?: (cells: { id: string; content: string }[]) => void;
   // Points were reordered (drag) — reflow the Send doc cards to match this order.
@@ -723,7 +724,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   }
 
   // Triggers matching what's typed after "/" (dedup, capped) for the dropdown.
-  const slashMatches = slash ? fuzzyRank(slash.query, slashOptions).slice(0, 50) : [];
+  const slashMatches = slash ? (slash.query.trim() ? fuzzyRank(slash.query, slashOptions) : slashOptions).slice(0, 50) : [];
 
   // Walk the ordered list, tracking a per-depth counter to build 1./a./i. labels.
   const ordered = [...cells].sort((a, b) => a.row_index - b.row_index);
@@ -982,21 +983,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             </div>
           )}
           {slash?.id === cell.id && slashMatches.length > 0 && (
-            <ul className="flow-slash" role="listbox">
-              {slashMatches.map((o, i) => (
-                <li key={o.trigger} role="option" aria-selected={i === slashActive}>
-                  <button
-                    type="button"
-                    ref={i === slashActive ? (el) => el?.scrollIntoView({ block: "nearest" }) : undefined}
-                    className={`flow-slash__opt ${i === slashActive ? "is-active" : ""}`}
-                    onMouseDown={(e) => { e.preventDefault(); completeSlash(cell, o.trigger); }}
-                  >
-                    <span className="flow-slash__trig">/{o.trigger}</span>
-                    <span className="flow-slash__label">{o.label}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <SlashList matches={slashMatches} active={slashActive} onPick={(t) => completeSlash(cell, t)} />
           )}
           <div className="flow-node__tools">
             <button className={`flow-node__btn ${cell.status === "flag" ? "is-flag" : ""}`} onClick={() => toggleFlag(cell)} title="Flag (or type /flag)" aria-label="Flag"><Flag size={13} /></button>
