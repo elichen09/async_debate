@@ -1821,10 +1821,17 @@ input, button, textarea, select { font-family: inherit; }
    FREEFORM CARD CANVAS — dashboard cards draggable to any position
    ========================================================================= */
 .gh-dash__canvas {
-  position: relative;
-  width: 100%;
-  height: calc(100dvh - 44px);
+  /* A true full-viewport layer (like the fixed profile card) so the drag math's
+     viewport coordinates line up and cards are never clipped by an inset canvas —
+     the background stays behind them. Sits above the background, below the
+     profile card / siderail / topnav. */
+  position: fixed;
+  top: 44px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: hidden;
+  z-index: 2;
 }
 
 .db-drag-card {
@@ -5488,3 +5495,95 @@ html.gh-light .flow-shell .extcard__count { color: var(--fl-soft); background: v
 .flow-legend kbd::after  { content: "]"; color: var(--fl-line-2); margin-left: 3px; }
 @media (max-width: 900px) { .flow-legend { display: none; } }
 @media (prefers-reduced-motion: reduce) { .flow-legend { transition: none; } }
+
+/* ---- Focus reader (RSVP) — portaled to <body>, full-screen, self-contained ----
+   Lives outside .flow-shell (the read pane is a container-type containing block,
+   which would trap a fixed child), so it carries its own tokens and a z-index
+   above the site topnav. */
+.rdr {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: oklch(0.955 0.0015 270);
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --rdr-ink: oklch(0.225 0.004 270);
+  --rdr-soft: oklch(0.43 0.005 270);
+  --rdr-muted: oklch(0.52 0.005 270);
+  --rdr-line: oklch(0.22 0.004 270 / 0.12);
+  --rdr-line2: oklch(0.22 0.004 270 / 0.26);
+  --rdr-hover: oklch(0.22 0.004 270 / 0.05);
+  --rdr-accent: oklch(0.235 0.005 270);
+  --rdr-accent-deep: oklch(0.14 0.005 270);
+  --rdr-accent-ink: oklch(0.985 0 0);
+  --rdr-orp: oklch(0.55 0.2 25);    /* the fixation letter — a clean red */
+  color: var(--rdr-ink);
+  animation: rdr-fade 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes rdr-fade { from { opacity: 0; } to { opacity: 1; } }
+.rdr__status {
+  position: absolute; top: 18px; left: 22px; z-index: 2;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.04em; color: var(--rdr-muted);
+}
+.rdr__close {
+  position: absolute; top: 14px; right: 16px; z-index: 2;  /* above the stage, which is positioned and would otherwise capture the click */
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; border-radius: 9px;
+  background: none; border: 1px solid var(--rdr-line2); color: var(--rdr-soft);
+  cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+}
+.rdr__close:hover { background: var(--rdr-hover); color: var(--rdr-ink); }
+
+.rdr__stage {
+  flex: 1; min-height: 0; position: relative;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; overflow: hidden;
+}
+.rdr__guide {
+  position: absolute; top: 16%; bottom: 16%; left: 50%;
+  width: 1px; background: var(--rdr-line); transform: translateX(-0.5px);
+}
+.rdr__col {
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: clamp(6px, 1.6vh, 16px); width: min(900px, 92vw);
+}
+.rdr__line {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline;
+  font-size: clamp(16px, 2.4vw, 28px); font-weight: 500; line-height: 1.1;
+  color: var(--rdr-soft); white-space: pre;
+  transition: opacity 0.18s cubic-bezier(0.22, 1, 0.36, 1), color 0.18s ease, font-size 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.rdr__line.is-focus {
+  font-size: clamp(26px, 4.2vw, 52px); font-weight: 650; color: var(--rdr-ink);
+}
+.rdr__pre  { justify-self: end;   text-align: right; }
+.rdr__post { justify-self: start; text-align: left; }
+.rdr__orp  { color: var(--rdr-orp); padding: 0 1px; }
+
+.rdr__bar {
+  flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+  padding: 14px clamp(16px, 4vw, 44px) 22px;
+}
+.rdr__btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 32px; border-radius: 8px;
+  background: none; border: 1px solid var(--rdr-line2); color: var(--rdr-soft);
+  cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
+}
+.rdr__btn:hover { background: var(--rdr-hover); color: var(--rdr-ink); }
+.rdr__btn--play { background: var(--rdr-accent); border-color: var(--rdr-accent); color: var(--rdr-accent-ink); }
+.rdr__btn--play:hover { background: var(--rdr-accent-deep); border-color: var(--rdr-accent-deep); color: var(--rdr-accent-ink); }
+.rdr__speed { display: inline-flex; align-items: center; gap: 8px; }
+.rdr__wpm {
+  font-size: 13px; font-weight: 600; color: var(--rdr-ink);
+  min-width: 70px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.rdr__wpm i { font-style: normal; font-weight: 500; color: var(--rdr-muted); font-size: 11px; }
+.rdr__prog { flex: 1; height: 4px; border-radius: 999px; background: var(--rdr-line); overflow: hidden; }
+.rdr__prog > span { display: block; height: 100%; background: var(--rdr-accent); border-radius: 999px; transition: width 0.18s linear; }
+.rdr__count { font-size: 12px; color: var(--rdr-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rdr__empty { margin: auto; color: var(--rdr-soft); font-size: 15px; }
+@media (prefers-reduced-motion: reduce) {
+  .rdr, .rdr__line, .rdr__prog > span { animation: none; transition: none; }
+}

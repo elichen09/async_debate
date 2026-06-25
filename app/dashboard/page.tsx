@@ -78,11 +78,36 @@ export default function DashboardPage() {
   const profileRafRef = useRef<number>(0);
   const [profileDragging, setProfileDragging] = useState(false);
   const [enteredCards, setEnteredCards] = useState<Set<string>>(new Set());
+  const [vp, setVp] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
   }, []);
+
+  // Track the viewport so card positions can be kept on-screen: saved/default
+  // coords from a wider window must not push a card past the right edge, which
+  // the canvas (overflow:hidden) clips. Non-destructive — the stored value stays,
+  // so the card returns to its spot when there's room again.
+  useEffect(() => {
+    const onResize = () => setVp({ w: window.innerWidth, h: window.innerHeight });
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  // Keep a card fully inside the viewport-aligned canvas: x clear of the left
+  // siderail and short of the right edge; y below the topnav. The canvas now spans
+  // the viewport, so these are plain viewport coordinates.
+  const MIN_X = 150; // clears the ~132px left siderail
+  const cardBounds = (w: number, h: number) => {
+    const cardW = Math.min(440, w - 260); // mirrors .db-drag-card width / max-width
+    return { minX: MIN_X, maxX: Math.max(MIN_X, w - cardW - 16), minY: 8, maxY: Math.max(56, h - 44 - 130) };
+  };
+  const clampPos = (p: Pos): Pos => {
+    if (!vp.w) return p; // pre-measure (SSR / first paint): use the raw position
+    const b = cardBounds(vp.w, vp.h);
+    return { x: Math.min(Math.max(b.minX, p.x), b.maxX), y: Math.min(Math.max(b.minY, p.y), b.maxY) };
+  };
 
   useEffect(() => {
     try {
@@ -210,8 +235,9 @@ export default function DashboardPage() {
   }
   function moveDrag(key: string, e: React.PointerEvent) {
     if (!dragRef.current || dragRef.current.key !== key) return;
-    const x = Math.max(0, Math.min(window.innerWidth - 440, e.clientX - dragRef.current.offsetX));
-    const y = Math.max(44, Math.min(window.innerHeight - 44 - 52, e.clientY - dragRef.current.offsetY));
+    const b = cardBounds(window.innerWidth, window.innerHeight);
+    const x = Math.max(b.minX, Math.min(b.maxX, e.clientX - dragRef.current.offsetX));
+    const y = Math.max(b.minY, Math.min(b.maxY, e.clientY - dragRef.current.offsetY));
     posRef.current = { ...posRef.current, [key]: { x, y } };
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => setPositions({ ...posRef.current }));
@@ -318,7 +344,7 @@ export default function DashboardPage() {
           if (key === "outgoing" && outgoing.length === 0) return null;
           if (key === "watch" && !topRound) return null;
 
-          const pos = positions[key] ?? DEFAULTS[key];
+          const pos = clampPos(positions[key] ?? DEFAULTS[key]);
           const isDragging = activeCard === key;
 
           const handle = (

@@ -1,10 +1,11 @@
 "use client";
 
 import { createElement, Fragment, useMemo, useState } from "react";
-import { Download, Scissors } from "lucide-react";
+import { Download, Scissors, BookOpen } from "lucide-react";
 import { toReadDocHtml } from "@/lib/readDoc";
 import { downloadHtmlAsDocx } from "@/lib/sendDocExport";
 import ReadTimer from "@/app/components/flow/ReadTimer";
+import ReadFocus, { type FocusWord } from "@/app/components/flow/ReadFocus";
 import type { TimerSnap } from "@/app/components/flow/FlowTimers";
 import {
   type Settings,
@@ -46,6 +47,22 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
   // lands exactly on the whole-doc estimate. The cut line falls before the first
   // card whose cumulative time passes your speech length.
   const [plan, setPlan] = useState(false);
+  const [focusOpen, setFocusOpen] = useState(false);
+
+  // Flatten the read doc into a word stream for the focus reader: each card's
+  // tag + cite read at tag pace, its body at card pace.
+  const focusWords = useMemo<FocusWord[]>(() => {
+    const out: FocusWord[] = [];
+    const push = (text: string, kind: "tag" | "body") => {
+      for (const w of text.trim().match(/\S+/g) ?? []) out.push({ text: w, kind });
+    };
+    for (const s of segs) {
+      if (s.heading?.text) push(s.heading.text, "tag");
+      if (s.cite) push(s.cite, "tag");
+      if (s.body) push(s.body, "body");
+    }
+    return out;
+  }, [segs]);
   const planData = useMemo(() => {
     let bw = 0, tw = 0, bLenW = 0, tLenW = 0;
     const cum: number[] = [];
@@ -65,6 +82,14 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
       <div className="flow-readview__bar">
         <ReadTimer analysis={analysis} settings={settings} onSave={save} timer={timer} targetSec={targetSec} onTarget={setTarget} />
         <span className="flow-sendedit__spacer" />
+        <button
+          className="db-btn db-btn--glass db-btn--sm"
+          disabled={empty}
+          onClick={() => setFocusOpen(true)}
+          title="Read it back word-by-word at your calibrated pace"
+        >
+          <BookOpen size={14} /> Focus read
+        </button>
         <button
           className={`db-btn db-btn--glass db-btn--sm ${plan ? "is-active" : ""}`}
           disabled={empty}
@@ -131,6 +156,7 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
           })}
         </div>
       )}
+      {focusOpen && <ReadFocus words={focusWords} settings={eff} onClose={() => setFocusOpen(false)} />}
     </div>
   );
 }
