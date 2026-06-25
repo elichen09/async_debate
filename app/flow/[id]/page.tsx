@@ -486,6 +486,19 @@ export default function FlowWorkspace() {
     appendBlock(snip);
   }
 
+  // Download the whole flow (outline + speech + send doc) as a .docx. The outline
+  // is fetched fresh so it's current; the docx library loads only on first export.
+  async function exportDocx() {
+    const { data } = await supabase.from("flow_cells").select("*").eq("flow_id", flowId);
+    const { exportFlowDocx } = await import("@/lib/flowDocx");
+    await exportFlowDocx({
+      title: flow?.title ?? "Flow",
+      cells: (data ?? []) as FlowCell[],
+      speechBody: flow?.speech_body ?? "",
+      sendHtml: sendHtmlRef.current,
+    });
+  }
+
   useEffect(() => {
     let active = true;
     async function load() {
@@ -642,6 +655,7 @@ export default function FlowWorkspace() {
     { trigger: "share collaborators invite partner", label: dock === "share" ? "Close Share" : "Open Share", group: "Tools", run: () => setDock(dock === "share" ? null : "share") },
     { trigger: "fullscreen focus", label: fullscreen ? "Exit fullscreen" : "Fullscreen", group: "Tools", run: () => setFullscreen((f) => !f) },
     { trigger: "keyboard shortcuts help", label: "Keyboard shortcuts", group: "Tools", hint: "?", run: () => setShowShortcuts(true) },
+    { trigger: "export download docx word save flow speech send doc", label: "Export to .docx", group: "Tools", run: () => exportDocx() },
     { trigger: "extensions library manage full page", label: "Open Extensions library", group: "Tools", run: () => router.push("/flow/extensions") },
     ...siblings.flatMap((s) => s.id === flowId ? [] : [{
       trigger: `flow ${s.title}`, label: `Open flow: ${s.title}`, group: "Flows", run: () => router.push(`/flow/${s.id}`),
@@ -797,6 +811,9 @@ export default function FlowWorkspace() {
                 </button>
                 <button className="flow-menu__item" role="menuitem" onClick={() => { setShowShortcuts(true); setMenu(null); }}>
                   <span>Keyboard shortcuts</span><span className="flow-menu__kbd">?</span>
+                </button>
+                <button className="flow-menu__item" role="menuitem" onClick={() => { exportDocx(); setMenu(null); }}>
+                  <span>Export to .docx</span>
                 </button>
               </>
             )}

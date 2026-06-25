@@ -85,12 +85,12 @@ export default function FlowTimers({ flowId, onState }: { flowId: string; onStat
     return { ...s, mainDur: dur, main: idle(dur) };
   });
 
-  const prep = (label: string, accent: string, key: "pro" | "con") => {
+  const prep = (label: string, key: "pro" | "con") => {
     const clock = st[key];
     const ms = clockMs(clock);
     return (
       <div className={`flow-timer ${clock.running ? "is-running" : ""} ${ms === 0 ? "is-done" : ""} ${ms <= 30_000 && ms > 0 ? "is-low" : ""}`}>
-        <span className="flow-timer__label" style={{ color: accent }}>{label}</span>
+        <span className="flow-timer__label">{label}</span>
         <span className="flow-timer__time">{fmt(ms)}</span>
         <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, [key]: s[key].running ? pause(s[key]) : start(s[key]) }))} title={clock.running ? "Pause" : "Start"}>{clock.running ? <Pause size={13} /> : <Play size={13} />}</button>
         <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, [key]: idle(s.prepDur) }))} title="Reset"><RotateCcw size={13} /></button>
@@ -109,8 +109,8 @@ export default function FlowTimers({ flowId, onState }: { flowId: string; onStat
         <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, main: s.main.running ? pause(s.main) : start(s.main) }))} title={st.main.running ? "Pause" : "Start"}>{st.main.running ? <Pause size={13} /> : <Play size={13} />}</button>
         <button className="flow-timer__btn" onClick={() => commit((s) => ({ ...s, main: idle(s.mainDur) }))} title="Reset"><RotateCcw size={13} /></button>
       </div>
-      {prep("Pro prep", "#6f9bea", "pro")}
-      {prep("Con prep", "#e0704f", "con")}
+      {prep("Pro prep", "pro")}
+      {prep("Con prep", "con")}
     </div>
   );
 }
