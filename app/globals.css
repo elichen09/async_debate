@@ -5587,3 +5587,33 @@ html.gh-light .flow-shell .extcard__count { color: var(--fl-soft); background: v
 @media (prefers-reduced-motion: reduce) {
   .rdr, .rdr__line, .rdr__prog > span { animation: none; transition: none; }
 }
+
+/* ---- Read-doc pace cursor: a line that descends at the calibrated pace ---- */
+.flow-shell .flow-readview { position: relative; }
+.flow-shell .flow-readview__doc { position: relative; }
+.flow-shell .rd-paceline {
+  position: absolute; left: 0; right: 0; top: 0; height: 0;
+  border-top: 2px solid oklch(0.55 0.2 25);
+  box-shadow: 0 0 14px oklch(0.55 0.2 25 / 0.3);
+  z-index: 5; pointer-events: none; will-change: transform;
+}
+.flow-shell .rd-paceline::before {
+  content: ""; position: absolute; left: 0; top: -4px;
+  width: 7px; height: 7px; border-radius: 50%; background: oklch(0.55 0.2 25);
+}
+.flow-shell .rd-pacebar {
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  z-index: 6; display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px 5px 6px; border-radius: 999px;
+  background: var(--fl-paper); border: 1px solid var(--fl-line-2);
+  box-shadow: 0 10px 30px oklch(0.2 0 0 / 0.18);
+}
+.flow-shell .rd-pacebar__btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 28px; border-radius: 999px;
+  background: none; border: none; color: var(--fl-soft); cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.flow-shell .rd-pacebar__btn:hover { background: var(--fl-hover); color: var(--fl-ink); }
+.flow-shell .rd-pacebar__time { font-size: 12.5px; font-weight: 600; color: var(--fl-ink); font-variant-numeric: tabular-nums; padding: 0 6px; white-space: nowrap; }
+.flow-shell .rd-pacebar__time i { font-style: normal; font-weight: 500; color: var(--fl-muted); }
