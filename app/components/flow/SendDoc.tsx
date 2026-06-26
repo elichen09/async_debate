@@ -19,6 +19,9 @@ interface SendDocProps {
   flowId?: string;
   userId?: string;
   userName?: string;
+  // Outline drag reordered the doc: the new top-to-bottom order of flow-linked
+  // card ids (data-cell), so the flow can reorder its points to match.
+  onReorderCards?: (orderedCellIds: string[]) => void;
 }
 
 interface OutlineItem { text: string; level: number; }
@@ -27,7 +30,7 @@ interface OutlineItem { text: string; level: number; }
 // contentEditable renders card formatting, accepts pasted rich text, and exports
 // the live HTML to .docx. Uncontrolled: innerHTML is set only on external appends
 // (version) so typing never loses the caret.
-export default function SendDoc({ html, version, onChange, resolveSlashHtml, slashOptions = [], flowId = "", userId = "", userName = "Partner" }: SendDocProps) {
+export default function SendDoc({ html, version, onChange, resolveSlashHtml, slashOptions = [], flowId = "", userId = "", userName = "Partner", onReorderCards }: SendDocProps) {
   const ref = useRef<HTMLDivElement>(null);
   const savedRange = useRef<Range | null>(null);
   const [outline, setOutline] = useState<OutlineItem[]>([]);
@@ -48,6 +51,45 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, sla
   const toggleHead = (i: number) => setCollapsedHeads((prev) => {
     const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n;
   });
+  // Drag-reorder in the outline: which heading is being dragged + the drop target.
+  const [dragHead, setDragHead] = useState<number | null>(null);
+  const [dropHead, setDropHead] = useState<{ i: number; after: boolean } | null>(null);
+
+  const isHeading = (el: Element | null): el is HTMLElement => !!el && /^H[1-6]$/.test(el.tagName);
+  const headLevel = (el: Element) => parseInt(el.tagName[1], 10);
+  // The contiguous block a heading owns: itself + following siblings up to the next
+  // heading of the same or shallower level (so an h3 carries its h4 cards + bodies).
+  function sectionOf(head: HTMLElement): HTMLElement[] {
+    const lvl = headLevel(head);
+    const out: HTMLElement[] = [head];
+    for (let n = head.nextElementSibling; n && !(isHeading(n) && headLevel(n) <= lvl); n = n.nextElementSibling) out.push(n as HTMLElement);
+    return out;
+  }
+
+  // Move the heading at outline index `from` (and its section) before/after the
+  // heading at index `to`, then persist + tell the flow to reorder linked points.
+  function moveHeading(from: number, to: number, after: boolean) {
+    const el = ref.current;
+    if (!el || from === to) return;
+    const heads = Array.from(el.children).filter(isHeading);
+    const src = heads[from], tgt = heads[to];
+    if (!src || !tgt) return;
+    const section = sectionOf(src);
+    if (section.includes(tgt)) return; // can't drop a section into itself
+    const anchor = after ? sectionOf(tgt)[sectionOf(tgt).length - 1].nextElementSibling : tgt;
+    if (anchor && section.includes(anchor as HTMLElement)) return;
+    for (const node of section) el.insertBefore(node, anchor); // insertBefore relocates existing nodes
+    onChange(el.innerHTML);
+    refreshOutline();
+    setCollapsedHeads(new Set());
+    // New top-to-bottom order of flow-linked cards → hand it to the flow.
+    const ids: string[] = [];
+    el.querySelectorAll("[data-cell]").forEach((h) => {
+      const id = h.getAttribute("data-cell");
+      if (id && !ids.includes(id)) ids.push(id);
+    });
+    if (ids.length) onReorderCards?.(ids);
+  }
   // Slash autocomplete (mirrors FlowSpeech): the partial "/trigger" being typed at
   // the caret + its screen position, plus the highlighted suggestion.
   const [slash, setSlash] = useState<{ query: string; top: number; left: number } | null>(null);
@@ -277,7 +319,25 @@ export default function SendDoc({ html, version, onChange, resolveSlashHtml, sla
             <p className="flow-sendedit__outline-empty">Headings appear here.</p>
           ) : (
             outline.map((o, i) => hiddenHeads.has(i) ? null : (
-              <div key={i} className="flow-sendedit__outline-row" style={{ paddingLeft: 2 + (o.level - 1) * 14 }}>
+              <div
+                key={i}
+                className={`flow-sendedit__outline-row ${dragHead === i ? "is-drag" : ""} ${dropHead?.i === i ? (dropHead.after ? "is-drop-after" : "is-drop-before") : ""}`}
+                style={{ paddingLeft: 2 + (o.level - 1) * 14 }}
+                draggable
+                onDragStart={(e) => { setDragHead(i); e.dataTransfer.effectAllowed = "move"; }}
+                onDragOver={(e) => {
+                  if (dragHead === null || dragHead === i) return;
+                  e.preventDefault();
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setDropHead({ i, after: e.clientY > r.top + r.height / 2 });
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragHead !== null && dropHead) moveHeading(dragHead, dropHead.i, dropHead.after);
+                  setDragHead(null); setDropHead(null);
+                }}
+                onDragEnd={() => { setDragHead(null); setDropHead(null); }}
+              >
                 {headHasChildren(i) ? (
                   <button
                     className="flow-sendedit__outline-caret"

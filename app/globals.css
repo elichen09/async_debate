@@ -5650,3 +5650,8 @@ html.gh-light .flow-shell .extcard__count { color: var(--fl-soft); background: v
 .flow-shell .flow-sendedit__outline-caret:hover { color: var(--fl-ink); }
 .flow-shell .flow-sendedit__outline-caret--leaf { cursor: default; }
 .flow-shell .flow-sendedit__outline-row .flow-sendedit__outline-item { flex: 1; min-width: 0; padding-left: 4px; }
+/* Drag to reorder headings (moves the heading + its section, and the linked flow points). */
+.flow-shell .flow-sendedit__outline-row { cursor: grab; border-top: 2px solid transparent; border-bottom: 2px solid transparent; }
+.flow-shell .flow-sendedit__outline-row.is-drag { opacity: 0.45; }
+.flow-shell .flow-sendedit__outline-row.is-drop-before { border-top-color: var(--accent); }
+.flow-shell .flow-sendedit__outline-row.is-drop-after { border-bottom-color: var(--accent); }

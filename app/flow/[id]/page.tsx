@@ -460,6 +460,24 @@ export default function FlowWorkspace() {
     if (next !== sendHtmlRef.current) commitSend(next, true);
   }
 
+  // The reverse: the Send doc outline was reordered, so reorder the flow points its
+  // cards are linked to. We reshuffle just the linked cells among the row_index
+  // slots they already occupy (so unlinked points stay put), matching the new doc
+  // order. The FlowGrid picks the change up over Realtime.
+  async function reorderFlowFromDoc(orderedCellIds: string[]) {
+    if (orderedCellIds.length < 2) return;
+    const { data } = await supabase.from("flow_cells").select("id, row_index").in("id", orderedCellIds);
+    if (!data || !data.length) return;
+    const byId = new Map(data.map((r) => [r.id as string, r.row_index as number]));
+    const present = orderedCellIds.filter((id) => byId.has(id));
+    if (present.length < 2) return;
+    const slots = present.map((id) => byId.get(id) as number).sort((a, b) => a - b);
+    if (present.every((id, i) => byId.get(id) === slots[i])) return; // already in this order
+    await Promise.all(present.map((id, i) =>
+      supabase.from("flow_cells").update({ row_index: slots[i], updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id),
+    ));
+  }
+
   // "/send" from the flow: append each point to the Send doc as a Heading-4 card,
   // tied to its cell id so deleting the point removes the card (and it isn't added
   // twice).
@@ -771,7 +789,7 @@ export default function FlowWorkspace() {
                     <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} userId={userId} userName={userName} />
                   )}
                   {pane.view === "send" && (
-                    <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} slashOptions={slashOptions} flowId={flowId} userId={userId} userName={userName} />
+                    <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} slashOptions={slashOptions} flowId={flowId} userId={userId} userName={userName} onReorderCards={reorderFlowFromDoc} />
                   )}
                   {pane.view === "read" && (
                     <ReadDocView sendHtml={sendHtml} timer={timerSnap} onCutCard={cutReadCard} />
