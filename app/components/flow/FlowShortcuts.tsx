@@ -11,6 +11,8 @@ const GROUPS: { title: string; rows: { keys: string[]; desc: string }[] }[] = [
       { keys: ["/", "trigger", "↵"], desc: "Insert an extension's points and queue its cards into the Send doc" },
       { keys: ["Tab"], desc: "Indent a point a level deeper" },
       { keys: ["⇧", "Tab"], desc: "Outdent a point" },
+      { keys: ["⇧", "↑ / ↓"], desc: "Move a point (with its sub-points) up or down — no mouse" },
+      { keys: ["Ctrl", "E"], desc: "Highlight a key point" },
     ],
   },
   {

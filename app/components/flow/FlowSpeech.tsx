@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { enqueueUpdate } from "@/lib/flowSync";
 import { fuzzyRank } from "@/lib/fuzzy";
 import { usePanePresence } from "@/lib/presence";
 import { caretOffsetIn } from "@/lib/caret";
@@ -98,16 +99,16 @@ export default function FlowSpeech({ flowId, initialBody, registerInsert, resolv
     return () => {
       active = false;
       if (saveTimer.current) clearTimeout(saveTimer.current);
-      if (dirty.current) supabase.from("flows").update({ speech_body: latest.current }).eq("id", flowId).then(() => {}); // flush
+      if (dirty.current) enqueueUpdate("flows", flowId, { speech_body: latest.current }); // flush to the offline outbox
       supabase.removeChannel(channel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowId]);
 
-  async function save(html: string) {
+  function save(html: string) {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     dirty.current = false;
-    await supabase.from("flows").update({ speech_body: html }).eq("id", flowId);
+    enqueueUpdate("flows", flowId, { speech_body: html });
   }
 
   // Mark a local edit and autosave on a steady cadence *while* typing (throttle, not

@@ -7,6 +7,7 @@ import { GripVertical, ChevronRight, ChevronDown, Flag, ListPlus, IndentDecrease
 import { useConfirm } from "@/app/components/flow/ConfirmProvider";
 import { SlashList } from "@/app/components/flow/SlashMenu";
 import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, type FlowCell, type EditorInsert, type FlowDragPayload, type SlashOption } from "@/app/flow/shared";
+import { enqueueInsert, enqueueUpdate, enqueueDelete, saveSnapshot, loadSnapshot, applyPending } from "@/lib/flowSync";
 
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -78,7 +79,10 @@ function nodeLabel(count: number, depth: number): string {
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
 export default function FlowGrid({ flowId, userId, userName = "Partner", registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints, onReorder }: FlowGridProps) {
   const confirm = useConfirm();
-  const [cells, setCells] = useState<FlowCell[]>([]);
+  // Hydrate instantly from the local snapshot (mounts client-side, after the session
+  // loads, so there's no SSR mismatch) — the flow shows even on a cold offline load,
+  // before the server fetch reconciles it.
+  const [cells, setCells] = useState<FlowCell[]>(() => loadSnapshot<FlowCell>(flowId) ?? []);
   const [loadError, setLoadError] = useState("");
   const cellsRef = useRef<FlowCell[]>([]);
   const editingId = useRef<string | null>(null);
@@ -130,7 +134,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     return () => window.removeEventListener("pointerup", onUp);
   }, []);
 
-  useEffect(() => { cellsRef.current = cells; }, [cells]);
+  useEffect(() => { cellsRef.current = cells; saveSnapshot(flowId, cells); }, [cells, flowId]);
 
   // Flush any queued saves when the component unmounts (e.g. tab switch). `pending`
   // is the same Map throughout the component's life, so capturing it here is safe.
@@ -138,9 +142,10 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const pend = pending.current;
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
+      // Hand any buffered keystrokes to the outbox (which persists + retries) so a
+      // tab switch mid-type never drops what you wrote, even offline.
       for (const [id, content] of pend) {
-        // .then() so the request is actually sent (an un-awaited builder never fires).
-        supabase.from("flow_cells").update({ content, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id).then(() => {});
+        enqueueUpdate("flow_cells", id, { content, updated_by: userId, updated_at: new Date().toISOString() });
       }
       pend.clear();
     };
@@ -149,15 +154,29 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
 
   useEffect(() => {
     let active = true;
-    supabase
-      .from("flow_cells")
-      .select(SEL)
-      .eq("flow_id", flowId)
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) { setLoadError(error.message); return; }
-        if (data) setCells(data as FlowCell[]);
-      });
+    // The snapshot is hydrated as the initial state above; this reconciles with the
+    // server and replays any unsynced local edits on top of the fetched rows — so a
+    // stale server read never clobbers what you flowed during an outage. Re-run on
+    // reconnect too, to pick up anything a collaborator changed while you were offline
+    // (Realtime doesn't replay events missed during a dropped connection).
+    const reconcile = () => {
+      supabase
+        .from("flow_cells")
+        .select(SEL)
+        .eq("flow_id", flowId)
+        .then(({ data, error }) => {
+          if (!active) return;
+          if (error) {
+            // Offline: keep the snapshot quietly. Only surface a real (schema) error.
+            if (navigator.onLine !== false) setLoadError(error.message);
+            return;
+          }
+          setLoadError("");
+          if (data) setCells(applyPending(flowId, data as FlowCell[]));
+        });
+    };
+    reconcile();
+    window.addEventListener("online", reconcile);
 
     const channel = supabase
       .channel(`flow_cells:${flowId}`)
@@ -183,7 +202,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       )
       .subscribe();
 
-    return () => { active = false; supabase.removeChannel(channel); };
+    return () => { active = false; window.removeEventListener("online", reconcile); supabase.removeChannel(channel); };
   }, [flowId]);
 
   // Rebuild the cellId -> editors map from what we've heard, dropping anyone whose
@@ -255,9 +274,9 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     setCells((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
   }
 
-  async function saveContent(id: string, content: string) {
+  function saveContent(id: string, content: string) {
     pending.current.delete(id);
-    await supabase.from("flow_cells").update({ content, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id);
+    enqueueUpdate("flow_cells", id, { content, updated_by: userId, updated_at: new Date().toISOString() });
   }
 
   // Throttled autosave while typing (flush every ~250ms), so a partner sees edits
@@ -272,8 +291,8 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       for (const [cid, c] of batch) saveContent(cid, c);
     }, 250);
   }
-  async function saveMeta(id: string, patch: { depth?: number; highlighted?: boolean; status?: string | null }) {
-    await supabase.from("flow_cells").update({ ...patch, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id);
+  function saveMeta(id: string, patch: { depth?: number; highlighted?: boolean; status?: string | null }) {
+    enqueueUpdate("flow_cells", id, { ...patch, updated_by: userId, updated_at: new Date().toISOString() });
   }
 
   function setStatus(id: string, status: string | null) {
@@ -295,18 +314,20 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     for (const id of subtreeIds(cell.id)) setStatus(id, v);
   }
 
-  async function insertNode(row: number, depth: number, content = "", focus = true): Promise<string | null> {
-    const { data } = await supabase
-      .from("flow_cells")
-      .insert({ flow_id: flowId, col: 0, row_index: row, depth, content, updated_by: userId })
-      .select(SEL)
-      .single();
-    if (data) {
-      if (focus) focusId.current = (data as FlowCell).id;
-      setCells((prev) => (prev.some((c) => c.id === data.id) ? prev : [...prev, data as FlowCell]));
-      return (data as FlowCell).id;
-    }
-    return null;
+  // The id is minted on the client (not awaited from the DB) so a new point appears
+  // instantly and works with no connection — the row is queued to the outbox, which
+  // upserts it when the network is back.
+  function insertNode(row: number, depth: number, content = "", focus = true): string {
+    const id = crypto.randomUUID();
+    const cell: FlowCell = {
+      id, flow_id: flowId, col: 0, row_index: row, depth,
+      highlighted: false, content, status: null,
+      updated_by: userId, updated_at: new Date().toISOString(),
+    };
+    if (focus) focusId.current = id;
+    setCells((prev) => (prev.some((c) => c.id === id) ? prev : [...prev, cell]));
+    enqueueInsert("flow_cells", cell as unknown as Record<string, unknown> & { id: string });
+    return id;
   }
 
   // Insert an extension's tags as responses at the current point: the first tag
@@ -383,6 +404,45 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     saveMeta(cell.id, { highlighted: v });
   }
 
+  // Alt+↑/↓ while flowing: move this point (and its whole subtree) past the sibling
+  // block above/below it, without reaching for the mouse — the keyboard version of a
+  // drag-reorder. Only swaps with a true sibling at the same depth (won't pop a child
+  // out of its parent), so the outline stays valid. Depths are untouched; we just
+  // reassign the row_index slots the two blocks already occupy.
+  function movePoint(cell: FlowCell, dir: -1 | 1) {
+    const list = sorted();
+    const i = list.findIndex((c) => c.id === cell.id);
+    if (i < 0) return;
+    const d = cell.depth;
+    let jEnd = i; // end of this point's subtree
+    while (jEnd + 1 < list.length && list[jEnd + 1].depth > d) jEnd++;
+    let lo: number, hi: number, newOrder: FlowCell[];
+    if (dir === 1) {
+      const ns = jEnd + 1; // next sibling must sit at the same depth
+      if (ns >= list.length || list[ns].depth !== d) return;
+      let nEnd = ns;
+      while (nEnd + 1 < list.length && list[nEnd + 1].depth > d) nEnd++;
+      lo = i; hi = nEnd;
+      newOrder = [...list.slice(ns, nEnd + 1), ...list.slice(i, jEnd + 1)];
+    } else {
+      let r = i - 1; // skip the previous sibling's deeper descendants
+      while (r >= 0 && list[r].depth > d) r--;
+      if (r < 0 || list[r].depth !== d) return; // no previous sibling at this depth
+      lo = r; hi = jEnd;
+      newOrder = [...list.slice(i, jEnd + 1), ...list.slice(r, i)];
+    }
+    const slots = list.slice(lo, hi + 1).map((c) => c.row_index); // ascending
+    const updates = newOrder.map((c, k) => ({ id: c.id, row_index: slots[k] }));
+    setCells((prev) => prev.map((c) => { const u = updates.find((x) => x.id === c.id); return u ? { ...c, row_index: u.row_index } : c; }));
+    for (const u of updates) enqueueUpdate("flow_cells", u.id, { row_index: u.row_index, updated_by: userId, updated_at: new Date().toISOString() });
+    // Keep the moved point's cards in doc order in the Send doc.
+    const reordered = list
+      .map((c) => { const u = updates.find((x) => x.id === c.id); return u ? { ...c, row_index: u.row_index } : c; })
+      .sort((a, b) => a.row_index - b.row_index)
+      .map((c) => c.id);
+    onReorder?.(reordered);
+  }
+
   async function clearAll() {
     if (!cellsRef.current.length) return;
     const ok = await confirm({
@@ -395,10 +455,10 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const ids = cellsRef.current.map((c) => c.id);
     setCells([]);
     onCellsDeleted?.(ids);
-    await supabase.from("flow_cells").delete().eq("flow_id", flowId);
+    enqueueDelete("flow_cells", ids);
   }
 
-  async function delNode(cell: FlowCell, focusPrev = false) {
+  function delNode(cell: FlowCell, focusPrev = false) {
     if (focusPrev) {
       const list = sorted();
       const idx = list.findIndex((c) => c.id === cell.id);
@@ -406,7 +466,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     }
     setCells((prev) => prev.filter((c) => c.id !== cell.id));
     onCellsDeleted?.([cell.id]);
-    await supabase.from("flow_cells").delete().eq("id", cell.id);
+    enqueueDelete("flow_cells", [cell.id]);
   }
 
   // Delete every selected point along with its sub-points. Removes for everyone and
@@ -426,7 +486,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     setCells((prev) => prev.filter((c) => !ids.has(c.id)));
     onCellsDeleted?.(idArr);
     clearSelection();
-    await supabase.from("flow_cells").delete().in("id", idArr);
+    enqueueDelete("flow_cells", idArr);
   }
 
   function toggleCollapse(id: string) {
@@ -470,7 +530,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     }));
     setCells((prev) => prev.map((c) => { const u = updates.find((x) => x.id === c.id); return u ? { ...c, row_index: u.row_index } : c; }));
     for (const u of updates) {
-      supabase.from("flow_cells").update({ row_index: u.row_index, updated_by: userId, updated_at: new Date().toISOString() }).eq("id", u.id).then(() => {});
+      enqueueUpdate("flow_cells", u.id, { row_index: u.row_index, updated_by: userId, updated_at: new Date().toISOString() });
     }
     // Tell the Send doc the new top-to-bottom point order so its cards reflow to match.
     const newOrder = list
@@ -528,7 +588,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // Drop a group dragged from another flow: insert its points as new cells. On a
   // target node they land just after that node's whole subtree, nested under the
   // target's depth; dropped in empty space they append at the bottom.
-  async function insertExternal(payload: FlowDragPayload, afterCell: FlowCell | null) {
+  function insertExternal(payload: FlowDragPayload, afterCell: FlowCell | null) {
     if (!payload?.points?.length) return;
     if (payload.sourceFlowId === flowId && !afterCell) return; // no-op self-append
     const list = sorted();
@@ -545,7 +605,8 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       hi = lo + 1;
     }
     const n = payload.points.length;
-    const rows = payload.points.map((p, k) => ({
+    const rows: FlowCell[] = payload.points.map((p, k) => ({
+      id: crypto.randomUUID(),
       flow_id: flowId,
       col: 0,
       row_index: lo + ((hi - lo) * (k + 1)) / (n + 1),
@@ -554,9 +615,10 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       highlighted: !!p.highlighted,
       status: p.status ?? null,
       updated_by: userId,
+      updated_at: new Date().toISOString(),
     }));
-    const { data } = await supabase.from("flow_cells").insert(rows).select(SEL);
-    if (data) setCells((prev) => [...prev, ...(data as FlowCell[])]);
+    setCells((prev) => [...prev, ...rows]);
+    for (const r of rows) enqueueInsert("flow_cells", r as unknown as Record<string, unknown> & { id: string });
   }
 
   // Read a cross-pane drop payload off the event (returns null for non-flow drags).
@@ -890,6 +952,13 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             onKeyDown={(e) => {
               const ta = e.target as HTMLTextAreaElement;
               const dropOpen = slash?.id === cell.id && slashMatches.length > 0;
+              // Shift+↑/↓ reorders this point (and its sub-points) without the mouse.
+              if (!dropOpen && e.shiftKey && !e.altKey && !e.metaKey && !e.ctrlKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+                e.preventDefault();
+                saveContent(cell.id, ta.value);
+                movePoint(cell, e.key === "ArrowUp" ? -1 : 1);
+                return;
+              }
               if (dropOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
                 e.preventDefault();
                 setSlashActive((i) => (i + (e.key === "ArrowDown" ? 1 : -1) + slashMatches.length) % slashMatches.length);

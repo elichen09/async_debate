@@ -3689,6 +3689,43 @@ html.flow-route .gh-topnav__burger {
 .flow-pill:hover { background: rgba(255, 255, 255, 0.13); }
 .flow-pill.is-active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent-deep); }
 
+/* Sync indicator — a quiet dot + label that flips to "Offline" so a debater always
+   knows their flow is being kept even when the tournament wifi drops. */
+.flow-sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  user-select: none;
+}
+.flow-sync__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.flow-sync--synced  { color: rgba(120, 200, 150, 0.85); }
+.flow-sync--syncing { color: rgba(225, 190, 90, 0.95); }
+.flow-sync--offline { color: rgba(230, 130, 95, 0.95); }
+/* Synced is reassurance, not a call to action — keep its label muted/secondary. */
+.flow-sync--synced .flow-sync__label { color: rgba(255, 255, 255, 0.42); }
+.flow-sync--syncing .flow-sync__dot { animation: flow-sync-pulse 1s ease-in-out infinite; }
+.flow-sync--offline .flow-sync__dot { box-shadow: 0 0 0 3px rgba(230, 130, 95, 0.18); }
+@keyframes flow-sync-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .flow-sync--syncing .flow-sync__dot { animation: none; } }
+html.gh-light .flow-sync { color: var(--fl-muted, rgba(60, 40, 20, 0.5)); }
+html.gh-light .flow-sync--synced  { color: rgba(40, 130, 75, 0.9); }
+html.gh-light .flow-sync--syncing { color: rgba(170, 120, 20, 0.95); }
+html.gh-light .flow-sync--offline { color: rgba(190, 80, 45, 0.95); }
+html.gh-light .flow-sync--synced .flow-sync__label { color: rgba(60, 40, 20, 0.5); }
+
 .flow-work__body { flex: 1; display: flex; min-height: 0; position: relative; }
 .flow-work__main { flex: 1; min-width: 0; overflow: auto; padding: 8px 12px 60px; }
 

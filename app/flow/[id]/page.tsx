@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { enqueueInsert, enqueueUpdate, enqueueDelete } from "@/lib/flowSync";
 import { blockToHtml, cardHtml } from "@/lib/richText";
 import FlowGrid from "@/app/components/flow/FlowGrid";
 import FlowSpeech from "@/app/components/flow/FlowSpeech";
@@ -12,6 +13,7 @@ import FlowTimers, { type TimerSnap } from "@/app/components/flow/FlowTimers";
 import FlowDock from "@/app/components/flow/FlowDock";
 import FlowShortcuts from "@/app/components/flow/FlowShortcuts";
 import FlowPalette, { type PaletteCommand } from "@/app/components/flow/FlowPalette";
+import SyncStatus from "@/app/components/flow/SyncStatus";
 import { Columns2, Ellipsis, X } from "lucide-react";
 import type { EditorInsert, Flow, FlowSnippet, FlowCell, SlashOption } from "@/app/flow/shared";
 
@@ -342,12 +344,12 @@ export default function FlowWorkspace() {
     if (!flow) return null;
     return flow.folder_id ? ["flow_folders", flow.folder_id] : ["flows", flowId];
   }
-  async function saveSend(html: string) {
+  function saveSend(html: string) {
     const t = sendTarget();
     if (!t) return;
-    // Must await: a PostgREST builder only sends its request when it's then()'d.
-    const { error } = await supabase.from(t[0]).update({ send_html: html }).eq("id", t[1]);
-    if (error) console.error("Send doc save failed:", error.message);
+    // Through the offline outbox so cut cards survive a dropped connection and sync
+    // back automatically (coalesced per row, so a burst of edits is one write).
+    enqueueUpdate(t[0], t[1], { send_html: html });
   }
   function scheduleSendSave() {
     // Throttle (not debounce) so collaborators see Send-doc edits stream in; the
@@ -423,8 +425,7 @@ export default function FlowWorkspace() {
       const idList = [...ids];
       const { data } = await supabase.from("flow_cells").select("*").in("id", idList);
       rows = (data ?? []) as FlowCell[];
-      const { error } = await supabase.from("flow_cells").delete().in("id", idList);
-      if (error) console.error("Cut flow points failed:", error.message);
+      enqueueDelete("flow_cells", idList);
     }
     armUndo(prevHtml, rows, mode === "delete" ? "Card deleted" : "Card cut");
   }
@@ -447,10 +448,9 @@ export default function FlowWorkspace() {
         id: r.id, flow_id: r.flow_id, col: r.col, row_index: r.row_index,
         depth: r.depth, highlighted: r.highlighted, content: r.content,
         status: r.status ?? null, updated_by: r.updated_by,
+        updated_at: new Date().toISOString(),
       }));
-      supabase.from("flow_cells").insert(restore).then(({ error }) => {
-        if (error) console.error("Undo cut failed:", error.message);
-      });
+      for (const r of restore) enqueueInsert("flow_cells", r);
     }
   }
 
@@ -473,9 +473,9 @@ export default function FlowWorkspace() {
     if (present.length < 2) return;
     const slots = present.map((id) => byId.get(id) as number).sort((a, b) => a - b);
     if (present.every((id, i) => byId.get(id) === slots[i])) return; // already in this order
-    await Promise.all(present.map((id, i) =>
-      supabase.from("flow_cells").update({ row_index: slots[i], updated_by: userId, updated_at: new Date().toISOString() }).eq("id", id),
-    ));
+    present.forEach((id, i) =>
+      enqueueUpdate("flow_cells", id, { row_index: slots[i], updated_by: userId, updated_at: new Date().toISOString() }),
+    );
   }
 
   // "/send" from the flow: append each point to the Send doc as a Heading-4 card,
@@ -744,6 +744,7 @@ export default function FlowWorkspace() {
           ><Columns2 size={15} /></button>
         </div>
         <div className="flow-work__actions">
+          <SyncStatus />
           <button
             className={`flow-pill flow-pill--icon ${menu?.kind === "more" || dock || showTimers ? "is-active" : ""}`}
             onClick={(e) => openMenu("more", e)}
@@ -881,6 +882,7 @@ export default function FlowWorkspace() {
         <li><kbd>⇧⇧</kbd> palette</li>
         <li><kbd>?</kbd> shortcuts</li>
         <li><kbd>⌥ ←→</kbd> switch flow</li>
+        <li><kbd>⇧ ↑↓</kbd> move point</li>
         <li><kbd>⇥</kbd> indent</li>
       </ul>
 
