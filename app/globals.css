@@ -3740,7 +3740,11 @@ html.gh-light .flow-sync--synced .flow-sync__label { color: rgba(60, 40, 20, 0.5
 body.flow-work-full .gh-topnav,
 body.flow-work-full .gh-siderail,
 body.flow-work-full .gh-drawer,
-body.flow-work-full .gh-drawer-backdrop { display: none !important; }
+body.flow-work-full .gh-drawer-backdrop,
+/* Hide the flow rail + its reveal handle so they don't show through the now-
+   transparent fullscreen surface (they sit below it at z-index 95/96). */
+body.flow-work-full .flow-nav-hotzone,
+body.flow-work-full .flow-rail { display: none !important; }
 
 /* Split view: side-by-side panes, each independently scrollable. */
 .flow-work__panes { flex: 1; min-width: 0; display: flex; min-height: 0; overflow-x: auto; }
@@ -4476,6 +4480,7 @@ body.flow-send-full .gh-drawer-backdrop { display: none !important; }
 .flow-sendedit__outline-item:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 .flow-sendedit__outline-item.lvl1 { font-weight: 700; color: rgba(255, 255, 255, 0.85); }
 html.gh-light .flow-sendedit__outline-title { color: var(--muted); }
+html.gh-light .flow-sendedit__outline-empty { color: var(--muted); }
 html.gh-light .flow-sendedit__outline-item { color: var(--ink-soft); }
 html.gh-light .flow-sendedit__outline-item:hover { color: var(--ink); background: oklch(0.12 0.04 232 / 0.08); }
 
@@ -5297,7 +5302,9 @@ html.flow-route .gh-topnav {
   backdrop-filter: none;
 }
 html.gh-light .flow-shell .flow-work { background: none; }
-html.gh-light .flow-shell .flow-work--full { background: var(--fl-bg); }
+/* Transparent (not a solid --fl-bg) so the animated film grain shows through in
+   fullscreen too — the rail/hotzone behind it are hidden below, so nothing bleeds. */
+html.gh-light .flow-shell .flow-work--full { background: transparent; }
 html.gh-light .flow-shell .flow-work__head { border-bottom-color: var(--fl-line); }
 html.gh-light .flow-shell .flow-work__title { color: var(--fl-ink); font-weight: 700; letter-spacing: -0.01em; }
 
