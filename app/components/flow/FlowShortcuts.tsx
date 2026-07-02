@@ -13,13 +13,23 @@ const GROUPS: { title: string; rows: { keys: string[]; desc: string }[] }[] = [
       { keys: ["⇧", "Tab"], desc: "Outdent a point" },
       { keys: ["⇧", "↑ / ↓"], desc: "Move a point (with its sub-points) up or down — no mouse" },
       { keys: ["Ctrl", "E"], desc: "Highlight a key point" },
+      { keys: ["Ctrl", "V"], desc: "Paste a multi-line outline — each line becomes a point, tabs indent" },
     ],
   },
   {
     title: "Navigating",
     rows: [
+      { keys: ["Ctrl", "F"], desc: "Find in the flow — dims everything that doesn't match" },
       { keys: ["Alt", "←"], desc: "Previous flow in this folder" },
       { keys: ["Alt", "→"], desc: "Next flow in this folder" },
+    ],
+  },
+  {
+    title: "Timers",
+    rows: [
+      { keys: ["Alt", "S"], desc: "Start or pause the speech clock (opens the Timers strip if hidden)" },
+      { keys: ["Alt", "P"], desc: "Start or pause Pro prep" },
+      { keys: ["Alt", "C"], desc: "Start or pause Con prep" },
     ],
   },
   {

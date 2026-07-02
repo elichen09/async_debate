@@ -193,30 +193,32 @@ export default function ReadDocView({ sendHtml, timer, onCutCard }: {
       <div className="flow-readview__bar">
         <ReadTimer analysis={analysis} settings={settings} onSave={save} timer={timer} targetSec={targetSec} onTarget={setTarget} />
         <span className="flow-sendedit__spacer" />
-        <button
-          className="db-btn db-btn--glass db-btn--sm"
-          disabled={empty}
-          onClick={() => setFocusOpen(true)}
-          title="Read it back word-by-word at your calibrated pace"
-        >
-          <BookOpen size={14} /> Focus read
-        </button>
-        <button
-          className={`db-btn db-btn--glass db-btn--sm ${paceOn ? "is-active" : ""}`}
-          disabled={empty}
-          onClick={togglePace}
-          title="Show a pace cursor that moves down the doc at your calibrated reading speed"
-        >
-          <Crosshair size={14} /> Pace
-        </button>
-        <button
-          className={`db-btn db-btn--glass db-btn--sm ${plan ? "is-active" : ""}`}
-          disabled={empty}
-          onClick={() => setPlan((p) => !p)}
-          title="Mark where the speech clock runs out, so you can see what to cut"
-        >
-          <Scissors size={14} /> Plan{plan && belowCount > 0 ? ` · ${belowCount} below` : ""}
-        </button>
+        <div className="flow-readtools" role="group" aria-label="Reading tools">
+          <button
+            className="flow-readtools__btn"
+            disabled={empty}
+            onClick={() => setFocusOpen(true)}
+            title="Read it back word-by-word at your calibrated pace"
+          >
+            <BookOpen size={14} /> Focus read
+          </button>
+          <button
+            className={`flow-readtools__btn ${paceOn ? "is-active" : ""}`}
+            disabled={empty}
+            onClick={togglePace}
+            title="Show a pace cursor that moves down the doc at your calibrated reading speed"
+          >
+            <Crosshair size={14} /> Pace
+          </button>
+          <button
+            className={`flow-readtools__btn ${plan ? "is-active" : ""}`}
+            disabled={empty}
+            onClick={() => setPlan((p) => !p)}
+            title="Mark where the speech clock runs out, so you can see what to cut"
+          >
+            <Scissors size={14} /> Plan{plan && belowCount > 0 ? ` · ${belowCount} below` : ""}
+          </button>
+        </div>
         <button
           className="db-btn db-btn--accent db-btn--sm"
           disabled={empty}

@@ -9,7 +9,9 @@ import FlowGrid from "@/app/components/flow/FlowGrid";
 import FlowSpeech from "@/app/components/flow/FlowSpeech";
 import SendDoc from "@/app/components/flow/SendDoc";
 import ReadDocView from "@/app/components/flow/ReadDocView";
-import FlowTimers, { type TimerSnap } from "@/app/components/flow/FlowTimers";
+import FlowTimers, { type TimerSnap, type TimerKey } from "@/app/components/flow/FlowTimers";
+import FlowSnapshots from "@/app/components/flow/FlowSnapshots";
+import { takeSnap } from "@/lib/flowSnaps";
 import FlowDock from "@/app/components/flow/FlowDock";
 import FlowShortcuts from "@/app/components/flow/FlowShortcuts";
 import FlowPalette, { type PaletteCommand } from "@/app/components/flow/FlowPalette";
@@ -196,6 +198,10 @@ export default function FlowWorkspace() {
   // Last "cut card" action, so it can be undone from a short-lived toast.
   const [cutUndo, setCutUndo] = useState<{ sendHtml: string; rows: FlowCell[]; label: string } | null>(null);
   const cutUndoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Snapshot history dialog + the short-lived "snapshot saved" confirmation.
+  const [showSnaps, setShowSnaps] = useState(false);
+  const [snapToast, setSnapToast] = useState("");
+  const snapToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Toggle helpers that also remember the choice for next time.
   const setDock = (d: DockTab | null) => { setDockState(d); saveUi({ dock: d }); };
   const setShowTimers = (v: boolean) => { setShowTimersState(v); saveUi({ timers: v }); };
@@ -261,8 +267,69 @@ export default function FlowWorkspace() {
     return () => document.body.classList.remove("flow-work-full");
   }, [fullscreen]);
 
-  // Clear the pending undo timer if the workspace unmounts.
-  useEffect(() => () => { if (cutUndoTimer.current) clearTimeout(cutUndoTimer.current); }, []);
+  // Clear the pending undo/toast timers if the workspace unmounts.
+  useEffect(() => () => {
+    if (cutUndoTimer.current) clearTimeout(cutUndoTimer.current);
+    if (snapToastTimer.current) clearTimeout(snapToastTimer.current);
+  }, []);
+
+  // --- Flow snapshots (freeze the outline at the end of a speech) ---
+  function flashSnapToast(msg: string) {
+    setSnapToast(msg);
+    if (snapToastTimer.current) clearTimeout(snapToastTimer.current);
+    snapToastTimer.current = setTimeout(() => { snapToastTimer.current = null; setSnapToast(""); }, 2600);
+  }
+  function snapNow(label: string) {
+    const snap = takeSnap(flowId, label);
+    flashSnapToast(snap ? `Snapshot saved — ${snap.label}` : "Nothing to snapshot yet");
+  }
+
+  // With the Timers open, a snapshot is taken automatically when the speech clock
+  // runs out — the end-of-speech moment worth freezing. Keyed on endsAt so pausing
+  // or resetting cancels it and each countdown fires at most once.
+  const lastAutoSnap = useRef(0);
+  useEffect(() => {
+    const c = timerSnap?.main;
+    if (!c?.running || c.endsAt == null) return;
+    const endsAt = c.endsAt;
+    const wait = endsAt - Date.now();
+    if (wait <= 0) return;
+    const t = setTimeout(() => {
+      if (lastAutoSnap.current === endsAt) return;
+      lastAutoSnap.current = endsAt;
+      if (takeSnap(flowId, "End of speech")) flashSnapToast("Snapshot saved — end of speech");
+    }, wait);
+    return () => clearTimeout(t);
+  }, [timerSnap, flowId]);
+
+  // --- Global timer hotkeys (Alt+S / Alt+P / Alt+C) ---
+  // FlowTimers registers a start/pause toggle; if the strip is hidden the hotkey
+  // opens it and the toggle runs as soon as it mounts.
+  const timerCtl = useRef<((k: TimerKey) => void) | null>(null);
+  const pendingTimerKey = useRef<TimerKey | null>(null);
+  const registerTimerControls = (fn: ((k: TimerKey) => void) | null) => {
+    timerCtl.current = fn;
+    if (fn && pendingTimerKey.current) { fn(pendingTimerKey.current); pendingTimerKey.current = null; }
+  };
+  function toggleTimer(k: TimerKey) {
+    if (timerCtl.current) { timerCtl.current(k); return; }
+    pendingTimerKey.current = k;
+    setShowTimers(true);
+  }
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      // e.code, not e.key — macOS Option+letter types a special character.
+      const map: Record<string, TimerKey> = { KeyS: "main", KeyP: "pro", KeyC: "con" };
+      const k = map[e.code];
+      if (!k) return;
+      e.preventDefault();
+      toggleTimer(k);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // --- View / split controls ---
   // A tab switches to its view. Clicking it focuses that view — collapsing a split
@@ -702,6 +769,11 @@ export default function FlowWorkspace() {
     { trigger: "split add send doc", label: "Split: add Send doc", group: "Split", run: () => addPane("send") },
     { trigger: "split add read doc", label: "Split: add Read doc", group: "Split", run: () => addPane("read") },
     { trigger: "timers clock prep speech", label: showTimers ? "Hide timers" : "Show timers", group: "Tools", run: () => setShowTimers(!showTimers) },
+    { trigger: "speech timer start pause toggle clock", label: "Start/pause speech timer", group: "Tools", hint: "⌥S", run: () => toggleTimer("main") },
+    { trigger: "pro prep timer start pause", label: "Start/pause Pro prep", group: "Tools", hint: "⌥P", run: () => toggleTimer("pro") },
+    { trigger: "con prep timer start pause", label: "Start/pause Con prep", group: "Tools", hint: "⌥C", run: () => toggleTimer("con") },
+    { trigger: "snapshot take freeze mark speech flow history", label: "Take flow snapshot", group: "Tools", run: () => snapNow("Snapshot") },
+    { trigger: "snapshots history speech scrub view", label: "View flow snapshots", group: "Tools", run: () => setShowSnaps(true) },
     { trigger: "extensions blocks library panel", label: dock === "extensions" ? "Close Extensions" : "Open Extensions", group: "Tools", run: () => setDock(dock === "extensions" ? null : "extensions") },
     { trigger: "share collaborators invite partner", label: dock === "share" ? "Close Share" : "Open Share", group: "Tools", run: () => setDock(dock === "share" ? null : "share") },
     { trigger: "fullscreen focus", label: fullscreen ? "Exit fullscreen" : "Fullscreen", group: "Tools", run: () => setFullscreen((f) => !f) },
@@ -754,7 +826,7 @@ export default function FlowWorkspace() {
         </div>
       </header>
 
-      {showTimers && <FlowTimers flowId={flowId} onState={setTimerSnap} />}
+      {showTimers && <FlowTimers flowId={flowId} onState={setTimerSnap} registerControls={registerTimerControls} />}
 
       <div className="flow-work__body">
         <div className="flow-work__panes">
@@ -854,6 +926,9 @@ export default function FlowWorkspace() {
                 <button className={`flow-menu__item ${showTimers ? "is-on" : ""}`} role="menuitem" onClick={() => { setShowTimers(!showTimers); setMenu(null); }}>
                   <span>Timers</span>{showTimers && <span className="flow-menu__check">✓</span>}
                 </button>
+                <button className="flow-menu__item" role="menuitem" onClick={() => { setShowSnaps(true); setMenu(null); }}>
+                  <span>Flow snapshots</span>
+                </button>
                 <div className="flow-menu__sep" />
                 <button className="flow-menu__item" role="menuitem" onClick={() => { setShowPalette(true); setMenu(null); }}>
                   <span>Command palette</span><span className="flow-menu__kbd">⇧⇧</span>
@@ -877,11 +952,15 @@ export default function FlowWorkspace() {
 
       {showPalette && <FlowPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />}
 
+      {showSnaps && <FlowSnapshots flowId={flowId} onClose={() => setShowSnaps(false)} />}
+
       {/* Persistent shortcut legend — quick-navigate hints, like the reference. */}
       <ul className="flow-legend" aria-hidden>
         <li><kbd>⇧⇧</kbd> palette</li>
         <li><kbd>?</kbd> shortcuts</li>
         <li><kbd>⌥ ←→</kbd> switch flow</li>
+        <li><kbd>⌥ S·P·C</kbd> timers</li>
+        <li><kbd>⌃F</kbd> find</li>
         <li><kbd>⇧ ↑↓</kbd> move point</li>
         <li><kbd>⇥</kbd> indent</li>
       </ul>
@@ -890,6 +969,12 @@ export default function FlowWorkspace() {
         <div className="flow-undo" role="status">
           <span>{cutUndo.label}</span>
           <button className="flow-undo__btn" onClick={undoCut}>Undo</button>
+        </div>
+      )}
+
+      {snapToast && !cutUndo && (
+        <div className="flow-undo" role="status">
+          <span>{snapToast}</span>
         </div>
       )}
     </div>

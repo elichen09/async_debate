@@ -40,10 +40,19 @@ function pause(c: Clock): Clock {
   return { running: false, endsAt: null, remaining: clockMs(c) };
 }
 
+// Which clock a workspace hotkey toggles: the speech clock or a side's prep.
+export type TimerKey = "main" | "pro" | "con";
+
 // Shared per-flow speech + prep timers, pinned under the header. State syncs over a
 // Realtime broadcast channel (ephemeral — no schema); a fresh tab requests the
 // current state on join, and we re-render on a local tick to count down smoothly.
-export default function FlowTimers({ flowId, onState }: { flowId: string; onState?: (s: TimerSnap) => void }) {
+// `registerControls` hands the page a toggle so global hotkeys (Alt+S/P/C) can
+// start/pause a clock without reaching for the mouse.
+export default function FlowTimers({ flowId, onState, registerControls }: {
+  flowId: string;
+  onState?: (s: TimerSnap) => void;
+  registerControls?: (fn: ((k: TimerKey) => void) | null) => void;
+}) {
   const [st, setSt] = useState<TState>(initial);
   const stRef = useRef(st);
   const chRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -78,6 +87,16 @@ export default function FlowTimers({ flowId, onState }: { flowId: string; onStat
       return next;
     });
   }
+
+  const toggleClock = (k: TimerKey) =>
+    commit((s) => ({ ...s, [k]: s[k].running ? pause(s[k]) : start(s[k]) }));
+
+  // Hand the workspace a start/pause toggle for the global timer hotkeys.
+  useEffect(() => {
+    registerControls?.(toggleClock);
+    return () => registerControls?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowId]);
 
   const adjustMain = (delta: number) => commit((s) => {
     const dur = Math.max(MIN, Math.min(60 * MIN, s.mainDur + delta));

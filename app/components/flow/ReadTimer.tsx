@@ -56,36 +56,45 @@ export default function ReadTimer({ analysis, settings, onSave, timer, targetSec
 
   return (
     <>
-      <span className="flow-readstat" title={`${bodyWords} card-text + ${tagWords} tag/cite words`}>
-        <b>{totalWords}</b> words
-      </span>
-      <span
-        className="flow-readstat"
-        title={settings
-          ? `${eff.cardWpm} wpm card · ${eff.tagWpm} wpm tags · +${eff.fatiguePct}% fatigue by 4:00 — also adjusted for word length`
-          : "Estimate at a default pace, adjusted for word length and fatigue — calibrate for your own speed"}
-      >
-        ~<b>{fmt(estSec)}</b> to read{settings ? "" : " (est.)"}
-      </span>
-      <SpeechLen sec={targetSec} onChange={onTarget} />
-      {totalWords > 0 && (
+      <div className="flow-readbar" role="group" aria-label="Read time">
+        <span className="flow-readstat" title={`${bodyWords} card-text + ${tagWords} tag/cite words`}>
+          <b>{totalWords}</b> words
+        </span>
+        <span className="flow-readbar__div" aria-hidden />
         <span
-          className={`flow-pace ${over ? "is-over" : "is-under"}`}
-          title={`Compared to a ${fmt(targetSec)} speech — click the speech length to change it`}
+          className="flow-readstat"
+          title={settings
+            ? `${eff.cardWpm} wpm card · ${eff.tagWpm} wpm tags · +${eff.fatiguePct}% fatigue by 4:00 — also adjusted for word length`
+            : "Estimate at a default pace, adjusted for word length and fatigue — calibrate for your own speed"}
         >
-          {over
-            ? <>{fmt(deltaSec)} over · trim ~{trimWords} {trimWords === 1 ? "word" : "words"}</>
-            : <>{fmt(-deltaSec)} spare</>}
+          ~<b>{fmt(estSec)}</b> to read{settings ? "" : " (est.)"}
         </span>
-      )}
-      {clock?.running && leftMs != null && (
-        <span className={`flow-pace flow-pace--live ${leftMs <= 30_000 ? "is-low" : ""}`} title="Speech clock remaining">
-          <Play size={11} /> {fmt(leftMs / 1000)} left
-        </span>
-      )}
-      <button className="db-btn db-btn--glass db-btn--sm" onClick={() => setOpen(true)}>
-        {settings ? "Calibrate" : "Calibrate read speed"}
-      </button>
+        <span className="flow-readbar__div" aria-hidden />
+        <SpeechLen sec={targetSec} onChange={onTarget} />
+        {totalWords > 0 && (
+          <span
+            className={`flow-pace ${over ? "is-over" : "is-under"}`}
+            title={`Compared to a ${fmt(targetSec)} speech — click the speech length to change it`}
+          >
+            {over
+              ? <>{fmt(deltaSec)} over · trim ~{trimWords} {trimWords === 1 ? "word" : "words"}</>
+              : <>{fmt(-deltaSec)} spare</>}
+          </span>
+        )}
+        {clock?.running && leftMs != null && (
+          <span className={`flow-pace flow-pace--live ${leftMs <= 30_000 ? "is-low" : ""}`} title="Speech clock remaining">
+            <Play size={11} /> {fmt(leftMs / 1000)} left
+          </span>
+        )}
+        <span className="flow-readbar__div" aria-hidden />
+        <button
+          className="flow-readbar__cal"
+          onClick={() => setOpen(true)}
+          title={settings ? "Retest or edit your reading pace" : "Time yourself once so the estimate matches how fast you actually read"}
+        >
+          Calibrate
+        </button>
+      </div>
       {open && <CalModal settings={eff} docCard={bodyText} docTag={tagText} onSave={onSave} onClose={() => setOpen(false)} />}
     </>
   );

@@ -3822,6 +3822,39 @@ html.gh-light .flow-addflow { background: oklch(0.12 0.04 232 / 0.06); border-co
 .flow-outline__add:hover { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.4); }
 .flow-outline__error { margin: 8px 4px; font-size: 13px; color: oklch(0.78 0.13 28); line-height: 1.5; }
 .flow-outline__bar { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; flex-wrap: wrap; row-gap: 6px; }
+
+/* ---- Find in flow (Ctrl+F): inline search box in the outline bar ---- */
+.flow-find {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 26px; padding: 0 4px 0 9px;
+  border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 7px;
+  background: rgba(255, 255, 255, 0.07); color: rgba(255, 255, 255, 0.6);
+}
+.flow-find__input {
+  width: 130px; border: none; background: none; outline: none;
+  font-family: inherit; font-size: 12.5px; color: #fff;
+}
+.flow-find__input::placeholder { color: rgba(255, 255, 255, 0.45); }
+.flow-find__count { font-size: 11px; white-space: nowrap; color: rgba(255, 255, 255, 0.55); font-variant-numeric: tabular-nums; }
+.flow-find__close {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; padding: 0; border: none; border-radius: 5px;
+  background: none; color: rgba(255, 255, 255, 0.55); cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.flow-find__close:hover { background: rgba(255, 255, 255, 0.14); color: #fff; }
+html.gh-light .flow-shell .flow-find { background: #fff; border-color: var(--fl-line-2); color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-find__input { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-find__input::placeholder { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-find__count { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-find__close { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-find__close:hover { background: var(--fl-hover); color: var(--fl-ink); }
+/* A live query dims every point that doesn't match — matches keep full ink. */
+.flow-node.is-findmiss { opacity: 0.28; }
+.flow-node.is-findmiss .flow-node__tools { visibility: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  .flow-node.is-findmiss, .flow-node.is-findhit { transition: opacity 0.15s ease; }
+}
 /* One line, pushed right, truncates instead of wrapping into a tall column when the
    selection buttons appear (keeps the bar a stable single row). */
 .flow-outline__bar-hint {
@@ -4316,10 +4349,58 @@ body.flow-send-full .gh-drawer-backdrop { display: none !important; }
 
 /* Read doc — read-only, speech-ready view derived from the Send doc */
 .flow-readview { display: flex; flex-direction: column; height: 100%; gap: 10px; }
-.flow-readview__bar { display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+.flow-readview__bar { display: flex; align-items: center; gap: 10px; row-gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
 .flow-readview__hint { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
-.flow-readstat { font-size: 12.5px; color: rgba(255, 255, 255, 0.62); white-space: nowrap; }
+.flow-readstat { font-size: 12.5px; color: rgba(255, 255, 255, 0.7); white-space: nowrap; }
 .flow-readstat b { font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
+
+/* One quiet capsule for the read stats (words · read time · speech target · pace)
+   with Calibrate riding along — instead of a loose row of mixed chips. */
+.flow-readbar {
+  display: inline-flex; align-items: center; gap: 10px;
+  min-height: 30px; padding: 2px 4px 2px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.flow-readbar__div { width: 1px; height: 15px; background: rgba(255, 255, 255, 0.13); flex-shrink: 0; }
+/* The speech-length chip flattens inside the capsule (the capsule is the border). */
+.flow-readbar .flow-target { border: none; background: none; padding: 3px 4px; border-radius: 6px; }
+.flow-readbar .flow-target:hover, .flow-readbar .flow-target.is-open { background: rgba(255, 255, 255, 0.1); }
+.flow-readbar .flow-pace { padding: 2px 8px; border-radius: 6px; }
+.flow-readbar__cal {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px; border: none; border-radius: 6px;
+  background: none; color: rgba(255, 255, 255, 0.66);
+  font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.flow-readbar__cal:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+/* Narrow pane: the capsule dissolves back into wrapping chips. */
+@container (max-width: 680px) {
+  .flow-readbar { flex-wrap: wrap; border: none; background: none; padding: 0; row-gap: 6px; min-height: 0; }
+  .flow-readbar__div { display: none; }
+}
+
+/* Focus read / Pace / Plan as one segmented control. */
+.flow-readtools {
+  display: inline-flex; align-items: stretch;
+  border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 8px;
+  overflow: hidden;
+}
+.flow-readtools__btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; min-height: 28px;
+  background: rgba(255, 255, 255, 0.05); border: none; border-left: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.75);
+  font-family: inherit; font-size: 12.5px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.flow-readtools__btn:first-child { border-left: none; }
+.flow-readtools__btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.flow-readtools__btn.is-active { background: var(--accent); color: var(--accent-ink, #fff); }
+.flow-readtools__btn:disabled { opacity: 0.45; cursor: default; }
 
 /* Read-speed calibration modal */
 .flow-rtcal-backdrop {
@@ -5101,18 +5182,28 @@ html.gh-light .flow-menu__sep { background: rgba(70, 45, 20, 0.1); }
 .flow-target:hover, .flow-target.is-open { background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.32); }
 .flow-target b { color: #fff; font-weight: 700; font-variant-numeric: tabular-nums; }
 .flow-target__caret { font-size: 9px; color: rgba(255, 255, 255, 0.5); }
-/* Light theme: the pane is paper (#fffdf8), so the read bar reverts to warm ink. */
-html.gh-light .flow-readstat { color: #6f6557; }
-html.gh-light .flow-readstat b { color: #2a2118; }
-html.gh-light .flow-readview__hint { color: #8a7f6f; }
-html.gh-light .flow-pace.is-under { color: #2f6b3d; background: rgba(60, 150, 80, 0.14); }
-html.gh-light .flow-pace.is-over { color: #b23b2e; background: rgba(190, 70, 50, 0.12); }
-html.gh-light .flow-pace--live { color: #2a2118; background: rgba(70, 45, 20, 0.08); }
-html.gh-light .flow-pace--live.is-low { color: #b23b2e; background: rgba(190, 70, 50, 0.15); }
-html.gh-light .flow-target { color: #6f6557; border-color: rgba(70, 45, 20, 0.16); background: rgba(70, 45, 20, 0.05); }
-html.gh-light .flow-target:hover, html.gh-light .flow-target.is-open { background: rgba(70, 45, 20, 0.1); border-color: rgba(70, 45, 20, 0.28); }
-html.gh-light .flow-target b { color: #2a2118; }
-html.gh-light .flow-target__caret { color: #a98a5e; }
+/* Light theme: the read bar sits in the monochrome flow shell, so the capsule,
+   chips, and segmented tools all read from the fl- tokens (not the site's warm
+   palette). Green/red keep their meaning, at ink-level contrast. */
+html.gh-light .flow-shell .flow-readview__hint { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-readstat { color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-readstat b { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-readbar { background: oklch(1 0 0 / 0.5); border-color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-readbar__div { background: var(--fl-line); }
+html.gh-light .flow-shell .flow-readbar__cal { color: var(--fl-soft); background: none; }
+html.gh-light .flow-shell .flow-readbar__cal:hover { background: var(--fl-hover); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-pace.is-under { color: oklch(0.40 0.09 155); background: oklch(0.55 0.12 155 / 0.13); }
+html.gh-light .flow-shell .flow-pace.is-over { color: oklch(0.47 0.16 25); background: oklch(0.55 0.19 25 / 0.11); }
+html.gh-light .flow-shell .flow-pace--live { color: var(--fl-ink); background: oklch(0.22 0.004 270 / 0.07); }
+html.gh-light .flow-shell .flow-pace--live.is-low { color: oklch(0.47 0.16 25); background: oklch(0.55 0.19 25 / 0.14); }
+html.gh-light .flow-shell .flow-target { color: var(--fl-soft); border: none; background: none; }
+html.gh-light .flow-shell .flow-target:hover, html.gh-light .flow-shell .flow-target.is-open { background: var(--fl-hover); }
+html.gh-light .flow-shell .flow-target b { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-target__caret { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-readtools { border-color: var(--fl-line-2); background: oklch(1 0 0 / 0.5); }
+html.gh-light .flow-shell .flow-readtools__btn { background: none; border-left-color: var(--fl-line); color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-readtools__btn:hover:not(:disabled) { background: var(--fl-hover); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-readtools__btn.is-active { background: var(--accent); color: var(--accent-ink); }
 /* Paper-styled popover (overrides the dark .flow-menu base — read bar is light). */
 .flow-speechpop {
   min-width: 200px; gap: 8px; padding: 10px;
@@ -5222,8 +5313,6 @@ html.gh-light .flow-target__caret { color: #a98a5e; }
 .flow-palette__empty { padding: 16px; text-align: center; color: #8a7f6f; font-size: 13px; }
 @media (prefers-reduced-motion: reduce) { .flow-palette-backdrop, .flow-palette { animation: none; } }
 /* Active toggle in the (dark) read bar. */
-.flow-readview__bar .db-btn.is-active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-
 /* Keyboard-shortcuts overlay (reuses the .flow-rtcal paper card). */
 .flow-keys { width: min(560px, 100%); }
 .flow-keys__groups { display: grid; grid-template-columns: 1fr; gap: 18px; margin: 6px 0 4px; }
@@ -5237,6 +5326,59 @@ html.gh-light .flow-target__caret { color: #a98a5e; }
   color: #2a2118;
 }
 .flow-keys__desc { font-size: 13.5px; color: #574b39; line-height: 1.45; }
+
+/* Flow-snapshots dialog (reuses the .flow-rtcal paper card): take a labeled
+   snapshot up top, then an accordion of frozen outlines below. */
+.flow-snaps { width: min(620px, 100%); }
+.flow-snaps__take { display: flex; gap: 8px; margin: 14px 0 12px; }
+.flow-snaps__label {
+  flex: 1; min-width: 0; height: 32px; padding: 0 11px;
+  border: 1px solid rgba(70, 45, 20, 0.18); border-radius: 8px;
+  background: #fff; color: #2a2118; font-family: inherit; font-size: 13px;
+}
+.flow-snaps__label::placeholder { color: #8a7f6f; }
+.flow-snaps__label:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.flow-snaps__empty { margin: 4px 0 8px; font-size: 13.5px; line-height: 1.5; color: #6f6557; }
+.flow-snaps__list { display: flex; flex-direction: column; gap: 4px; margin: 0 0 6px; max-height: 46vh; overflow-y: auto; }
+.flow-snaps__item { border: 1px solid rgba(70, 45, 20, 0.12); border-radius: 10px; background: rgba(255, 255, 255, 0.5); }
+.flow-snaps__item.is-open { background: #fff; }
+.flow-snaps__row { display: flex; align-items: center; gap: 4px; padding: 4px 6px; }
+.flow-snaps__head {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px;
+  padding: 5px 4px; border: none; background: none; cursor: pointer;
+  font-family: inherit; text-align: left; color: #8a7f6f;
+}
+.flow-snaps__name { font-size: 13px; font-weight: 650; color: #2a2118; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flow-snaps__meta { flex-shrink: 0; margin-left: auto; font-size: 11.5px; color: #8a7f6f; font-variant-numeric: tabular-nums; }
+.flow-snaps__act {
+  flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border: none; border-radius: 7px;
+  background: none; color: #8a7f6f; cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.flow-snaps__act:hover { background: rgba(70, 45, 20, 0.08); color: #2a2118; }
+.flow-snaps__act--del:hover { color: #b23b2e; background: rgba(190, 70, 50, 0.1); }
+/* The frozen outline renders in the flow's own document face + depth colors. */
+.flow-snaps__preview {
+  border-top: 1px solid rgba(70, 45, 20, 0.1);
+  padding: 10px 14px 12px; max-height: 30vh; overflow-y: auto;
+  font-family: var(--font-calibri);
+}
+.flow-snaps__pt { display: flex; gap: 7px; font-size: 13.5px; line-height: 1.45; padding: 1px 0; }
+.flow-snaps__num { flex-shrink: 0; min-width: 18px; font-size: 12px; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.flow-snaps__hl { background: rgba(255, 220, 90, 0.55); border-radius: 3px; padding: 0 2px; }
+html.gh-light .flow-shell .flow-snaps__label { border-color: var(--fl-line-2); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-snaps__label::placeholder { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-snaps__empty { color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-snaps__item { border-color: var(--fl-line); background: oklch(1 0 0 / 0.5); }
+html.gh-light .flow-shell .flow-snaps__item.is-open { background: #fff; }
+html.gh-light .flow-shell .flow-snaps__head { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-snaps__name { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-snaps__meta { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-snaps__act { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-snaps__act:hover { background: var(--fl-hover); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-snaps__act--del:hover { color: oklch(0.47 0.16 25); background: oklch(0.55 0.19 25 / 0.1); }
+html.gh-light .flow-shell .flow-snaps__preview { border-top-color: var(--fl-line); }
 @media (min-width: 520px) { .flow-keys__groups { grid-template-columns: 1fr 1fr; } }
 
 /* =========================================================================

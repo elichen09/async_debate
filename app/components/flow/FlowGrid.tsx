@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { fuzzyRank } from "@/lib/fuzzy";
-import { GripVertical, ChevronRight, ChevronDown, Flag, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2, EyeOff, Eye } from "lucide-react";
+import { GripVertical, ChevronRight, ChevronDown, Flag, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2, EyeOff, Eye, Search } from "lucide-react";
 import { useConfirm } from "@/app/components/flow/ConfirmProvider";
 import { SlashList } from "@/app/components/flow/SlashMenu";
-import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, type FlowCell, type EditorInsert, type FlowDragPayload, type SlashOption } from "@/app/flow/shared";
+import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, nodeLabel, type FlowCell, type EditorInsert, type FlowDragPayload, type SlashOption } from "@/app/flow/shared";
 import { enqueueInsert, enqueueUpdate, enqueueDelete, saveSnapshot, loadSnapshot, applyPending } from "@/lib/flowSync";
 
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -55,23 +55,24 @@ const INDENT = 26; // px per outline level
 // Flag — the one status mark. Set manually (⚑ button) or with "/flag".
 const FLAG_COLOR = "#ef6f6f";
 
-function toAlpha(n: number): string {
-  let s = "";
-  while (n > 0) { n--; s = String.fromCharCode(97 + (n % 26)) + s; n = Math.floor(n / 26); }
-  return s;
-}
-function toRoman(n: number): string {
-  const map: [number, string][] = [[1000,"m"],[900,"cm"],[500,"d"],[400,"cd"],[100,"c"],[90,"xc"],[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]];
-  let r = "";
-  for (const [v, s] of map) while (n >= v) { r += s; n -= v; }
-  return r;
-}
-// Numbering cycles by depth: 1. / a. / i. / 1. / a. / i. …
-function nodeLabel(count: number, depth: number): string {
-  const k = depth % 3;
-  if (k === 0) return `${count}.`;
-  if (k === 1) return `${toAlpha(count)}.`;
-  return `${toRoman(count)}.`;
+// Parse pasted multi-line text into outline points. Leading tabs set each line's
+// depth; purely space-indented text uses its smallest indent step as one level.
+// Obvious bullet markers ("-", "*", "•", "1)") are stripped — the outline numbers
+// points itself. Depths are normalized so the shallowest line is 0.
+function parseOutline(text: string): { content: string; depth: number }[] {
+  const lines = text.replace(/\r/g, "").split("\n").filter((l) => l.trim());
+  if (!lines.length) return [];
+  const lead = (l: string) => /^[\t ]*/.exec(l)![0];
+  const hasTabs = lines.some((l) => lead(l).includes("\t"));
+  const spaceIndents = lines.map((l) => lead(l).length).filter((n) => n > 0);
+  const unit = hasTabs ? 1 : (spaceIndents.length ? Math.min(...spaceIndents) : 1);
+  const items = lines.map((l) => {
+    const w = lead(l);
+    const depth = hasTabs ? (w.match(/\t/g) ?? []).length : Math.floor(w.length / Math.max(1, unit));
+    return { content: l.trim().replace(/^([-*•]|\d+[.)])\s+/, ""), depth };
+  });
+  const min = Math.min(...items.map((i) => i.depth));
+  return items.map((i) => ({ content: i.content, depth: i.depth - min }));
 }
 
 // A debate flow as a nested outline: Enter adds a sibling point, Tab indents it
@@ -102,6 +103,11 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   const suppressClick = useRef(false);
   // Points hidden from view to declutter (not persisted — a focus aid, like collapse).
   const [hiddenPts, setHiddenPts] = useState<Set<string>>(new Set());
+  // Find-in-flow (Ctrl+F): null = closed; a query dims non-matching points.
+  const [find, setFind] = useState<string | null>(null);
+  const findInput = useRef<HTMLInputElement>(null);
+  const findIdx = useRef(0);          // which match Enter last jumped to
+  const rootRef = useRef<HTMLDivElement>(null);
   // Collapsed subtrees (local view state), status filter, and drag-reorder.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [flaggedOnly, setFlaggedOnly] = useState(false);
@@ -135,6 +141,29 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   }, []);
 
   useEffect(() => { cellsRef.current = cells; saveSnapshot(flowId, cells); }, [cells, flowId]);
+
+  // Ctrl/Cmd+F opens the find box (instead of browser find) when you're working in
+  // this outline — or when nothing else is focused (first grid wins there, so a
+  // split of two flows doesn't open two find boxes). Typing in another editor
+  // (Speech, Send doc, another flow) keeps its own Ctrl+F behavior.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "f") return;
+      const root = rootRef.current;
+      if (!root) return;
+      const ae = document.activeElement as HTMLElement | null;
+      const inThis = !!ae && root.contains(ae);
+      if (!inThis) {
+        const inEditor = !!ae && (ae.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName));
+        if (inEditor || document.querySelector(".flow-outline") !== root) return;
+      }
+      e.preventDefault();
+      setFind((f) => f ?? "");
+      requestAnimationFrame(() => findInput.current?.focus());
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // Flush any queued saves when the component unmounts (e.g. tab switch). `pending`
   // is the same Map throughout the component's life, so capturing it here is safe.
@@ -621,6 +650,21 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     for (const r of rows) enqueueInsert("flow_cells", r as unknown as Record<string, unknown> & { id: string });
   }
 
+  // Paste a multi-line outline (e.g. a case skeleton from a doc) into a point:
+  // an empty point takes the first line, the rest insert below it, tab indents
+  // becoming sub-points. A point with text keeps it and the lines insert after.
+  function pasteOutline(cell: FlowCell, items: { content: string; depth: number }[]) {
+    let rest = items;
+    if (!cell.content.trim() && items.length) {
+      setLocal(cell.id, { content: items[0].content });
+      saveContent(cell.id, items[0].content);
+      rest = items.slice(1).map((p) => ({ content: p.content, depth: p.depth - items[0].depth }));
+    }
+    if (rest.length) {
+      insertExternal({ sourceFlowId: flowId, points: rest }, cell);
+    }
+  }
+
   // Read a cross-pane drop payload off the event (returns null for non-flow drags).
   function readDrag(e: React.DragEvent): FlowDragPayload | null {
     const raw = e.dataTransfer.getData(FLOW_DRAG_MIME);
@@ -807,8 +851,23 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     hideUnder = -1;
     if (collapsed.has(cell.id) && labeled[i].hasKids) hideUnder = cell.depth;
   }
-  const visible = labeled.filter(({ cell }) => !hidden.has(cell.id) && !hiddenPts.has(cell.id) && (!flaggedOnly || cell.status === "flag"));
+  // A non-empty find query overrides the collapse/hide filters (every match has to
+  // be on screen for the count to be honest) and dims the non-matches instead.
+  const findQ = (find ?? "").trim().toLowerCase();
+  const isFindHit = (c: FlowCell) => findQ !== "" && c.content.toLowerCase().includes(findQ);
+  const visible = findQ
+    ? labeled
+    : labeled.filter(({ cell }) => !hidden.has(cell.id) && !hiddenPts.has(cell.id) && (!flaggedOnly || cell.status === "flag"));
+  const findHits = findQ ? visible.filter(({ cell }) => isFindHit(cell)) : [];
   const anyCollapsed = collapsed.size > 0;
+
+  // Enter in the find box hops from match to match (Shift+Enter goes back).
+  function jumpFind(dir: 1 | -1) {
+    if (!findHits.length) return;
+    findIdx.current = (((findIdx.current + dir) % findHits.length) + findHits.length) % findHits.length;
+    const el = taRefs.current.get(findHits[findIdx.current].cell.id);
+    el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
 
   // Arrow Up/Down between points: focus the previous/next visible point and keep
   // roughly the same caret column. Returns false at the ends of the list.
@@ -827,6 +886,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
 
   return (
     <div
+      ref={rootRef}
       className={`flow-outline ${extDrop ? "is-extdrop" : ""}`}
       onKeyDown={(e) => {
         // Selection shortcuts — but never while typing in a cell (textarea handles its own).
@@ -885,6 +945,34 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
               {anyCollapsed ? "Expand all" : "Collapse all"}
             </button>
           )}
+          {find === null ? (
+            <button
+              className="db-btn db-btn--glass db-btn--sm"
+              onClick={() => { setFind(""); requestAnimationFrame(() => findInput.current?.focus()); }}
+              title="Find in flow (Ctrl+F)"
+              aria-label="Find in flow"
+            ><Search size={13} /></button>
+          ) : (
+            <div className="flow-find">
+              <Search size={13} aria-hidden />
+              <input
+                ref={findInput}
+                className="flow-find__input"
+                value={find}
+                placeholder="Find in flow"
+                aria-label="Find in flow"
+                onChange={(e) => { findIdx.current = -1; setFind(e.target.value); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { e.preventDefault(); setFind(null); }
+                  else if (e.key === "Enter") { e.preventDefault(); jumpFind(e.shiftKey ? -1 : 1); }
+                }}
+              />
+              {findQ !== "" && (
+                <span className="flow-find__count">{findHits.length} {findHits.length === 1 ? "match" : "matches"}</span>
+              )}
+              <button className="flow-find__close" onClick={() => setFind(null)} aria-label="Close find" title="Close (Esc)"><X size={12} /></button>
+            </div>
+          )}
           <span className="flow-outline__bar-hint">Click or drag the numbers to select</span>
           <button className="db-btn db-btn--glass db-btn--sm" onClick={clearAll}>Clear flow</button>
         </div>
@@ -892,7 +980,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       {visible.map(({ cell, label, hasKids }) => (
         <div
           key={cell.id}
-          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${dropId === cell.id ? "is-drop" : ""} ${dragId === cell.id || (dragId && selected.size > 1 && selected.has(dragId) && selected.has(cell.id)) ? "is-drag" : ""}`}
+          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${dropId === cell.id ? "is-drop" : ""} ${dragId === cell.id || (dragId && selected.size > 1 && selected.has(dragId) && selected.has(cell.id)) ? "is-drag" : ""} ${findQ ? (isFindHit(cell) ? "is-findhit" : "is-findmiss") : ""}`}
           style={{ marginLeft: cell.depth * INDENT, ...(remoteEditors[cell.id]?.length ? { boxShadow: `inset 0 0 0 1.5px ${remoteEditors[cell.id][0].color}` } : cell.status === "flag" ? { boxShadow: `inset 3px 0 0 ${FLAG_COLOR}` } : {}) }}
           onDragOver={(e) => {
             if (dragId) { if (dragId !== cell.id) { e.preventDefault(); setDropId(cell.id); } }
@@ -1029,6 +1117,16 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
                 e.preventDefault();
                 delNode(cell, true);
               }
+            }}
+            onPaste={(e) => {
+              // Multi-line paste → outline points (tabs indent); single lines paste
+              // as normal text.
+              const text = e.clipboardData.getData("text/plain");
+              if (!text || !text.trim().includes("\n")) return;
+              const items = parseOutline(text);
+              if (items.length < 2) return;
+              e.preventDefault();
+              pasteOutline(cell, items);
             }}
             onFocus={(e) => {
               editingId.current = cell.id;
