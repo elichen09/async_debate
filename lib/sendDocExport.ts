@@ -127,11 +127,19 @@ function walk(node: Node, paras: Paragraph[]) {
   });
 }
 
-// Parse the Send doc's HTML and download it as a .docx with formatting intact.
-export async function downloadHtmlAsDocx(html: string, filename = "send-doc.docx") {
+// Rich HTML (Send doc / Speech) → docx paragraphs with formatting intact:
+// highlights, colors, fonts, sizes, alignment, and execCommand-style CSS.
+// Shared with the full-flow export (flowDocx) so both downloads look the same.
+export function htmlToDocxParagraphs(html: string): Paragraph[] {
   const dom = new DOMParser().parseFromString(html || "", "text/html");
   const paras: Paragraph[] = [];
   walk(dom.body, paras);
+  return paras;
+}
+
+// Parse the Send doc's HTML and download it as a .docx with formatting intact.
+export async function downloadHtmlAsDocx(html: string, filename = "send-doc.docx") {
+  const paras = htmlToDocxParagraphs(html);
   if (!paras.length) paras.push(new Paragraph({ text: "" }));
 
   const doc = new Document({

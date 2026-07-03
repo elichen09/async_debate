@@ -42,13 +42,20 @@ export default function FlowSnapshots({ flowId, onClose }: { flowId: string; onC
   }
 
   // Same clipboard shape as the outline's Copy: tab-indented text + HTML carrying
-  // the depth colors, so a snapshot pastes back into a flow (or the Speech doc).
+  // the depth colors and each point's 1./a./i. label, so a snapshot pastes back
+  // into a flow (or the Speech doc) numbered the way it was frozen.
   async function copySnap(s: FlowSnap) {
     const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const min = Math.min(...s.cells.map((c) => c.depth));
-    const text = s.cells.map((c) => "\t".repeat(c.depth - min) + c.content).join("\n");
-    const html = s.cells
-      .map((c) => `<div style="margin-left:${(c.depth - min) * 24}px;color:${FLOW_DEPTH_COLORS[c.depth % 2]}">${esc(c.content) || "<br>"}</div>`)
+    const counters: number[] = [];
+    const lines = s.cells.map((c) => {
+      counters[c.depth] = (counters[c.depth] || 0) + 1;
+      counters.length = c.depth + 1;
+      return { c, line: `${nodeLabel(counters[c.depth], c.depth)} ${c.content}`.trim() };
+    });
+    const text = lines.map(({ c, line }) => "\t".repeat(c.depth - min) + line).join("\n");
+    const html = lines
+      .map(({ c, line }) => `<div style="margin-left:${(c.depth - min) * 24}px;color:${FLOW_DEPTH_COLORS[c.depth % 2]}">${esc(line) || "<br>"}</div>`)
       .join("");
     try {
       await navigator.clipboard.write([

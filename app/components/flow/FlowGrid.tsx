@@ -65,6 +65,20 @@ const FLAG_COLOR = "#ef6f6f";
 const EXT_COLOR = "#3a9d6f";
 type StatusMark = "flag" | "extended";
 
+// The on-screen 1./a./i. label for every point, keyed by id — computed over the
+// whole ordered flow, so a copied/dragged subset keeps the numbers it shows in
+// the grid rather than renumbering from 1.
+function labelsFor(list: FlowCell[]): Map<string, string> {
+  const counters: number[] = [];
+  const out = new Map<string, string>();
+  for (const c of list) {
+    counters[c.depth] = (counters[c.depth] || 0) + 1;
+    counters.length = c.depth + 1;
+    out.set(c.id, nodeLabel(counters[c.depth], c.depth));
+  }
+  return out;
+}
+
 // Parse pasted multi-line text into outline points. Leading tabs set each line's
 // depth; purely space-indented text uses its smallest indent step as one level.
 // Obvious bullet markers ("-", "*", "•", "1)") are stripped — the outline numbers
@@ -79,7 +93,9 @@ function parseOutline(text: string): { content: string; depth: number }[] {
   const items = lines.map((l) => {
     const w = lead(l);
     const depth = hasTabs ? (w.match(/\t/g) ?? []).length : Math.floor(w.length / Math.max(1, unit));
-    return { content: l.trim().replace(/^([-*•]|\d+[.)])\s+/, ""), depth };
+    // Strips bullets AND the grid's own 1./a./i. labels, so copying points (which
+    // carries their numbers) and pasting them back round-trips cleanly.
+    return { content: l.trim().replace(/^([-*•]|\d+[.)]|[ivxlcdm]{1,5}[.)]|[a-z]{1,2}[.)])\s+/i, ""), depth };
   });
   const min = Math.min(...items.map((i) => i.depth));
   return items.map((i) => ({ content: i.content, depth: i.depth - min }));
@@ -631,15 +647,19 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const group = dragGroup(cell.id);
     if (!group.length) return;
     const min = Math.min(...group.map((c) => c.depth));
+    // The flow→flow payload stays label-free (the target numbers points itself);
+    // the text/HTML flavors carry each point's on-screen 1./a./i. label so a drop
+    // into the Speech tab (or another app) keeps the numbering.
+    const labels = labelsFor(sorted());
     const payload: FlowDragPayload = {
       sourceFlowId: flowId,
       points: group.map((c) => ({ content: c.content, depth: c.depth - min, highlighted: c.highlighted, status: c.status ?? null })),
     };
-    const text = group.map((c) => "\t".repeat(c.depth - min) + c.content).join("\n");
+    const text = group.map((c) => "\t".repeat(c.depth - min) + `${labels.get(c.id) ?? ""} ${c.content}`.trim()).join("\n");
     const html = group.map((c) => {
       const color = depthInk[c.depth % 2];
       const indent = (c.depth - min) * 24;
-      return `<div style="margin-left:${indent}px;color:${color}">${escHtml(c.content) || "<br>"}</div>`;
+      return `<div style="margin-left:${indent}px;color:${color}">${escHtml(`${labels.get(c.id) ?? ""} ${c.content}`.trim()) || "<br>"}</div>`;
     }).join("");
     try {
       e.dataTransfer.setData(FLOW_DRAG_MIME, JSON.stringify(payload));
@@ -784,13 +804,15 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const chosen = selected.size ? list.filter((c) => selected.has(c.id)) : list;
     if (!chosen.length) return;
     const min = Math.min(...chosen.map((c) => c.depth));
-    const text = chosen.map((c) => "\t".repeat(c.depth - min) + c.content).join("\n");
-    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // Each line leads with its on-screen 1./a./i. label (from the full flow, so a
+    // copied subset keeps the numbers it shows in the grid).
+    const labels = labelsFor(list);
+    const text = chosen.map((c) => "\t".repeat(c.depth - min) + `${labels.get(c.id) ?? ""} ${c.content}`.trim()).join("\n");
     const html = chosen
       .map((c) => {
         const color = depthInk[c.depth % 2];
         const indent = (c.depth - min) * 24;
-        return `<div style="margin-left:${indent}px;color:${color}">${esc(c.content) || "<br>"}</div>`;
+        return `<div style="margin-left:${indent}px;color:${color}">${escHtml(`${labels.get(c.id) ?? ""} ${c.content}`.trim()) || "<br>"}</div>`;
       })
       .join("");
     try {

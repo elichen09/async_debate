@@ -1,126 +1,19 @@
 // Export a flow folder (every flow's outline + speech, plus the shared send doc)
 // to a downloadable .docx. Runs entirely in the browser; the `docx` dependency is
 // only pulled in when an export happens (page.tsx dynamic-imports this on demand).
+//
+// Rich HTML (the Speech + Send doc) converts via sendDocExport's shared
+// converter, so the send doc here matches the Read view's standalone download
+// exactly — highlights, colors, fonts, sizes, and alignment all survive.
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
-import type { FlowCell } from "@/app/flow/shared";
+import { htmlToDocxParagraphs } from "@/lib/sendDocExport";
+import { nodeLabel, type FlowCell } from "@/app/flow/shared";
 
 // Half-point sizes (docx unit). BODY is the base; bump it to scale everything.
 const BODY = 26;            // 13pt body / outline / speech
-const H = { h1: 36, h2: 32, h3: 30, h4: 30, h5: 28, h6: 28 } as const;
-
-// ── Outline numbering (mirrors FlowGrid's 1. / a. / i. by depth) ──────────────
-function toAlpha(n: number): string {
-  let s = "";
-  while (n > 0) { n--; s = String.fromCharCode(97 + (n % 26)) + s; n = Math.floor(n / 26); }
-  return s;
-}
-function toRoman(n: number): string {
-  const map: [number, string][] = [[1000,"m"],[900,"cm"],[500,"d"],[400,"cd"],[100,"c"],[90,"xc"],[50,"l"],[40,"xl"],[10,"x"],[9,"ix"],[5,"v"],[4,"iv"],[1,"i"]];
-  let r = "";
-  for (const [v, s] of map) while (n >= v) { r += s; n -= v; }
-  return r;
-}
-function nodeLabel(count: number, depth: number): string {
-  const k = depth % 3;
-  if (k === 0) return `${count}.`;
-  if (k === 1) return `${toAlpha(count)}.`;
-  return `${toRoman(count)}.`;
-}
-
-// ── HTML → docx (handles the Speech contentEditable + Send doc rich HTML) ─────
-// Headings render as explicit bold/sized black runs (NOT Word's built-in Heading
-// styles) so the download keeps the on-screen look instead of Word's blue theme.
-type Fmt = { bold?: boolean; italics?: boolean; underline?: boolean; color?: string; size?: number; highlight?: "yellow" };
-const BLOCK = new Set(["div", "p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "section"]);
-
-function cssToHex(c: string | undefined): string {
-  if (!c) return "";
-  c = c.trim().toLowerCase();
-  if (c.startsWith("#")) {
-    let h = c.slice(1);
-    if (h.length === 3) h = h.split("").map((x) => x + x).join("");
-    return /^[0-9a-f]{6}$/.test(h) ? h : "";
-  }
-  const m = /rgba?\(([^)]+)\)/.exec(c);
-  if (m) {
-    const parts = m[1].split(",").map((x) => parseInt(x.trim(), 10));
-    if (parts.length < 3 || parts.slice(0, 3).some((n) => Number.isNaN(n))) return "";
-    return parts.slice(0, 3).map((v) => Math.max(0, Math.min(255, v)).toString(16).padStart(2, "0")).join("");
-  }
-  return "";
-}
-
-function run(text: string, fmt: Fmt, extra?: { break?: number }): TextRun {
-  return new TextRun({
-    text,
-    bold: fmt.bold,
-    italics: fmt.italics,
-    underline: fmt.underline ? {} : undefined,
-    color: fmt.color,
-    size: fmt.size,
-    highlight: fmt.highlight,
-    ...extra,
-  });
-}
-
-function collectRuns(node: Node, fmt: Fmt): TextRun[] {
-  const runs: TextRun[] = [];
-  node.childNodes.forEach((child) => {
-    if (child.nodeType === Node.TEXT_NODE) {
-      const text = child.textContent ?? "";
-      if (text) runs.push(run(text, fmt));
-      return;
-    }
-    if (child.nodeType !== Node.ELEMENT_NODE) return;
-    const el = child as HTMLElement;
-    const tag = el.tagName.toLowerCase();
-    if (tag === "br") { runs.push(new TextRun({ break: 1 })); return; }
-    const next: Fmt = { ...fmt };
-    if (tag === "b" || tag === "strong") next.bold = true;
-    if (tag === "i" || tag === "em") next.italics = true;
-    if (tag === "u") next.underline = true;
-    const color = cssToHex(el.style?.color); if (color) next.color = color;
-    const bg = el.style?.backgroundColor; if (bg && bg !== "transparent" && cssToHex(bg)) next.highlight = "yellow";
-    runs.push(...collectRuns(el, next));
-  });
-  return runs;
-}
-
-function pushBlock(node: Node, out: Paragraph[]): void {
-  if (node.nodeType === Node.TEXT_NODE) {
-    const t = node.textContent ?? "";
-    if (t.trim()) out.push(new Paragraph({ children: [new TextRun(t)] }));
-    return;
-  }
-  if (node.nodeType !== Node.ELEMENT_NODE) return;
-  const el = node as HTMLElement;
-  const tag = el.tagName.toLowerCase();
-  if (tag === "br") { out.push(new Paragraph({})); return; }
-  const isHeading = /^h[1-6]$/.test(tag);
-  // A non-heading wrapper holding its own block children: recurse so each becomes
-  // its own paragraph instead of one flattened blob.
-  if (!isHeading) {
-    const hasBlockKids = Array.from(el.childNodes).some(
-      (n) => n.nodeType === Node.ELEMENT_NODE && BLOCK.has((n as Element).tagName.toLowerCase()),
-    );
-    if (hasBlockKids) { el.childNodes.forEach((c) => pushBlock(c, out)); return; }
-  }
-  const headFmt: Fmt = isHeading ? { bold: true, size: H[tag as keyof typeof H] } : {};
-  const runs = collectRuns(el, headFmt);
-  if (!runs.length) { if (!isHeading) out.push(new Paragraph({})); return; }
-  out.push(new Paragraph({
-    children: runs,
-    alignment: tag === "h3" ? AlignmentType.CENTER : undefined,  // Send doc centers block titles
-    spacing: isHeading ? { before: 120, after: 60 } : { after: 80 },
-  }));
-}
 
 function htmlToParagraphs(html: string): Paragraph[] {
-  const out: Paragraph[] = [];
-  if (html && html.trim()) {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    doc.body.childNodes.forEach((n) => pushBlock(n, out));
-  }
+  const out = html && html.trim() ? htmlToDocxParagraphs(html) : [];
   if (!out.length) out.push(new Paragraph({ children: [new TextRun({ text: "(empty)", italics: true, color: "888888" })] }));
   return out;
 }
