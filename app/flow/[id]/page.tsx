@@ -11,6 +11,7 @@ import SendDoc from "@/app/components/flow/SendDoc";
 import ReadDocView from "@/app/components/flow/ReadDocView";
 import FlowTimers, { type TimerSnap, type TimerKey } from "@/app/components/flow/FlowTimers";
 import FlowSnapshots from "@/app/components/flow/FlowSnapshots";
+import FolderColors from "@/app/components/flow/FolderColors";
 import { takeSnap } from "@/lib/flowSnaps";
 import FlowDock from "@/app/components/flow/FlowDock";
 import FlowShortcuts from "@/app/components/flow/FlowShortcuts";
@@ -20,7 +21,8 @@ import { Columns2, Ellipsis, X } from "lucide-react";
 import type { EditorInsert, Flow, FlowSnippet, FlowCell, SlashOption } from "@/app/flow/shared";
 
 const SNIP_SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
-type Sibling = { id: string; title: string; folder_id: string | null };
+type Sibling = { id: string; title: string; folder_id: string | null; side: "aff" | "neg" | null };
+type FolderInk = { fid: string; aff: string | null; neg: string | null };
 type ViewKind = "flow" | "speech" | "send" | "read";
 type DockTab = "extensions" | "share";
 type Pane = { key: string; view: ViewKind; flowId: string };
@@ -202,6 +204,12 @@ export default function FlowWorkspace() {
   const [showSnaps, setShowSnaps] = useState(false);
   const [snapToast, setSnapToast] = useState("");
   const snapToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Folder-level aff/neg font colors, keyed by the folder they were loaded for
+  // (a stale folder's colors simply don't match, so no reset-on-switch needed).
+  // colorsOk goes false when the columns are missing (flow_colors.sql not run).
+  const [folderInk, setFolderInk] = useState<FolderInk | null>(null);
+  const [colorsOk, setColorsOk] = useState(true);
+  const [showColors, setShowColors] = useState(false);
   // Toggle helpers that also remember the choice for next time.
   const setDock = (d: DockTab | null) => { setDockState(d); saveUi({ dock: d }); };
   const setShowTimers = (v: boolean) => { setShowTimersState(v); saveUi({ timers: v }); };
@@ -301,6 +309,51 @@ export default function FlowWorkspace() {
     }, wait);
     return () => clearTimeout(t);
   }, [timerSnap, flowId]);
+
+  // --- Folder aff/neg font colors ---
+  // Loaded separately from the Send doc (so a missing column can't break that
+  // load); saved straight to the folder row, which every flow in it reads.
+  useEffect(() => {
+    const fid = flow?.folder_id;
+    if (!fid) return;
+    let active = true;
+    supabase.from("flow_folders").select("aff_color, neg_color").eq("id", fid).single().then(({ data, error }) => {
+      if (!active) return;
+      if (error) {
+        // Missing columns → surface the run-the-SQL hint. Anything else (e.g. a
+        // collaborator who can't read the owner's folder row) just means no
+        // custom colors here — not a schema problem.
+        if (/column|schema cache/i.test(error.message)) setColorsOk(false);
+        return;
+      }
+      setColorsOk(true);
+      const row = data as { aff_color: string | null; neg_color: string | null };
+      setFolderInk({ fid, aff: row.aff_color ?? null, neg: row.neg_color ?? null });
+    });
+    return () => { active = false; };
+  }, [flow?.folder_id]);
+
+  // Colors loaded for the CURRENT folder (stale ones from a previous flow don't match).
+  const activeInk = folderInk && folderInk.fid === flow?.folder_id ? folderInk : null;
+
+  function saveFolderInk(aff: string | null, neg: string | null) {
+    const fid = flow?.folder_id;
+    if (!fid) return;
+    setFolderInk({ fid, aff, neg });
+    supabase.from("flow_folders").update({ aff_color: aff, neg_color: neg }).eq("id", fid)
+      .then(({ error }) => { if (error) flashSnapToast(`Couldn't save colors: ${error.message}`); });
+  }
+
+  // A pane's alternating depth colors: the flow's own side color leads (depth 0,
+  // 2, …) and the opposing side's answers it (depth 1, 3, …) — aff/neg/aff on an
+  // aff flow, neg/aff/neg on a neg flow. Sideless flows keep the theme defaults.
+  function paneInk(fid: string): [string | null, string | null] | null {
+    if (!activeInk || (!activeInk.aff && !activeInk.neg)) return null;
+    const side = siblings.find((s) => s.id === fid)?.side ?? (fid === flowId ? flow?.side : null);
+    if (side === "aff") return [activeInk.aff, activeInk.neg];
+    if (side === "neg") return [activeInk.neg, activeInk.aff];
+    return null;
+  }
 
   // --- Global timer hotkeys (Alt+S / Alt+P / Alt+C) ---
   // FlowTimers registers a start/pause toggle; if the strip is hidden the hotkey
@@ -646,7 +699,7 @@ export default function FlowWorkspace() {
       // someone else's flow: they see that person's flows, not a global mix.
       const base = supabase
         .from("flows")
-        .select("id, title, folder_id")
+        .select("id, title, folder_id, side")
         .eq("owner_id", flow.owner_id)
         .order("created_at", { ascending: true });
       const { data } = await (flow.folder_id ? base.eq("folder_id", flow.folder_id) : base.is("folder_id", null));
@@ -671,6 +724,14 @@ export default function FlowWorkspace() {
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: t[0], filter: `id=eq.${t[1]}` },
         (payload) => {
+          // Folder rows also carry the aff/neg font colors — apply those before
+          // the local-edit guard (they're never typed here, so no caret to protect).
+          if (t[0] === "flow_folders") {
+            const row = payload.new as { aff_color?: string | null; neg_color?: string | null };
+            if ("aff_color" in row || "neg_color" in row) {
+              setFolderInk({ fid: t[1], aff: row.aff_color ?? null, neg: row.neg_color ?? null });
+            }
+          }
           if (Date.now() - lastSendEdit.current < 1500) return;
           const next = (payload.new as { send_html?: string }).send_html ?? "";
           if (next !== sendHtmlRef.current) applyRemoteSend(next);
@@ -782,6 +843,7 @@ export default function FlowWorkspace() {
     { trigger: "con prep timer start pause", label: "Start/pause Con prep", group: "Tools", hint: "⌥C", run: () => toggleTimer("con") },
     { trigger: "snapshot take freeze mark speech flow history", label: "Take flow snapshot", group: "Tools", run: () => snapNow("Snapshot") },
     { trigger: "snapshots history speech scrub view", label: "View flow snapshots", group: "Tools", run: () => setShowSnaps(true) },
+    ...(flow.folder_id ? [{ trigger: "aff neg font colors folder ink", label: "Aff & neg colors", group: "Tools", run: () => setShowColors(true) }] : []),
     { trigger: "extensions blocks library panel", label: dock === "extensions" ? "Close Extensions" : "Open Extensions", group: "Tools", run: () => setDock(dock === "extensions" ? null : "extensions") },
     { trigger: "share collaborators invite partner", label: dock === "share" ? "Close Share" : "Open Share", group: "Tools", run: () => setDock(dock === "share" ? null : "share") },
     { trigger: "fullscreen focus", label: fullscreen ? "Exit fullscreen" : "Fullscreen", group: "Tools", run: () => setFullscreen((f) => !f) },
@@ -864,7 +926,7 @@ export default function FlowWorkspace() {
                 )}
                 <div className="flow-pane__body">
                   {pane.view === "flow" && (
-                    <FlowGrid flowId={pane.flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} onReorder={onReorder} />
+                    <FlowGrid flowId={pane.flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} onReorder={onReorder} depthColors={paneInk(pane.flowId)} />
                   )}
                   {pane.view === "speech" && (
                     <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} userId={userId} userName={userName} />
@@ -937,6 +999,11 @@ export default function FlowWorkspace() {
                 <button className="flow-menu__item" role="menuitem" onClick={() => { setShowSnaps(true); setMenu(null); }}>
                   <span>Flow snapshots</span>
                 </button>
+                {flow.folder_id && (
+                  <button className="flow-menu__item" role="menuitem" onClick={() => { setShowColors(true); setMenu(null); }}>
+                    <span>Aff &amp; neg colors</span>
+                  </button>
+                )}
                 <div className="flow-menu__sep" />
                 <button className="flow-menu__item" role="menuitem" onClick={() => { setShowPalette(true); setMenu(null); }}>
                   <span>Command palette</span><span className="flow-menu__kbd">⇧⇧</span>
@@ -961,6 +1028,16 @@ export default function FlowWorkspace() {
       {showPalette && <FlowPalette commands={paletteCommands} onClose={() => setShowPalette(false)} />}
 
       {showSnaps && <FlowSnapshots flowId={flowId} onClose={() => setShowSnaps(false)} />}
+
+      {showColors && (
+        <FolderColors
+          aff={activeInk?.aff ?? null}
+          neg={activeInk?.neg ?? null}
+          supported={colorsOk}
+          onSave={saveFolderInk}
+          onClose={() => setShowColors(false)}
+        />
+      )}
 
       {/* Persistent shortcut legend — quick-navigate hints, like the reference.
           Solo pane only: in a split the left pane's bottom corner is real content

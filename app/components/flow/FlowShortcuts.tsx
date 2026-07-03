@@ -13,6 +13,8 @@ const GROUPS: { title: string; rows: { keys: string[]; desc: string }[] }[] = [
       { keys: ["⇧", "Tab"], desc: "Outdent a point" },
       { keys: ["⇧", "↑ / ↓"], desc: "Move a point (with its sub-points) up or down — no mouse" },
       { keys: ["Ctrl", "E"], desc: "Highlight a key point" },
+      { keys: ["/", "flag", "↵"], desc: "Flag a point and its sub-points (red) — come back to this" },
+      { keys: ["/", "extend", "↵"], desc: "Mark a point extended (green →) — carried through a later speech" },
       { keys: ["Ctrl", "V"], desc: "Paste a multi-line outline — each line becomes a point, tabs indent" },
     ],
   },

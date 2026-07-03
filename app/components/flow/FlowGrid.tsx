@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { fuzzyRank } from "@/lib/fuzzy";
-import { GripVertical, ChevronRight, ChevronDown, Flag, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2, EyeOff, Eye, Search } from "lucide-react";
+import { GripVertical, ChevronRight, ChevronDown, Flag, ArrowRight, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2, EyeOff, Eye, Search, Ellipsis, Copy } from "lucide-react";
 import { useConfirm } from "@/app/components/flow/ConfirmProvider";
 import { SlashList } from "@/app/components/flow/SlashMenu";
 import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, nodeLabel, type FlowCell, type EditorInsert, type FlowDragPayload, type SlashOption } from "@/app/flow/shared";
@@ -47,13 +47,23 @@ interface FlowGridProps {
   onSendPoints?: (cells: { id: string; content: string }[]) => void;
   // Points were reordered (drag) — reflow the Send doc cards to match this order.
   onReorder?: (orderedCellIds: string[]) => void;
+  // The folder's custom depth colors for this flow, alternating by indent level:
+  // [0] = this flow's own side color (depth 0, 2, …), [1] = the opposing side's
+  // (depth 1, 3, …) — so an aff flow runs aff/neg/aff and a neg flow the reverse.
+  // A null slot (or the whole prop) falls back to the theme's default color.
+  depthColors?: [string | null, string | null] | null;
 }
 
 const SEL = "id, flow_id, col, row_index, depth, highlighted, content, status, updated_by, updated_at";
 const INDENT = 26; // px per outline level
 
-// Flag — the one status mark. Set manually (⚑ button) or with "/flag".
+// The two status marks a point can carry (one at a time). Flag = "needs a
+// response / come back to this" (red). Extended = "we carried this argument
+// through a later speech" (green arrow). Set from the hover tools or by typing
+// "/flag" / "/extend" at the end of the point.
 const FLAG_COLOR = "#ef6f6f";
+const EXT_COLOR = "#3a9d6f";
+type StatusMark = "flag" | "extended";
 
 // Parse pasted multi-line text into outline points. Leading tabs set each line's
 // depth; purely space-indented text uses its smallest indent step as one level.
@@ -78,8 +88,17 @@ function parseOutline(text: string): { content: string; depth: number }[] {
 // A debate flow as a nested outline: Enter adds a sibling point, Tab indents it
 // into a response, Shift+Tab outdents, and highlighting marks key cards. Numbers
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
-export default function FlowGrid({ flowId, userId, userName = "Partner", registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints, onReorder }: FlowGridProps) {
+export default function FlowGrid({ flowId, userId, userName = "Partner", registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints, onReorder, depthColors = null }: FlowGridProps) {
   const confirm = useConfirm();
+  // The two alternating depth colors this flow writes into copies/drags (and,
+  // when custom, paints via the --fn-* vars). Per-slot fallback to the defaults.
+  const depthInk: [string, string] = [depthColors?.[0] ?? FLOW_DEPTH_COLORS[0], depthColors?.[1] ?? FLOW_DEPTH_COLORS[1]];
+  const inkVars = depthColors && (depthColors[0] || depthColors[1])
+    ? ({
+        ...(depthColors[0] ? { "--fn-c0": depthColors[0], "--fn-c0-rail": `${depthColors[0]}66` } : {}),
+        ...(depthColors[1] ? { "--fn-c1": depthColors[1], "--fn-c1-rail": `${depthColors[1]}8c` } : {}),
+      } as React.CSSProperties)
+    : undefined;
   // Hydrate instantly from the local snapshot (mounts client-side, after the session
   // loads, so there's no SSR mismatch) — the flow shows even on a cold offline load,
   // before the server fetch reconciles it.
@@ -110,7 +129,9 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   const rootRef = useRef<HTMLDivElement>(null);
   // Collapsed subtrees (local view state), status filter, and drag-reorder.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [flaggedOnly, setFlaggedOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusMark | null>(null);
+  // Which toolbar dropdown is open (the filter chip or the ⋯ overflow menu).
+  const [barMenu, setBarMenu] = useState<"filter" | "more" | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
   const [extDrop, setExtDrop] = useState(false);   // a point from another pane is hovering this flow
@@ -141,6 +162,18 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   }, []);
 
   useEffect(() => { cellsRef.current = cells; saveSnapshot(flowId, cells); }, [cells, flowId]);
+
+  // Close an open toolbar dropdown on any outside press or Escape.
+  useEffect(() => {
+    if (!barMenu) return;
+    const onDown = (e: PointerEvent) => {
+      if (!(e.target as Element | null)?.closest?.(".flow-barmenu")) setBarMenu(null);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setBarMenu(null); };
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("pointerdown", onDown); window.removeEventListener("keydown", onKey); };
+  }, [barMenu]);
 
   // Ctrl/Cmd+F opens the find box (instead of browser find) when you're working in
   // this outline — or when nothing else is focused (first grid wins there, so a
@@ -337,9 +370,10 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     for (let j = i + 1; j < list.length && list[j].depth > list[i].depth; j++) out.push(list[j].id);
     return out;
   }
-  // Flagging a point flags its whole subtree (sub-points) too; unflag clears them.
-  function toggleFlag(cell: FlowCell) {
-    const v = cell.status === "flag" ? null : "flag";
+  // Marking a point (flag / extended) marks its whole subtree too; toggling the
+  // same mark off clears them. Setting one mark replaces the other.
+  function toggleMark(cell: FlowCell, value: StatusMark) {
+    const v = cell.status === value ? null : value;
     for (const id of subtreeIds(cell.id)) setStatus(id, v);
   }
 
@@ -603,7 +637,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     };
     const text = group.map((c) => "\t".repeat(c.depth - min) + c.content).join("\n");
     const html = group.map((c) => {
-      const color = FLOW_DEPTH_COLORS[c.depth % 2];
+      const color = depthInk[c.depth % 2];
       const indent = (c.depth - min) * 24;
       return `<div style="margin-left:${indent}px;color:${color}">${escHtml(c.content) || "<br>"}</div>`;
     }).join("");
@@ -754,7 +788,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const html = chosen
       .map((c) => {
-        const color = FLOW_DEPTH_COLORS[c.depth % 2];
+        const color = depthInk[c.depth % 2];
         const indent = (c.depth - min) * 24;
         return `<div style="margin-left:${indent}px;color:${color}">${esc(c.content) || "<br>"}</div>`;
       })
@@ -790,13 +824,14 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     clearSelection();
   }
 
-  // "/flag" (typed at the end of a point) flags it — plus any selected points —
-  // then strips the command, leaving the text. `base` is the line without "/flag".
-  function runFlag(cell: FlowCell, base: string) {
+  // "/flag" or "/extend" (typed at the end of a point) marks it — plus any
+  // selected points, each with its subtree — then strips the command, leaving
+  // the text. `base` is the line without the command.
+  function runMark(cell: FlowCell, base: string, value: StatusMark) {
     const ids = new Set<string>();
     for (const sid of selected) for (const d of subtreeIds(sid)) ids.add(d);
     for (const d of subtreeIds(cell.id)) ids.add(d);
-    for (const id of ids) setStatus(id, "flag");
+    for (const id of ids) setStatus(id, value);
     setLocal(cell.id, { content: base });
     saveContent(cell.id, base);
     setSlash(null);
@@ -857,7 +892,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   const isFindHit = (c: FlowCell) => findQ !== "" && c.content.toLowerCase().includes(findQ);
   const visible = findQ
     ? labeled
-    : labeled.filter(({ cell }) => !hidden.has(cell.id) && !hiddenPts.has(cell.id) && (!flaggedOnly || cell.status === "flag"));
+    : labeled.filter(({ cell }) => !hidden.has(cell.id) && !hiddenPts.has(cell.id) && (!statusFilter || cell.status === statusFilter));
   const findHits = findQ ? visible.filter(({ cell }) => isFindHit(cell)) : [];
   const anyCollapsed = collapsed.size > 0;
 
@@ -888,6 +923,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     <div
       ref={rootRef}
       className={`flow-outline ${extDrop ? "is-extdrop" : ""}`}
+      style={inkVars}
       onKeyDown={(e) => {
         // Selection shortcuts — but never while typing in a cell (textarea handles its own).
         if (!selected.size) return;
@@ -916,38 +952,61 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       )}
       {labeled.length > 0 && (
         <div className="flow-outline__bar">
-          <button className="db-btn db-btn--glass db-btn--sm" onClick={copyFlow}>
-            {selected.size ? `Copy ${selected.size}` : "Copy"}
-          </button>
-          {selected.size > 0 && (
+          {selected.size > 0 ? (
+            // Selection actions — contextual, same quiet style as the resting bar.
             <>
-              <button className="db-btn db-btn--glass db-btn--sm" onClick={hideSelected} title="Hide selected points from view">
+              <button className="flow-outline__ctl" onClick={copyFlow} title="Copy the selected points">
+                <Copy size={13} /> Copy {selected.size}
+              </button>
+              <button className="flow-outline__ctl" onClick={hideSelected} title="Hide selected points from view">
                 <EyeOff size={13} /> Hide {selected.size}
               </button>
-              <button className="db-btn db-btn--glass db-btn--sm flow-outline__del" onClick={deleteSelected} title="Delete selected points (Del)">
+              <button className="flow-outline__ctl flow-outline__ctl--danger" onClick={deleteSelected} title="Delete selected points (Del)">
                 <Trash2 size={13} /> Delete {selected.size}
               </button>
-              <button className="db-btn db-btn--glass db-btn--sm" onClick={clearSelection}>Deselect</button>
+              <button className="flow-outline__ctl" onClick={clearSelection}>Deselect</button>
             </>
-          )}
-          {hiddenPts.size > 0 && (
-            <button className="db-btn db-btn--glass db-btn--sm" onClick={showHidden} title="Show points you've hidden">
-              <Eye size={13} /> Show {hiddenPts.size} hidden
-            </button>
-          )}
-          {selected.size === 0 && (
-            <button className={`db-btn db-btn--glass db-btn--sm ${flaggedOnly ? "is-active" : ""}`} onClick={() => setFlaggedOnly((f) => !f)} title="Show only flagged points">
-              <Flag size={13} /> {flaggedOnly ? "Showing flagged" : "Only flagged"}
-            </button>
-          )}
-          {selected.size === 0 && (
-            <button className="db-btn db-btn--glass db-btn--sm" onClick={() => (anyCollapsed ? setCollapsed(new Set()) : setCollapsed(new Set(labeled.filter((l) => l.hasKids).map((l) => l.cell.id))))}>
-              {anyCollapsed ? "Expand all" : "Collapse all"}
-            </button>
+          ) : (
+            // Resting bar: a quiet filter chip + find + one overflow menu.
+            <>
+              <div className="flow-barmenu">
+                <button
+                  className={`flow-outline__ctl ${statusFilter ? "is-filtered" : ""} ${barMenu === "filter" ? "is-open" : ""}`}
+                  onClick={() => setBarMenu((m) => (m === "filter" ? null : "filter"))}
+                  title="Filter which points show"
+                  aria-haspopup="menu"
+                  aria-expanded={barMenu === "filter"}
+                >
+                  {statusFilter === "flag" ? <><Flag size={13} /> Flagged</>
+                    : statusFilter === "extended" ? <><ArrowRight size={13} /> Extended</>
+                    : "All points"}
+                  <ChevronDown size={12} />
+                </button>
+                {barMenu === "filter" && (
+                  <div className="flow-menu" role="menu">
+                    <div className="flow-menu__label">Show</div>
+                    <button className={`flow-menu__item ${!statusFilter ? "is-on" : ""}`} role="menuitem" onClick={() => { setStatusFilter(null); setBarMenu(null); }}>
+                      <span>All points</span>{!statusFilter && <span className="flow-menu__check">✓</span>}
+                    </button>
+                    <button className={`flow-menu__item ${statusFilter === "flag" ? "is-on" : ""}`} role="menuitem" onClick={() => { setStatusFilter("flag"); setBarMenu(null); }}>
+                      <span>Only flagged</span>{statusFilter === "flag" && <span className="flow-menu__check">✓</span>}
+                    </button>
+                    <button className={`flow-menu__item ${statusFilter === "extended" ? "is-on" : ""}`} role="menuitem" onClick={() => { setStatusFilter("extended"); setBarMenu(null); }}>
+                      <span>Only extended</span>{statusFilter === "extended" && <span className="flow-menu__check">✓</span>}
+                    </button>
+                  </div>
+                )}
+              </div>
+              {hiddenPts.size > 0 && (
+                <button className="flow-outline__ctl" onClick={showHidden} title="Show the points you've hidden">
+                  <Eye size={13} /> {hiddenPts.size} hidden
+                </button>
+              )}
+            </>
           )}
           {find === null ? (
             <button
-              className="db-btn db-btn--glass db-btn--sm"
+              className="flow-outline__ctl flow-outline__ctl--icon"
               onClick={() => { setFind(""); requestAnimationFrame(() => findInput.current?.focus()); }}
               title="Find in flow (Ctrl+F)"
               aria-label="Find in flow"
@@ -973,15 +1032,37 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
               <button className="flow-find__close" onClick={() => setFind(null)} aria-label="Close find" title="Close (Esc)"><X size={12} /></button>
             </div>
           )}
-          <span className="flow-outline__bar-hint">Click or drag the numbers to select</span>
-          <button className="db-btn db-btn--glass db-btn--sm" onClick={clearAll}>Clear flow</button>
+          {selected.size === 0 && (
+            <div className="flow-barmenu">
+              <button
+                className={`flow-outline__ctl flow-outline__ctl--icon ${barMenu === "more" ? "is-open" : ""}`}
+                onClick={() => setBarMenu((m) => (m === "more" ? null : "more"))}
+                title="Flow actions"
+                aria-label="Flow actions"
+                aria-haspopup="menu"
+                aria-expanded={barMenu === "more"}
+              ><Ellipsis size={15} /></button>
+              {barMenu === "more" && (
+                <div className="flow-menu" role="menu">
+                  <button className="flow-menu__item" role="menuitem" onClick={() => { copyFlow(); setBarMenu(null); }}>Copy flow</button>
+                  <button className="flow-menu__item" role="menuitem" onClick={() => { setCollapsed(anyCollapsed ? new Set() : new Set(labeled.filter((l) => l.hasKids).map((l) => l.cell.id))); setBarMenu(null); }}>
+                    {anyCollapsed ? "Expand all" : "Collapse all"}
+                  </button>
+                  <div className="flow-menu__sep" />
+                  <button className="flow-menu__item flow-menu__item--danger" role="menuitem" onClick={() => { setBarMenu(null); clearAll(); }}>Clear flow…</button>
+                  <div className="flow-menu__sep" />
+                  <div className="flow-menu__hint">Click or drag the numbers to select points</div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       {visible.map(({ cell, label, hasKids }) => (
         <div
           key={cell.id}
-          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${dropId === cell.id ? "is-drop" : ""} ${dragId === cell.id || (dragId && selected.size > 1 && selected.has(dragId) && selected.has(cell.id)) ? "is-drag" : ""} ${findQ ? (isFindHit(cell) ? "is-findhit" : "is-findmiss") : ""}`}
-          style={{ marginLeft: cell.depth * INDENT, ...(remoteEditors[cell.id]?.length ? { boxShadow: `inset 0 0 0 1.5px ${remoteEditors[cell.id][0].color}` } : cell.status === "flag" ? { boxShadow: `inset 3px 0 0 ${FLAG_COLOR}` } : {}) }}
+          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${cell.status === "extended" ? "flow-node--ext" : ""} ${dropId === cell.id ? "is-drop" : ""} ${dragId === cell.id || (dragId && selected.size > 1 && selected.has(dragId) && selected.has(cell.id)) ? "is-drag" : ""} ${findQ ? (isFindHit(cell) ? "is-findhit" : "is-findmiss") : ""}`}
+          style={{ marginLeft: cell.depth * INDENT, ...(remoteEditors[cell.id]?.length ? { boxShadow: `inset 0 0 0 1.5px ${remoteEditors[cell.id][0].color}` } : cell.status === "flag" ? { boxShadow: `inset 3px 0 0 ${FLAG_COLOR}` } : cell.status === "extended" ? { boxShadow: `inset 3px 0 0 ${EXT_COLOR}` } : {}) }}
           onDragOver={(e) => {
             if (dragId) { if (dragId !== cell.id) { e.preventDefault(); setDropId(cell.id); } }
             else if (e.dataTransfer.types.includes(FLOW_DRAG_MIME)) { e.preventDefault(); setDropId(cell.id); }
@@ -1016,7 +1097,10 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectLabel(cell, false); } }}
           >{label}</span>
           {cell.status === "flag" && (
-            <span className="flow-node__statustag" style={{ background: FLAG_COLOR }}><Flag size={10} /></span>
+            <span className="flow-node__statustag" style={{ background: FLAG_COLOR }} title="Flagged"><Flag size={10} /></span>
+          )}
+          {cell.status === "extended" && (
+            <span className="flow-node__statustag" style={{ background: EXT_COLOR }} title="Extended"><ArrowRight size={10} /></span>
           )}
           <textarea
             className="flow-node__text"
@@ -1076,7 +1160,12 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
                 }
                 // "/flag" → flag this line (and any selected points), strip the command.
                 if (/(^|\s)\/flag\s*$/i.test(ta.value)) {
-                  runFlag(cell, ta.value.replace(/(^|\s)\/flag\s*$/i, "").trim());
+                  runMark(cell, ta.value.replace(/(^|\s)\/flag\s*$/i, "").trim(), "flag");
+                  return;
+                }
+                // "/extend" (or "/ext") → mark it extended, strip the command.
+                if (/(^|\s)\/ext(end)?\s*$/i.test(ta.value)) {
+                  runMark(cell, ta.value.replace(/(^|\s)\/ext(end)?\s*$/i, "").trim(), "extended");
                   return;
                 }
                 const m = /^\/(\S+)$/.exec(ta.value.trim());
@@ -1153,7 +1242,8 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             <SlashList matches={slashMatches} active={slashActive} onPick={(t) => completeSlash(cell, t)} />
           )}
           <div className="flow-node__tools">
-            <button className={`flow-node__btn ${cell.status === "flag" ? "is-flag" : ""}`} onClick={() => toggleFlag(cell)} title="Flag (or type /flag)" aria-label="Flag"><Flag size={13} /></button>
+            <button className={`flow-node__btn ${cell.status === "flag" ? "is-flag" : ""}`} onClick={() => toggleMark(cell, "flag")} title="Flag (or type /flag)" aria-label="Flag"><Flag size={13} /></button>
+            <button className={`flow-node__btn ${cell.status === "extended" ? "is-ext" : ""}`} onClick={() => toggleMark(cell, "extended")} title="Mark extended (or type /extend)" aria-label="Mark extended"><ArrowRight size={13} /></button>
             <button className="flow-node__btn flow-node__btn--sub" onClick={() => addChild(cell)} title="Add sub-point inside" aria-label="Add sub-point"><ListPlus size={13} /></button>
             <button className="flow-node__btn" onClick={() => reIndent(cell, -1)} title="Outdent (Shift+Tab)" aria-label="Outdent"><IndentDecrease size={13} /></button>
             <button className="flow-node__btn" onClick={() => reIndent(cell, 1)} title="Indent (Tab)" aria-label="Indent"><IndentIncrease size={13} /></button>

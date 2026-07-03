@@ -3855,14 +3855,40 @@ html.gh-light .flow-shell .flow-find__close:hover { background: var(--fl-hover);
 @media (prefers-reduced-motion: no-preference) {
   .flow-node.is-findmiss, .flow-node.is-findhit { transition: opacity 0.15s ease; }
 }
-/* One line, pushed right, truncates instead of wrapping into a tall column when the
-   selection buttons appear (keeps the bar a stable single row). */
-.flow-outline__bar-hint {
-  margin-left: auto; flex: 0 1 auto; min-width: 0;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  font-size: 11px; color: rgba(255, 255, 255, 0.4);
+/* Resting-bar controls (filter chip, find, ⋯ menu): quiet flat text/icon buttons
+   like the view tabs, instead of a row of heavy pills. Selection actions keep the
+   pill style — they're contextual and momentary. */
+.flow-outline__ctl {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 26px; padding: 0 9px; border: none; border-radius: 7px;
+  background: none; color: rgba(255, 255, 255, 0.65);
+  font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.14s ease, color 0.14s ease;
 }
-html.gh-light .flow-outline__bar-hint { color: var(--muted); }
+.flow-outline__ctl:hover, .flow-outline__ctl.is-open { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.flow-outline__ctl--icon { padding: 0 6px; }
+/* An applied filter is state, not chrome — it flips to the accent pill. */
+.flow-outline__ctl.is-filtered { background: var(--accent); color: var(--accent-ink, #fff); }
+.flow-outline__ctl.is-filtered:hover { background: var(--accent); color: var(--accent-ink, #fff); }
+.flow-outline__ctl--danger:hover { background: rgba(220, 90, 70, 0.15); color: #ff9b8a; }
+html.gh-light .flow-shell .flow-outline__ctl--danger:hover { background: oklch(0.55 0.19 25 / 0.1); color: oklch(0.47 0.16 25); }
+html.gh-light .flow-shell .flow-outline__ctl { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-outline__ctl:hover,
+html.gh-light .flow-shell .flow-outline__ctl.is-open { background: var(--fl-hover); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-outline__ctl.is-filtered { background: var(--accent); color: var(--accent-ink); }
+/* Dropdown anchor. The workspace header's menus are fixed at page level, but a
+   pane is a container-type containing block (fixed would resolve against it), so
+   in-grid menus anchor absolutely under their trigger instead. */
+.flow-barmenu { position: relative; }
+.flow-barmenu .flow-menu { position: absolute; top: calc(100% + 6px); left: 0; }
+.flow-menu__item--danger { color: #ff9b8a; }
+.flow-menu__item--danger:hover { background: rgba(220, 90, 70, 0.14); color: #ff9b8a; }
+html.gh-light .flow-shell .flow-menu__item--danger { color: oklch(0.47 0.16 25); }
+html.gh-light .flow-shell .flow-menu__item--danger:hover { background: oklch(0.55 0.19 25 / 0.1); color: oklch(0.47 0.16 25); }
+/* Muted footer line inside a menu (usage hint, not an action). */
+.flow-menu__hint { font-size: 11px; line-height: 1.45; color: rgba(255, 255, 255, 0.45); padding: 2px 10px 6px; white-space: normal; }
+html.gh-light .flow-shell .flow-menu__hint { color: var(--fl-muted); }
 .flow-node {
   position: relative;
   display: flex;
@@ -3910,10 +3936,12 @@ html.gh-light .flow-outline__bar-hint { color: var(--muted); }
 /* Two colors alternate by indent depth. Fixed hexes (not theme tokens) so they
    read on both themes AND match exactly what the Copy action writes to the
    clipboard, keeping the color-coding when a flow is pasted into the speech. */
-.flow-node--c0 { border-left-color: #ff8a64aa; }
-.flow-node--c0 .flow-node__label, .flow-node--c0 .flow-node__text { color: #ffa987; }
-.flow-node--c1 { border-left-color: #6f9beaaa; }
-.flow-node--c1 .flow-node__label, .flow-node--c1 .flow-node__text { color: #9cc3ff; }
+/* Depth colors read through --fn-* vars so a folder's custom aff/neg font color
+   (set inline on .flow-outline) can override them; fallbacks are the defaults. */
+.flow-node--c0 { border-left-color: var(--fn-c0-rail, #ff8a64aa); }
+.flow-node--c0 .flow-node__label, .flow-node--c0 .flow-node__text { color: var(--fn-c0, #ffa987); }
+.flow-node--c1 { border-left-color: var(--fn-c1-rail, #6f9beaaa); }
+.flow-node--c1 .flow-node__label, .flow-node--c1 .flow-node__text { color: var(--fn-c1, #9cc3ff); }
 
 /* Highlighter */
 .flow-node--hl .flow-node__text {
@@ -3940,12 +3968,9 @@ html.gh-light .flow-node__fold { color: var(--muted); }
 .flow-node.is-drag { opacity: 0.45; }
 /* A point dragged in from another pane is hovering this flow (drop to add it). */
 .flow-outline.is-extdrop { box-shadow: inset 0 0 0 2px var(--accent-ring); border-radius: var(--radius); }
-/* Group-delete button reads destructive on hover. */
-.flow-outline__bar .flow-outline__del:hover:not(:disabled) { color: #ff9b8a; border-color: rgba(220, 90, 70, 0.5); }
-html.gh-light .flow-outline__bar .flow-outline__del:hover:not(:disabled) { color: #b23b2e; border-color: rgba(190, 70, 50, 0.45); }
 .flow-node__statustag { flex-shrink: 0; align-self: center; font-size: 10px; font-weight: 700; color: #fff; padding: 1px 6px; border-radius: 3px; line-height: 1.4; }
 .flow-node__btn.is-flag { color: #fff; background: #ef6f6f; border-color: #ef6f6f; }
-.flow-outline__bar .db-btn.is-active { background: var(--accent); color: var(--accent-ink, #fff); border-color: var(--accent); }
+.flow-node__btn.is-ext { color: #fff; background: #3a9d6f; border-color: #3a9d6f; }
 .flow-node__statussel {
   height: 22px;
   font-size: 11px;
@@ -4992,8 +5017,8 @@ html.gh-light .flow-outline__error { color: var(--loss); }
 html.gh-light .flow-node:hover { background: oklch(0.12 0.04 232 / 0.05); }
 html.gh-light .flow-node__text:focus { background: oklch(0.12 0.04 232 / 0.07); }
 html.gh-light .flow-node__text::placeholder { color: var(--muted); }
-html.gh-light .flow-node--c0 .flow-node__label, html.gh-light .flow-node--c0 .flow-node__text { color: #c0492b; }
-html.gh-light .flow-node--c1 .flow-node__label, html.gh-light .flow-node--c1 .flow-node__text { color: #2f5fc0; }
+html.gh-light .flow-node--c0 .flow-node__label, html.gh-light .flow-node--c0 .flow-node__text { color: var(--fn-c0, #c0492b); }
+html.gh-light .flow-node--c1 .flow-node__label, html.gh-light .flow-node--c1 .flow-node__text { color: var(--fn-c1, #2f5fc0); }
 html.gh-light .flow-node__btn { color: oklch(0.3 0.04 238 / 0.55); }
 html.gh-light .flow-node__btn:hover { color: var(--ink); background: oklch(0.12 0.04 232 / 0.1); }
 html.gh-light .flow-node__btn--sub { color: var(--accent-deep); }
@@ -5415,6 +5440,31 @@ html.gh-light .flow-shell .flow-readtools__btn.is-active { background: var(--acc
 }
 .flow-keys__desc { font-size: 13.5px; color: #574b39; line-height: 1.45; }
 
+/* Folder aff/neg font colors dialog (reuses the .flow-rtcal paper card). */
+.flow-fcolors { width: min(440px, 100%); }
+.flow-fcolors__row { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+.flow-fcolors__label { flex: 0 0 84px; font-size: 13.5px; font-weight: 650; color: #2a2118; }
+.flow-fcolors__swatch {
+  width: 44px; height: 30px; padding: 2px; border: 1px solid rgba(70, 45, 20, 0.2);
+  border-radius: 7px; background: #fff; cursor: pointer;
+}
+.flow-fcolors__hex { font-family: var(--font-mono); font-size: 12px; color: #574b39; }
+.flow-fcolors__hex--default { font-family: inherit; font-style: italic; color: #8a7f6f; }
+.flow-fcolors__reset {
+  margin-left: auto; padding: 4px 10px; border: none; border-radius: 7px;
+  background: none; color: #8a7f6f; font-family: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: background 0.14s ease, color 0.14s ease;
+}
+.flow-fcolors__reset:hover { background: rgba(70, 45, 20, 0.08); color: #2a2118; }
+.flow-fcolors__err { display: flex; align-items: flex-start; gap: 6px; margin: 2px 0 8px; font-size: 12.5px; color: #b23b2e; }
+html.gh-light .flow-shell .flow-fcolors__label { color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-fcolors__swatch { border-color: var(--fl-line-2); }
+html.gh-light .flow-shell .flow-fcolors__hex { color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-fcolors__hex--default { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-fcolors__reset { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-fcolors__reset:hover { background: var(--fl-hover); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-fcolors__err { color: oklch(0.47 0.16 25); }
+
 /* Flow-snapshots dialog (reuses the .flow-rtcal paper card): take a labeled
    snapshot up top, then an accordion of frozen outlines below. */
 .flow-snaps { width: min(620px, 100%); }
@@ -5674,15 +5724,14 @@ html.gh-light .flow-shell .flow-dock .flow-share__row { background: var(--fl-pap
 /* ---- Outline (Flow grid) chrome — text stays Calibri, frame goes neutral ---- */
 /* Alternating indent levels: neutral ink + slate, not coral / blue. Kept in sync
    with FLOW_DEPTH_COLORS so a copied flow pastes in the same two tones. */
-html.gh-light .flow-shell .flow-node--c0 { border-left-color: #1f202466; }
+html.gh-light .flow-shell .flow-node--c0 { border-left-color: var(--fn-c0-rail, #1f202466); }
 html.gh-light .flow-shell .flow-node--c0 .flow-node__label,
-html.gh-light .flow-shell .flow-node--c0 .flow-node__text { color: #1f2024; }
-html.gh-light .flow-shell .flow-node--c1 { border-left-color: #6a71808c; }
+html.gh-light .flow-shell .flow-node--c0 .flow-node__text { color: var(--fn-c0, #1f2024); }
+html.gh-light .flow-shell .flow-node--c1 { border-left-color: var(--fn-c1-rail, #6a71808c); }
 html.gh-light .flow-shell .flow-node--c1 .flow-node__label,
-html.gh-light .flow-shell .flow-node--c1 .flow-node__text { color: #6a7180; }
+html.gh-light .flow-shell .flow-node--c1 .flow-node__text { color: var(--fn-c1, #6a7180); }
 html.gh-light .flow-shell .flow-outline__add { color: var(--fl-soft); border-color: var(--fl-line-2); background: var(--fl-hover); }
 html.gh-light .flow-shell .flow-outline__add:hover { background: oklch(0.2 0 0 / 0.08); border-color: var(--fl-line-2); }
-html.gh-light .flow-shell .flow-outline__bar-hint { color: var(--fl-muted); }
 html.gh-light .flow-shell .flow-sendedit__outline { border-right-color: var(--fl-line); }
 
 /* ---- Slash autocomplete ---- */
