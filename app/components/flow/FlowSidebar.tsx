@@ -5,7 +5,8 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { parseFlowHeadings } from "@/lib/docxImport";
 import { useConfirm } from "@/app/components/flow/ConfirmProvider";
-import { FolderPlus, ChevronRight, ChevronDown, Upload, AlertTriangle, X } from "lucide-react";
+import { FolderPlus, ChevronRight, ChevronDown, Upload, AlertTriangle, X, ShieldCheck } from "lucide-react";
+import { isFlowMaster } from "@/lib/flowAccess";
 import { type Flow, type FlowFolder } from "@/app/flow/shared";
 
 // Left rail: lists the user's flows (owned + shared), organized into folders,
@@ -19,6 +20,7 @@ export default function FlowSidebar() {
   const confirm = useConfirm();
   const activeId = (params?.id as string) ?? "";
   const [userId, setUserId] = useState("");
+  const [userEmail, setUserEmail] = useState("");
   const [flows, setFlows] = useState<Flow[]>([]);
   const [folders, setFolders] = useState<FlowFolder[]>([]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -43,6 +45,7 @@ export default function FlowSidebar() {
       const uid = session.user.id;
       if (!active) return;
       setUserId(uid);
+      setUserEmail(session.user.email ?? "");
 
       const [{ data: owned }, { data: shared }, { data: folderData }] = await Promise.all([
         supabase.from("flows").select("*").eq("owner_id", uid),
@@ -304,6 +307,11 @@ export default function FlowSidebar() {
       <button className="flow-rail__import" onClick={() => fileRef.current?.click()} disabled={creating}>
         <Upload size={14} /> Import .docx
       </button>
+      {isFlowMaster(userEmail) && (
+        <button className="flow-rail__import" onClick={() => router.push("/flow/admin")} title="Manage flow access and browse every account">
+          <ShieldCheck size={14} /> Admin
+        </button>
+      )}
       <input
         ref={fileRef}
         type="file"

@@ -640,7 +640,15 @@ export default function FlowWorkspace() {
     if (!flow) return;
     let active = true;
     (async () => {
-      const base = supabase.from("flows").select("id, title, folder_id").order("created_at", { ascending: true });
+      // Scoped to this flow's owner explicitly — the master account's RLS can see
+      // every row, so "folder_id is null" alone would tab-bar everyone's loose
+      // flows. Owner-scoping also keeps the tabs coherent when the master browses
+      // someone else's flow: they see that person's flows, not a global mix.
+      const base = supabase
+        .from("flows")
+        .select("id, title, folder_id")
+        .eq("owner_id", flow.owner_id)
+        .order("created_at", { ascending: true });
       const { data } = await (flow.folder_id ? base.eq("folder_id", flow.folder_id) : base.is("folder_id", null));
       if (active && data) setSiblings(data as Sibling[]);
     })();
@@ -954,7 +962,10 @@ export default function FlowWorkspace() {
 
       {showSnaps && <FlowSnapshots flowId={flowId} onClose={() => setShowSnaps(false)} />}
 
-      {/* Persistent shortcut legend — quick-navigate hints, like the reference. */}
+      {/* Persistent shortcut legend — quick-navigate hints, like the reference.
+          Solo pane only: in a split the left pane's bottom corner is real content
+          (and its slash dropdown), so the legend would sit on top of it. */}
+      {panes.length === 1 && (
       <ul className="flow-legend" aria-hidden>
         <li><kbd>⇧⇧</kbd> palette</li>
         <li><kbd>?</kbd> shortcuts</li>
@@ -964,6 +975,7 @@ export default function FlowWorkspace() {
         <li><kbd>⇧ ↑↓</kbd> move point</li>
         <li><kbd>⇥</kbd> indent</li>
       </ul>
+      )}
 
       {cutUndo && (
         <div className="flow-undo" role="status">

@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { isFlowAllowed } from "@/lib/flowAccess";
+import { checkFlowAccess } from "@/lib/flowAccess";
 
-// Gates the whole /flow subtree to allow-listed emails during testing.
+// Gates the whole /flow subtree to allow-listed emails during testing. The list
+// lives in the flow_access table (managed from /flow/admin), with the static
+// list in lib/flowAccess.ts as a fallback.
 export default function FlowGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [allowed, setAllowed] = useState<boolean | null>(null);
@@ -16,7 +18,9 @@ export default function FlowGate({ children }: { children: React.ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!active) return;
       if (!session) { router.push("/login"); return; }
-      if (isFlowAllowed(session.user.email)) { setAllowed(true); return; }
+      const ok = await checkFlowAccess(session.user.email);
+      if (!active) return;
+      if (ok) { setAllowed(true); return; }
       router.push("/dashboard");
     })();
     return () => { active = false; };

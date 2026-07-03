@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { isFlowAllowed } from "@/lib/flowAccess";
+import { isFlowAllowed, checkFlowAccess } from "@/lib/flowAccess";
 import SceneToggle from "./SceneToggle";
 import CursorToggle from "./CursorToggle";
 
@@ -36,7 +36,10 @@ export default function TopNav() {
     async function load() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { if (active) { setElo(null); setUsername(""); setFlowOk(false); } return; }
+      // Paint the link immediately off the static list, then settle on the
+      // live flow_access answer (grants made from /flow/admin show up too).
       if (active) setFlowOk(isFlowAllowed(session.user.email));
+      checkFlowAccess(session.user.email).then((ok) => { if (active) setFlowOk(ok); });
       const { data } = await supabase
         .from("profiles")
         .select("username, elo")
