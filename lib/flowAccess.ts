@@ -9,6 +9,7 @@ export const FLOW_ALLOWED_EMAILS: string[] = [
   "ethanisebbin@gmail.com",
   "28shangl@abschools.org",
   "melamnirmal@gmail.com",
+  "christopherlawrence1022@gmail.com",
 ];
 
 export function isFlowAllowed(email: string | null | undefined): boolean {
