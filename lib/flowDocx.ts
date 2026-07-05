@@ -7,7 +7,7 @@
 // exactly — highlights, colors, fonts, sizes, and alignment all survive.
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 import { htmlToDocxParagraphs } from "@/lib/sendDocExport";
-import { nodeLabel, type FlowCell } from "@/app/flow/shared";
+import { outlineLabels, isHeadingCell, headingTitle, type FlowCell } from "@/app/flow/shared";
 
 // Half-point sizes (docx unit). BODY is the base; bump it to scale everything.
 const BODY = 26;            // 13pt body / outline / speech
@@ -30,16 +30,22 @@ const DEPTH_HEX = ["1f2024", "6a7180"]; // matches the on-screen --c0 / --c1 lev
 function outlineToParagraphs(cells: FlowCell[]): Paragraph[] {
   const ordered = [...cells].sort((a, b) => a.row_index - b.row_index);
   if (!ordered.length) return [new Paragraph({ children: [new TextRun({ text: "(no points)", italics: true, color: "888888" })] })];
-  const counters: number[] = [];
+  const labels = outlineLabels(ordered);
   return ordered.map((cell) => {
-    counters[cell.depth] = (counters[cell.depth] || 0) + 1;
-    counters.length = cell.depth + 1; // reset deeper counters under a new parent
+    // Section headings ("# " points): bold, a touch larger, unnumbered.
+    if (isHeadingCell(cell.content)) {
+      return new Paragraph({
+        indent: { left: cell.depth * 360 },
+        spacing: { before: 160, after: 60 },
+        children: [new TextRun({ text: headingTitle(cell.content) || "(untitled heading)", bold: true, size: BODY + 4, color: DEPTH_HEX[0] })],
+      });
+    }
     const color = DEPTH_HEX[cell.depth % 2];
     return new Paragraph({
       indent: { left: cell.depth * 360 }, // 360 twips = 0.25" per level
       spacing: { after: 40 },
       children: [
-        new TextRun({ text: `${nodeLabel(counters[cell.depth], cell.depth)} `, bold: true, color }),
+        new TextRun({ text: `${labels.get(cell.id) ?? ""} `, bold: true, color }),
         new TextRun({ text: cell.content || "", color, highlight: cell.highlighted ? "yellow" : undefined }),
       ],
     });

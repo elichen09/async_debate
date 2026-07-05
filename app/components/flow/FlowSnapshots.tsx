@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Camera, ChevronDown, ChevronRight, Copy, Trash2, Check } from "lucide-react";
 import { listSnaps, takeSnap, deleteSnap, type FlowSnap } from "@/lib/flowSnaps";
-import { FLOW_DEPTH_COLORS, nodeLabel } from "@/app/flow/shared";
+import { FLOW_DEPTH_COLORS, outlineLabels, isHeadingCell, headingTitle } from "@/app/flow/shared";
 
 // When in the round it was taken: time for today's snapshots, date + time after.
 function fmtWhen(at: number): string {
@@ -47,15 +47,15 @@ export default function FlowSnapshots({ flowId, onClose }: { flowId: string; onC
   async function copySnap(s: FlowSnap) {
     const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const min = Math.min(...s.cells.map((c) => c.depth));
-    const counters: number[] = [];
-    const lines = s.cells.map((c) => {
-      counters[c.depth] = (counters[c.depth] || 0) + 1;
-      counters.length = c.depth + 1;
-      return { c, line: `${nodeLabel(counters[c.depth], c.depth)} ${c.content}`.trim() };
-    });
+    const labels = outlineLabels(s.cells);
+    const lines = s.cells.map((c) => ({ c, line: `${labels.get(c.id) ?? ""} ${c.content}`.trim() }));
     const text = lines.map(({ c, line }) => "\t".repeat(c.depth - min) + line).join("\n");
+    // Headings copy bold with the "# " stripped (the plain text keeps the raw
+    // "# " so pasting back into a flow re-creates the heading).
     const html = lines
-      .map(({ c, line }) => `<div style="margin-left:${(c.depth - min) * 24}px;color:${FLOW_DEPTH_COLORS[c.depth % 2]}">${esc(line) || "<br>"}</div>`)
+      .map(({ c, line }) => isHeadingCell(c.content)
+        ? `<div style="margin-left:${(c.depth - min) * 24}px;color:${FLOW_DEPTH_COLORS[0]};font-weight:700;font-size:1.15em">${esc(headingTitle(c.content)) || "<br>"}</div>`
+        : `<div style="margin-left:${(c.depth - min) * 24}px;color:${FLOW_DEPTH_COLORS[c.depth % 2]}">${esc(line) || "<br>"}</div>`)
       .join("");
     try {
       await navigator.clipboard.write([
@@ -123,13 +123,18 @@ export default function FlowSnapshots({ flowId, onClose }: { flowId: string; onC
                 {open === s.id && (
                   <div className="flow-snaps__preview">
                     {(() => {
-                      const counters: number[] = [];
+                      const labels = outlineLabels(s.cells);
                       return s.cells.map((c) => {
-                        counters[c.depth] = (counters[c.depth] || 0) + 1;
-                        counters.length = c.depth + 1;
+                        if (isHeadingCell(c.content)) {
+                          return (
+                            <div key={c.id} className="flow-snaps__pt" style={{ marginLeft: c.depth * 18, color: FLOW_DEPTH_COLORS[0], fontWeight: 700 }}>
+                              <span>{headingTitle(c.content) || "(untitled heading)"}</span>
+                            </div>
+                          );
+                        }
                         return (
                           <div key={c.id} className="flow-snaps__pt" style={{ marginLeft: c.depth * 18, color: FLOW_DEPTH_COLORS[c.depth % 2] }}>
-                            <span className="flow-snaps__num">{nodeLabel(counters[c.depth], c.depth)}</span>
+                            <span className="flow-snaps__num">{labels.get(c.id)}</span>
                             <span className={c.highlighted ? "flow-snaps__hl" : undefined}>{c.content || "(empty)"}</span>
                           </div>
                         );

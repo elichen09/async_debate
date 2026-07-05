@@ -3804,6 +3804,64 @@ html.gh-light .flow-addflow { background: oklch(0.12 0.04 232 / 0.06); border-co
 /* The native drop-down popup is white, so force readable dark options/labels. */
 .flow-addflow option, .flow-addflow optgroup { color: #15171c; background: #fff; font-weight: 600; }
 
+/* ---- Outline navigator: the flow's "# " section headings, clickable, in the
+   left gutter beside the (solo) Flow pane. Clicking one scrolls the flow to
+   that section; the section in view stays lit (scroll-spy). An OVERLAY on the
+   gutter — absolutely positioned so appearing/disappearing never shifts the
+   centered flow pane — hidden when the window is too narrow to leave a gutter
+   (the toolbar's Outline dropdown covers those cases, and splits). ---- */
+.flow-toc {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 228px;
+  z-index: 5;
+  overflow-y: auto;
+  padding: 24px 10px 190px 16px;   /* deep bottom pad keeps the last items clear of the fixed shortcut legend */
+  font-family: var(--font-calibri);
+  scrollbar-width: thin;
+}
+.flow-toc__title {
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 0 10px 8px;
+}
+.flow-toc__item {
+  display: block;
+  width: 100%;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.62);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+.flow-toc__item:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.flow-toc__item.is-active { background: rgba(255, 255, 255, 0.1); color: #fff; font-weight: 600; }
+html.gh-light .flow-shell .flow-toc__title { color: var(--fl-muted); }
+html.gh-light .flow-shell .flow-toc__item { color: var(--fl-soft); }
+html.gh-light .flow-shell .flow-toc__item:hover { background: var(--fl-hover); color: var(--fl-ink); }
+html.gh-light .flow-shell .flow-toc__item.is-active { background: var(--fl-hover); color: var(--fl-ink); font-weight: 700; }
+/* Below this the overlay would reach the centered 880px pane ((w−880)/2 < 228). */
+@media (max-width: 1340px) { .flow-toc { display: none; } }
+
+/* The toolbar's Outline dropdown: a scrollable jump list of the headings. */
+.flow-menu--toc { max-height: 320px; overflow-y: auto; scrollbar-width: thin; }
+.flow-menu__toctext { flex: 1; min-width: 0; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* ---- Outline — nested debate flow (1./a./i. levels, alternating colors) ---- */
 /* The Flow tab renders in Calibri (debaters' house font); children inherit it. */
 .flow-outline { max-width: 920px; padding: 4px 4px 80px; font-family: var(--font-calibri); }
@@ -3943,6 +4001,14 @@ html.gh-light .flow-shell .flow-menu__hint { color: var(--fl-muted); }
 .flow-node--c1 { border-left-color: var(--fn-c1-rail, #6f9beaaa); }
 .flow-node--c1 .flow-node__label, .flow-node--c1 .flow-node__text { color: var(--fn-c1, #9cc3ff); }
 
+/* Section headings ("# " points): big, bold, neutral ink — they read as
+   structure, not argument, so they skip the alternating depth colors and the
+   rail. Numbering restarts after each one; they feed the outline navigator. */
+.flow-node--head { border-left-color: transparent; margin-top: 12px; }
+.flow-node--head .flow-node__text { font-size: 22px; font-weight: 700; letter-spacing: 0.005em; color: rgba(255, 255, 255, 0.95); }
+/* Navigator jumps land the point just under the top edge of the pane. */
+.flow-node__text { scroll-margin-top: 26px; }
+
 /* Highlighter */
 .flow-node--hl .flow-node__text {
   background: oklch(0.87 0.16 95);
@@ -3971,6 +4037,7 @@ html.gh-light .flow-node__fold { color: var(--muted); }
 .flow-node__statustag { flex-shrink: 0; align-self: center; font-size: 10px; font-weight: 700; color: #fff; padding: 1px 6px; border-radius: 3px; line-height: 1.4; }
 .flow-node__btn.is-flag { color: #fff; background: #ef6f6f; border-color: #ef6f6f; }
 .flow-node__btn.is-ext { color: #fff; background: #3a9d6f; border-color: #3a9d6f; }
+.flow-node__btn.is-head { color: #fff; background: #565b64; border-color: #565b64; }
 .flow-node__statussel {
   height: 22px;
   font-size: 11px;
@@ -5730,6 +5797,8 @@ html.gh-light .flow-shell .flow-node--c0 .flow-node__text { color: var(--fn-c0, 
 html.gh-light .flow-shell .flow-node--c1 { border-left-color: var(--fn-c1-rail, #6a71808c); }
 html.gh-light .flow-shell .flow-node--c1 .flow-node__label,
 html.gh-light .flow-shell .flow-node--c1 .flow-node__text { color: var(--fn-c1, #6a7180); }
+html.gh-light .flow-shell .flow-node--head { border-left-color: transparent; }
+html.gh-light .flow-shell .flow-node--head .flow-node__text { color: var(--fl-ink); }
 html.gh-light .flow-shell .flow-outline__add { color: var(--fl-soft); border-color: var(--fl-line-2); background: var(--fl-hover); }
 html.gh-light .flow-shell .flow-outline__add:hover { background: oklch(0.2 0 0 / 0.08); border-color: var(--fl-line-2); }
 html.gh-light .flow-shell .flow-sendedit__outline { border-right-color: var(--fl-line); }

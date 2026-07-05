@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { enqueueInsert, enqueueUpdate, enqueueDelete } from "@/lib/flowSync";
@@ -18,7 +18,7 @@ import FlowShortcuts from "@/app/components/flow/FlowShortcuts";
 import FlowPalette, { type PaletteCommand } from "@/app/components/flow/FlowPalette";
 import SyncStatus from "@/app/components/flow/SyncStatus";
 import { Columns2, Ellipsis, X } from "lucide-react";
-import type { EditorInsert, Flow, FlowSnippet, FlowCell, SlashOption } from "@/app/flow/shared";
+import type { EditorInsert, Flow, FlowSnippet, FlowCell, FlowTocItem, SlashOption } from "@/app/flow/shared";
 
 const SNIP_SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
 type Sibling = { id: string; title: string; folder_id: string | null; side: "aff" | "neg" | null };
@@ -223,6 +223,14 @@ export default function FlowWorkspace() {
   const [sendHtml, setSendHtml] = useState("");
   const [sendVersion, setSendVersion] = useState(0);
   const [siblings, setSiblings] = useState<Sibling[]>([]);
+  // Outline navigator: the flow's "# " headings (reported by the solo FlowGrid),
+  // the one the viewport is in, and the grid's registered jump-to-point function.
+  const [tocItems, setTocItems] = useState<FlowTocItem[]>([]);
+  const [tocActive, setTocActive] = useState<string | null>(null);
+  const tocJump = useRef<((id: string) => void) | null>(null);
+  const handleTocItems = useCallback((items: FlowTocItem[]) => setTocItems(items), []);
+  const handleTocActive = useCallback((id: string | null) => setTocActive(id), []);
+  const registerTocJump = useCallback((fn: ((id: string) => void) | null) => { tocJump.current = fn; }, []);
 
   // The App Router reuses this component when navigating between flows in the same
   // route, so reset the split back to a single pane for the new flow.
@@ -826,6 +834,11 @@ export default function FlowWorkspace() {
     );
   }
 
+  // The outline navigator needs the solo Flow pane (it lives in the margin the
+  // centered pane leaves free); only that pane's grid feeds it.
+  const soloFlow = panes.length === 1 && panes[0].view === "flow";
+  const tocMinDepth = tocItems.length ? Math.min(...tocItems.map((h) => h.depth)) : 0;
+
   // Everything reachable from the command palette (Ctrl/Cmd+K): views, splits,
   // tools, and a jump to any other flow in this folder.
   const paletteCommands: PaletteCommand[] = [
@@ -853,6 +866,10 @@ export default function FlowWorkspace() {
     ...siblings.flatMap((s) => s.id === flowId ? [] : [{
       trigger: `flow ${s.title}`, label: `Open flow: ${s.title}`, group: "Flows", run: () => router.push(`/flow/${s.id}`),
     }]),
+    // Jump straight to a section heading in the flow (mirrors the outline panel).
+    ...(soloFlow ? tocItems.map((h) => ({
+      trigger: `heading section jump ${h.text}`, label: `Jump to: ${h.text || "Untitled heading"}`, group: "Outline", run: () => tocJump.current?.(h.id),
+    })) : []),
   ];
 
   return (
@@ -899,6 +916,27 @@ export default function FlowWorkspace() {
       {showTimers && <FlowTimers flowId={flowId} onState={setTimerSnap} registerControls={registerTimerControls} />}
 
       <div className="flow-work__body">
+        {/* Outline navigator: the flow's "# " headings, clickable, overlaid on
+            the grey gutter the centered solo pane leaves free (an overlay, so
+            appearing never shifts the flow). Hidden in splits and with the dock
+            open (no gutter) and on narrow screens (CSS) — the toolbar's Outline
+            dropdown covers those. */}
+        {soloFlow && !dock && tocItems.length > 0 && (
+          <nav className="flow-toc" aria-label="Flow outline">
+            <div className="flow-toc__title">Outline</div>
+            {tocItems.map((h) => (
+              <button
+                key={h.id}
+                className={`flow-toc__item ${tocActive === h.id ? "is-active" : ""}`}
+                style={{ paddingLeft: 10 + Math.min(h.depth - tocMinDepth, 4) * 12 }}
+                onClick={() => tocJump.current?.(h.id)}
+                title={h.text || "Untitled heading"}
+              >
+                {h.text || "Untitled"}
+              </button>
+            ))}
+          </nav>
+        )}
         <div className="flow-work__panes">
           {panes.map((pane, i) => {
             const title =
@@ -926,7 +964,7 @@ export default function FlowWorkspace() {
                 )}
                 <div className="flow-pane__body">
                   {pane.view === "flow" && (
-                    <FlowGrid flowId={pane.flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} onReorder={onReorder} depthColors={paneInk(pane.flowId)} />
+                    <FlowGrid flowId={pane.flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} onReorder={onReorder} depthColors={paneInk(pane.flowId)} onTocItems={soloFlow ? handleTocItems : undefined} onTocActive={soloFlow ? handleTocActive : undefined} registerTocJump={soloFlow ? registerTocJump : undefined} />
                   )}
                   {pane.view === "speech" && (
                     <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} userId={userId} userName={userName} />
@@ -1051,6 +1089,7 @@ export default function FlowWorkspace() {
         <li><kbd>⌃F</kbd> find</li>
         <li><kbd>⇧ ↑↓</kbd> move point</li>
         <li><kbd>⇥</kbd> indent</li>
+        <li><kbd># ␣</kbd> heading</li>
       </ul>
       )}
 

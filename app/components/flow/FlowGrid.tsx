@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { fuzzyRank } from "@/lib/fuzzy";
-import { GripVertical, ChevronRight, ChevronDown, Flag, ArrowRight, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2, EyeOff, Eye, Search, Ellipsis, Copy } from "lucide-react";
+import { GripVertical, ChevronRight, ChevronDown, Flag, ArrowRight, List, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2, EyeOff, Eye, Search, Ellipsis, Copy, Heading } from "lucide-react";
 import { useConfirm } from "@/app/components/flow/ConfirmProvider";
 import { SlashList } from "@/app/components/flow/SlashMenu";
-import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, nodeLabel, type FlowCell, type EditorInsert, type FlowDragPayload, type SlashOption } from "@/app/flow/shared";
+import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, outlineLabels, isHeadingCell, headingTitle, type FlowCell, type EditorInsert, type FlowDragPayload, type SlashOption, type FlowTocItem } from "@/app/flow/shared";
 import { enqueueInsert, enqueueUpdate, enqueueDelete, saveSnapshot, loadSnapshot, applyPending } from "@/lib/flowSync";
 
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -52,6 +52,13 @@ interface FlowGridProps {
   // (depth 1, 3, …) — so an aff flow runs aff/neg/aff and a neg flow the reverse.
   // A null slot (or the whole prop) falls back to the theme's default color.
   depthColors?: [string | null, string | null] | null;
+  // The flow's section headings ("# " points), for the workspace's outline
+  // navigator. Called (debounced) whenever the heading set changes.
+  onTocItems?: (items: FlowTocItem[]) => void;
+  // Scroll-spy for the navigator: which heading's section the viewport is in.
+  onTocActive?: (id: string | null) => void;
+  // Registers a "scroll to this point" function the navigator calls on click.
+  registerTocJump?: (fn: ((id: string) => void) | null) => void;
 }
 
 const SEL = "id, flow_id, col, row_index, depth, highlighted, content, status, updated_by, updated_at";
@@ -64,20 +71,6 @@ const INDENT = 26; // px per outline level
 const FLAG_COLOR = "#ef6f6f";
 const EXT_COLOR = "#3a9d6f";
 type StatusMark = "flag" | "extended";
-
-// The on-screen 1./a./i. label for every point, keyed by id — computed over the
-// whole ordered flow, so a copied/dragged subset keeps the numbers it shows in
-// the grid rather than renumbering from 1.
-function labelsFor(list: FlowCell[]): Map<string, string> {
-  const counters: number[] = [];
-  const out = new Map<string, string>();
-  for (const c of list) {
-    counters[c.depth] = (counters[c.depth] || 0) + 1;
-    counters.length = c.depth + 1;
-    out.set(c.id, nodeLabel(counters[c.depth], c.depth));
-  }
-  return out;
-}
 
 // Parse pasted multi-line text into outline points. Leading tabs set each line's
 // depth; purely space-indented text uses its smallest indent step as one level.
@@ -104,7 +97,7 @@ function parseOutline(text: string): { content: string; depth: number }[] {
 // A debate flow as a nested outline: Enter adds a sibling point, Tab indents it
 // into a response, Shift+Tab outdents, and highlighting marks key cards. Numbers
 // and colors alternate by depth. Edits persist on blur and stream via Realtime.
-export default function FlowGrid({ flowId, userId, userName = "Partner", registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints, onReorder, depthColors = null }: FlowGridProps) {
+export default function FlowGrid({ flowId, userId, userName = "Partner", registerInsert, registerAddPoints, resolveSlashPoints, onSlashBlock, onCellsDeleted, slashOptions = [], onSendPoints, onReorder, depthColors = null, onTocItems, onTocActive, registerTocJump }: FlowGridProps) {
   const confirm = useConfirm();
   // The two alternating depth colors this flow writes into copies/drags (and,
   // when custom, paints via the --fn-* vars). Per-slot fallback to the defaults.
@@ -115,6 +108,17 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
         ...(depthColors[1] ? { "--fn-c1": depthColors[1], "--fn-c1-rail": `${depthColors[1]}8c` } : {}),
       } as React.CSSProperties)
     : undefined;
+  // One outline line as rich HTML for Copy / cross-pane drag: indented, in its
+  // depth color, led by its 1./a./i. label. Headings render bold with the "# "
+  // stripped (the plain-text flavor keeps the raw "# " so a paste back into a
+  // flow re-creates the heading).
+  const lineHtml = (c: FlowCell, label: string, minDepth: number) => {
+    const indent = (c.depth - minDepth) * 24;
+    if (isHeadingCell(c.content)) {
+      return `<div style="margin-left:${indent}px;color:${depthInk[0]};font-weight:700;font-size:1.15em">${escHtml(headingTitle(c.content)) || "<br>"}</div>`;
+    }
+    return `<div style="margin-left:${indent}px;color:${depthInk[c.depth % 2]}">${escHtml(`${label} ${c.content}`.trim()) || "<br>"}</div>`;
+  };
   // Hydrate instantly from the local snapshot (mounts client-side, after the session
   // loads, so there's no SSR mismatch) — the flow shows even on a cold offline load,
   // before the server fetch reconciles it.
@@ -146,8 +150,9 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // Collapsed subtrees (local view state), status filter, and drag-reorder.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<StatusMark | null>(null);
-  // Which toolbar dropdown is open (the filter chip or the ⋯ overflow menu).
-  const [barMenu, setBarMenu] = useState<"filter" | "more" | null>(null);
+  // Which toolbar dropdown is open (the filter chip, the Outline jump list, or
+  // the ⋯ overflow menu).
+  const [barMenu, setBarMenu] = useState<"filter" | "outline" | "more" | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
   const [dropId, setDropId] = useState<string | null>(null);
   const [extDrop, setExtDrop] = useState(false);   // a point from another pane is hovering this flow
@@ -447,6 +452,78 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flowId]);
 
+  // ── Outline navigator (section headings) ────────────────────────────────────
+  // Jump to a point from the navigator. If it's inside a collapsed / hidden /
+  // filtered part of the outline, reveal it first (expand its ancestors, unhide
+  // it, drop the status filter), then scroll once it has rendered.
+  function jumpToCell(id: string) {
+    const go = () => taRefs.current.get(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (taRefs.current.get(id)) { go(); return; }
+    const list = sorted();
+    const i = list.findIndex((c) => c.id === id);
+    if (i < 0) return;
+    const anc: string[] = [];
+    let d = list[i].depth;
+    for (let j = i - 1; j >= 0 && d > 0; j--) {
+      if (list[j].depth < d) { anc.push(list[j].id); d = list[j].depth; }
+    }
+    setCollapsed((prev) => { const n = new Set(prev); n.delete(id); for (const a of anc) n.delete(a); return n; });
+    setHiddenPts((prev) => { if (!prev.size) return prev; const n = new Set(prev); n.delete(id); for (const a of anc) n.delete(a); return n; });
+    setStatusFilter(null);
+    requestAnimationFrame(() => requestAnimationFrame(go));
+  }
+  useEffect(() => {
+    registerTocJump?.(jumpToCell);
+    return () => registerTocJump?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flowId, registerTocJump]);
+
+  // Report the heading list to the navigator — debounced, since a heading's
+  // title changes on every keystroke. The signature ref starts null so a fresh
+  // grid always reports once, even an empty list (clearing the previous flow's
+  // navigator after a flow switch).
+  const tocSigRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!onTocItems) { tocSigRef.current = null; return; }
+    const items: FlowTocItem[] = [...cells]
+      .sort((a, b) => a.row_index - b.row_index)
+      .filter((c) => isHeadingCell(c.content))
+      .map((c) => ({ id: c.id, text: headingTitle(c.content), depth: c.depth }));
+    const sig = items.map((h) => `${h.id}${h.text}${h.depth}`).join("");
+    if (sig === tocSigRef.current) return;
+    const t = setTimeout(() => { tocSigRef.current = sig; onTocItems(items); }, 150);
+    return () => clearTimeout(t);
+  }, [cells, onTocItems]);
+
+  // Scroll-spy for the navigator: the active heading is the last one at/above
+  // the top of the pane (so the section you're reading stays lit).
+  const tocActiveRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!onTocActive) { tocActiveRef.current = undefined; return; }
+    const scroller = rootRef.current?.closest(".flow-pane__body");
+    if (!scroller) return;
+    let raf = 0;
+    const compute = () => {
+      const heads = [...cellsRef.current].sort((a, b) => a.row_index - b.row_index).filter((c) => isHeadingCell(c.content));
+      let active: string | null = null;
+      if (heads.length) {
+        const top = scroller.getBoundingClientRect().top;
+        active = heads[0].id;
+        for (const h of heads) {
+          const el = taRefs.current.get(h.id);
+          if (!el) continue;
+          if (el.getBoundingClientRect().top - top <= 90) active = h.id;
+          else break;
+        }
+      }
+      if (active !== tocActiveRef.current) { tocActiveRef.current = active; onTocActive(active); }
+    };
+    const onScroll = () => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; compute(); }); };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    compute();
+    return () => { scroller.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, [onTocActive, flowId, cells.length]);
+
   // Enter: new sibling right below, at the same depth.
   function addSibling(cell: FlowCell) {
     const list = sorted();
@@ -481,6 +558,14 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const v = !cell.highlighted;
     setLocal(cell.id, { highlighted: v });
     saveMeta(cell.id, { highlighted: v });
+  }
+
+  // Toggle a point between section heading and normal point by adding/stripping
+  // the "# " prefix (the prefix is the heading's storage — see shared.ts).
+  function toggleHeading(cell: FlowCell) {
+    const v = isHeadingCell(cell.content) ? headingTitle(cell.content) : `# ${cell.content}`;
+    setLocal(cell.id, { content: v });
+    saveContent(cell.id, v);
   }
 
   // Alt+↑/↓ while flowing: move this point (and its whole subtree) past the sibling
@@ -650,17 +735,13 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     // The flow→flow payload stays label-free (the target numbers points itself);
     // the text/HTML flavors carry each point's on-screen 1./a./i. label so a drop
     // into the Speech tab (or another app) keeps the numbering.
-    const labels = labelsFor(sorted());
+    const labels = outlineLabels(sorted());
     const payload: FlowDragPayload = {
       sourceFlowId: flowId,
       points: group.map((c) => ({ content: c.content, depth: c.depth - min, highlighted: c.highlighted, status: c.status ?? null })),
     };
     const text = group.map((c) => "\t".repeat(c.depth - min) + `${labels.get(c.id) ?? ""} ${c.content}`.trim()).join("\n");
-    const html = group.map((c) => {
-      const color = depthInk[c.depth % 2];
-      const indent = (c.depth - min) * 24;
-      return `<div style="margin-left:${indent}px;color:${color}">${escHtml(`${labels.get(c.id) ?? ""} ${c.content}`.trim()) || "<br>"}</div>`;
-    }).join("");
+    const html = group.map((c) => lineHtml(c, labels.get(c.id) ?? "", min)).join("");
     try {
       e.dataTransfer.setData(FLOW_DRAG_MIME, JSON.stringify(payload));
       e.dataTransfer.setData("text/plain", text);
@@ -806,15 +887,9 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const min = Math.min(...chosen.map((c) => c.depth));
     // Each line leads with its on-screen 1./a./i. label (from the full flow, so a
     // copied subset keeps the numbers it shows in the grid).
-    const labels = labelsFor(list);
+    const labels = outlineLabels(list);
     const text = chosen.map((c) => "\t".repeat(c.depth - min) + `${labels.get(c.id) ?? ""} ${c.content}`.trim()).join("\n");
-    const html = chosen
-      .map((c) => {
-        const color = depthInk[c.depth % 2];
-        const indent = (c.depth - min) * 24;
-        return `<div style="margin-left:${indent}px;color:${color}">${escHtml(`${labels.get(c.id) ?? ""} ${c.content}`.trim()) || "<br>"}</div>`;
-      })
-      .join("");
+    const html = chosen.map((c) => lineHtml(c, labels.get(c.id) ?? "", min)).join("");
     try {
       await navigator.clipboard.write([
         new ClipboardItem({
@@ -889,15 +964,21 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
   // Triggers matching what's typed after "/" (dedup, capped) for the dropdown.
   const slashMatches = slash ? (slash.query.trim() ? fuzzyRank(slash.query, slashOptions) : slashOptions).slice(0, 50) : [];
 
-  // Walk the ordered list, tracking a per-depth counter to build 1./a./i. labels.
+  // Walk the ordered list to build the 1./a./i. labels (headings unnumbered,
+  // numbering restarts after them — see outlineLabels).
   const ordered = [...cells].sort((a, b) => a.row_index - b.row_index);
-  const counters: number[] = [];
+  const rowLabels = outlineLabels(ordered);
   const labeled = ordered.map((cell, i) => {
-    counters[cell.depth] = (counters[cell.depth] || 0) + 1;
-    counters.length = cell.depth + 1; // reset deeper counters under a new parent
     const hasKids = i + 1 < ordered.length && ordered[i + 1].depth > cell.depth;
-    return { cell, label: nodeLabel(counters[cell.depth], cell.depth), hasKids };
+    return { cell, label: rowLabels.get(cell.id) ?? "", hasKids };
   });
+
+  // Section headings for the toolbar's Outline dropdown — the way to jump to a
+  // section from anywhere (a split or a narrow window has no gutter navigator).
+  const tocHeads = ordered
+    .filter((c) => isHeadingCell(c.content))
+    .map((c) => ({ id: c.id, text: headingTitle(c.content), depth: c.depth }));
+  const tocMinDepth = tocHeads.length ? Math.min(...tocHeads.map((h) => h.depth)) : 0;
 
   // Hide points inside a collapsed parent, then apply the status filter.
   const hidden = new Set<string>();
@@ -1019,6 +1100,37 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
                   </div>
                 )}
               </div>
+              {tocHeads.length > 0 && (
+                <div className="flow-barmenu">
+                  <button
+                    className={`flow-outline__ctl ${barMenu === "outline" ? "is-open" : ""}`}
+                    onClick={() => setBarMenu((m) => (m === "outline" ? null : "outline"))}
+                    title="Jump to a section heading"
+                    aria-haspopup="menu"
+                    aria-expanded={barMenu === "outline"}
+                  >
+                    <List size={13} /> Outline
+                    <ChevronDown size={12} />
+                  </button>
+                  {barMenu === "outline" && (
+                    <div className="flow-menu flow-menu--toc" role="menu">
+                      <div className="flow-menu__label">Jump to section</div>
+                      {tocHeads.map((h) => (
+                        <button
+                          key={h.id}
+                          className="flow-menu__item"
+                          role="menuitem"
+                          style={{ paddingLeft: 10 + Math.min(h.depth - tocMinDepth, 4) * 12 }}
+                          onClick={() => { setBarMenu(null); jumpToCell(h.id); }}
+                          title={h.text || "Untitled heading"}
+                        >
+                          <span className="flow-menu__toctext">{h.text || "Untitled"}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {hiddenPts.size > 0 && (
                 <button className="flow-outline__ctl" onClick={showHidden} title="Show the points you've hidden">
                   <Eye size={13} /> {hiddenPts.size} hidden
@@ -1083,7 +1195,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       {visible.map(({ cell, label, hasKids }) => (
         <div
           key={cell.id}
-          className={`flow-node flow-node--c${cell.depth % 2} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${cell.status === "extended" ? "flow-node--ext" : ""} ${dropId === cell.id ? "is-drop" : ""} ${dragId === cell.id || (dragId && selected.size > 1 && selected.has(dragId) && selected.has(cell.id)) ? "is-drag" : ""} ${findQ ? (isFindHit(cell) ? "is-findhit" : "is-findmiss") : ""}`}
+          className={`flow-node flow-node--c${cell.depth % 2} ${isHeadingCell(cell.content) ? "flow-node--head" : ""} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${cell.status === "extended" ? "flow-node--ext" : ""} ${dropId === cell.id ? "is-drop" : ""} ${dragId === cell.id || (dragId && selected.size > 1 && selected.has(dragId) && selected.has(cell.id)) ? "is-drag" : ""} ${findQ ? (isFindHit(cell) ? "is-findhit" : "is-findmiss") : ""}`}
           style={{ marginLeft: cell.depth * INDENT, ...(remoteEditors[cell.id]?.length ? { boxShadow: `inset 0 0 0 1.5px ${remoteEditors[cell.id][0].color}` } : cell.status === "flag" ? { boxShadow: `inset 3px 0 0 ${FLAG_COLOR}` } : cell.status === "extended" ? { boxShadow: `inset 3px 0 0 ${EXT_COLOR}` } : {}) }}
           onDragOver={(e) => {
             if (dragId) { if (dragId !== cell.id) { e.preventDefault(); setDropId(cell.id); } }
@@ -1190,6 +1302,16 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
                   runMark(cell, ta.value.replace(/(^|\s)\/ext(end)?\s*$/i, "").trim(), "extended");
                   return;
                 }
+                // "/heading" (or "/head") → turn the line into a section heading
+                // (prefixes "# "), keeping its text. Same as typing "# " yourself.
+                if (/(^|\s)\/head(ing)?\s*$/i.test(ta.value)) {
+                  const base = ta.value.replace(/(^|\s)\/head(ing)?\s*$/i, "").trim();
+                  const v = isHeadingCell(base) ? base : `# ${base}`;
+                  setLocal(cell.id, { content: v });
+                  saveContent(cell.id, v);
+                  setSlash(null);
+                  return;
+                }
                 const m = /^\/(\S+)$/.exec(ta.value.trim());
                 const trigger = m?.[1].toLowerCase();
                 // Slash command: "/topshelf" + Enter inserts the block as responses
@@ -1264,6 +1386,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             <SlashList matches={slashMatches} active={slashActive} onPick={(t) => completeSlash(cell, t)} />
           )}
           <div className="flow-node__tools">
+            <button className={`flow-node__btn ${isHeadingCell(cell.content) ? "is-head" : ""}`} onClick={() => toggleHeading(cell)} title={'Heading — starts a section, shown in the outline sidebar (or type "# " before the text)'} aria-label="Toggle heading"><Heading size={13} /></button>
             <button className={`flow-node__btn ${cell.status === "flag" ? "is-flag" : ""}`} onClick={() => toggleMark(cell, "flag")} title="Flag (or type /flag)" aria-label="Flag"><Flag size={13} /></button>
             <button className={`flow-node__btn ${cell.status === "extended" ? "is-ext" : ""}`} onClick={() => toggleMark(cell, "extended")} title="Mark extended (or type /extend)" aria-label="Mark extended"><ArrowRight size={13} /></button>
             <button className="flow-node__btn flow-node__btn--sub" onClick={() => addChild(cell)} title="Add sub-point inside" aria-label="Add sub-point"><ListPlus size={13} /></button>

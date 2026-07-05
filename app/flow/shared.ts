@@ -132,6 +132,23 @@ export interface FlowDragPayload {
 // Neutral ink + slate to match the monochrome flow theme (and read on white paper).
 export const FLOW_DEPTH_COLORS = ["#1f2024", "#6a7180"];
 
+// ── Heading points ────────────────────────────────────────────────────────────
+// A point whose content starts with "# " is a section heading: shown big and
+// bold, unnumbered (numbering restarts after it), and listed in the outline
+// navigator beside the flow. The "# " prefix IS the storage — plain content —
+// so headings need no schema change and survive copy/paste, cross-pane drags,
+// snapshots, and exports (viewers that don't know about headings just show the
+// literal "# ").
+export const isHeadingCell = (content: string): boolean => /^#\s/.test(content);
+export const headingTitle = (content: string): string => content.replace(/^#\s+/, "").trim();
+
+// One heading in the outline navigator (the clickable panel left of the flow).
+export interface FlowTocItem {
+  id: string;      // the heading cell's id (jump target)
+  text: string;    // its title, "# " stripped
+  depth: number;   // indent level, for nesting in the navigator
+}
+
 // ── Outline numbering (1. / a. / i., cycling by depth) ───────────────────────
 // Shared between the live grid and the snapshot viewer so both number the same way.
 function toAlpha(n: number): string {
@@ -150,4 +167,24 @@ export function nodeLabel(count: number, depth: number): string {
   if (k === 0) return `${count}.`;
   if (k === 1) return `${toAlpha(count)}.`;
   return `${toRoman(count)}.`;
+}
+
+// The 1./a./i. label for every point in an ordered outline, keyed by id.
+// Headings get no label and restart the numbering of everything at their depth
+// and deeper (each section counts from 1 again). Used by the live grid, the
+// snapshot viewer, and the .docx export so all three number identically.
+export function outlineLabels(cells: { id: string; depth: number; content: string }[]): Map<string, string> {
+  const counters: number[] = [];
+  const out = new Map<string, string>();
+  for (const c of cells) {
+    if (isHeadingCell(c.content)) {
+      counters.length = c.depth;
+      out.set(c.id, "");
+      continue;
+    }
+    counters[c.depth] = (counters[c.depth] || 0) + 1;
+    counters.length = c.depth + 1;
+    out.set(c.id, nodeLabel(counters[c.depth], c.depth));
+  }
+  return out;
 }
