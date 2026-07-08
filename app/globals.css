@@ -4129,6 +4129,28 @@ html.gh-light .flow-outline__filter { background: oklch(0.12 0.04 232 / 0.06); c
   flex-shrink: 0;
   background: rgba(255, 255, 255, 0.02);
 }
+/* Float button (installed app): pop the strip into an always-on-top mini window. */
+.flow-timer__float {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  margin-left: auto;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+}
+.flow-timer__float:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+html.gh-light .flow-timer__float { color: var(--muted); }
+html.gh-light .flow-timer__float:hover { background: oklch(0.12 0.04 232 / 0.08); color: var(--ink); }
+/* The floating mini window itself (Document PiP): the strip IS the window. */
+.flow-pipbody { margin: 0; background: #1b1c20; overflow: hidden; }
+html.gh-light .flow-pipbody { background: #f2f0ed; }
+.flow-timers-pip .flow-timers { border: none; padding: 8px 10px; background: transparent; }
 .flow-timer { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; }
 .flow-timer--main { border-color: rgba(255, 255, 255, 0.2); }
 .flow-timer.is-running { border-color: var(--accent); }

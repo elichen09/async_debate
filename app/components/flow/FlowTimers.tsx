@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { Play, Pause, RotateCcw, Minus, Plus } from "lucide-react";
+import { Play, Pause, RotateCcw, Minus, Plus, PictureInPicture2 } from "lucide-react";
 import { loadSpeechSec, saveSpeechSec } from "@/lib/readEstimate";
 
 // A clock counts down `remaining` ms; while running we store an absolute `endsAt`
@@ -43,22 +43,30 @@ function pause(c: Clock): Clock {
 // Which clock a workspace hotkey toggles: the speech clock or a side's prep.
 export type TimerKey = "main" | "pro" | "con";
 
+// The last timer state per flow, kept across unmounts — hiding the strip, or
+// moving it into the floating mini window (a portal move remounts it), must not
+// reset a running clock. Per-tab and per-session; collaborators still converge
+// through the broadcast channel below.
+const stateCache = new Map<string, TState>();
+
 // Shared per-flow speech + prep timers, pinned under the header. State syncs over a
 // Realtime broadcast channel (ephemeral — no schema); a fresh tab requests the
 // current state on join, and we re-render on a local tick to count down smoothly.
 // `registerControls` hands the page a toggle so global hotkeys (Alt+S/P/C) can
-// start/pause a clock without reaching for the mouse.
-export default function FlowTimers({ flowId, onState, registerControls }: {
+// start/pause a clock without reaching for the mouse. `onFloat` (installed app
+// only) renders the pop-out button that floats the strip in a mini window.
+export default function FlowTimers({ flowId, onState, registerControls, onFloat }: {
   flowId: string;
   onState?: (s: TimerSnap) => void;
   registerControls?: (fn: ((k: TimerKey) => void) | null) => void;
+  onFloat?: () => void;
 }) {
-  const [st, setSt] = useState<TState>(initial);
+  const [st, setSt] = useState<TState>(() => stateCache.get(flowId) ?? initial());
   const stRef = useRef(st);
   const chRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const subscribed = useRef(false);
   const [, force] = useState(0);
-  useEffect(() => { stRef.current = st; }, [st]);
+  useEffect(() => { stRef.current = st; stateCache.set(flowId, st); }, [st, flowId]);
   // Surface the speech clock to the page (for the Read-doc pace chip). Fires only
   // when the clock actually changes (commits / collaborator updates), not on ticks.
   useEffect(() => { onState?.({ mainDur: st.mainDur, main: st.main }); }, [st.mainDur, st.main, onState]);
@@ -130,6 +138,11 @@ export default function FlowTimers({ flowId, onState, registerControls }: {
       </div>
       {prep("Pro prep", "pro")}
       {prep("Con prep", "con")}
+      {onFloat && (
+        <button className="flow-timer__float" onClick={onFloat} title="Float the timers in a small always-on-top window" aria-label="Float timers">
+          <PictureInPicture2 size={14} />
+        </button>
+      )}
     </div>
   );
 }

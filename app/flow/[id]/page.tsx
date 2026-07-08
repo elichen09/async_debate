@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { enqueueInsert, enqueueUpdate, enqueueDelete } from "@/lib/flowSync";
@@ -37,6 +38,17 @@ function subscribeDisplayMode(cb: () => void): () => void {
   return () => m.removeEventListener("change", cb);
 }
 const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches;
+
+// Document Picture-in-Picture (Chromium): a small always-on-top window we can
+// render React into — used to float the timer strip above every other window.
+interface DocPiP {
+  requestWindow(opts?: { width?: number; height?: number }): Promise<Window>;
+}
+declare global {
+  interface Window { documentPictureInPicture?: DocPiP }
+}
+const noopSubscribe = () => () => {};
+const hasDocPiP = () => "documentPictureInPicture" in window;
 
 // Remembered workspace layout (which view/panel you left open) so a reload — or
 // switching flows — lands you back where you were instead of always on Flow.
@@ -201,6 +213,42 @@ export default function FlowWorkspace() {
   // the standalone window — a browser tab can already be torn off natively.
   // (false during SSR, so the server HTML never includes the buttons.)
   const isApp = useSyncExternalStore(subscribeDisplayMode, isStandalone, () => false);
+  // Floating timers (installed app): the strip lives in a small always-on-top
+  // Document Picture-in-Picture window instead of under the header. The SAME
+  // component just portals there, so hotkeys, the pace chip, and auto-snapshots
+  // keep working; closing the mini window docks the strip back inline.
+  const canPip = useSyncExternalStore(noopSubscribe, hasDocPiP, () => false);
+  const [pipWin, setPipWin] = useState<Window | null>(null);
+  useEffect(() => () => { pipWin?.close(); }, [pipWin]);
+  async function floatTimers() {
+    const dpip = window.documentPictureInPicture;
+    if (!dpip) return;
+    try {
+      const pip = await dpip.requestWindow({ width: 560, height: 60 });
+      // A fresh PiP document has no styles or theme — copy both from this one.
+      pip.document.documentElement.className = document.documentElement.className;
+      for (const sheet of Array.from(document.styleSheets)) {
+        try {
+          const css = Array.from(sheet.cssRules).map((r) => r.cssText).join("");
+          const style = pip.document.createElement("style");
+          style.textContent = css;
+          pip.document.head.appendChild(style);
+        } catch {
+          // Cross-origin sheet: reference it instead of inlining.
+          if (sheet.href) {
+            const link = pip.document.createElement("link");
+            link.rel = "stylesheet";
+            link.href = sheet.href;
+            pip.document.head.appendChild(link);
+          }
+        }
+      }
+      pip.document.body.className = "flow-pipbody";
+      pip.addEventListener("pagehide", () => setPipWin(null));
+      setPipWin(pip);
+    } catch { /* needs a user gesture, or the browser said no — strip stays inline */ }
+  }
+
   // Views currently living in their own popped-out window. Their tabs don't
   // render here; closing a popup returns its tab (the handles are polled —
   // there's no cross-window close event).
@@ -249,7 +297,11 @@ export default function FlowWorkspace() {
   const [showColors, setShowColors] = useState(false);
   // Toggle helpers that also remember the choice for next time.
   const setDock = (d: DockTab | null) => { setDockState(d); saveUi({ dock: d }); };
-  const setShowTimers = (v: boolean) => { setShowTimersState(v); saveUi({ timers: v }); };
+  const setShowTimers = (v: boolean) => {
+    setShowTimersState(v);
+    saveUi({ timers: v });
+    if (!v) pipWin?.close();   // hiding the timers also docks/closes the float
+  };
   const openMenu = (kind: "split" | "more", e: React.MouseEvent) => {
     // Capture the rect now — the synthetic event's currentTarget is nulled out by
     // the time a state-updater callback runs under automatic batching.
@@ -951,6 +1003,7 @@ export default function FlowWorkspace() {
     ...(popped.has("send") ? [] : [{ trigger: "split add send doc", label: "Split: add Send doc", group: "Split", run: () => addPane("send") }]),
     ...(popped.has("read") ? [] : [{ trigger: "split add read doc", label: "Split: add Read doc", group: "Split", run: () => addPane("read") }]),
     { trigger: "timers clock prep speech", label: showTimers ? "Hide timers" : "Show timers", group: "Tools", run: () => setShowTimers(!showTimers) },
+    ...(isApp && canPip && !pipWin ? [{ trigger: "float timers mini window always on top pip", label: "Float timers", group: "Tools", run: () => { setShowTimersState(true); saveUi({ timers: true }); floatTimers(); } }] : []),
     { trigger: "speech timer start pause toggle clock", label: "Start/pause speech timer", group: "Tools", hint: "⌥S", run: () => toggleTimer("main") },
     { trigger: "pro prep timer start pause", label: "Start/pause Pro prep", group: "Tools", hint: "⌥P", run: () => toggleTimer("pro") },
     { trigger: "con prep timer start pause", label: "Start/pause Con prep", group: "Tools", hint: "⌥C", run: () => toggleTimer("con") },
@@ -1021,7 +1074,15 @@ export default function FlowWorkspace() {
         </div>
       </header>
 
-      {showTimers && <FlowTimers flowId={flowId} onState={setTimerSnap} registerControls={registerTimerControls} />}
+      {showTimers && !pipWin && (
+        <FlowTimers flowId={flowId} onState={setTimerSnap} registerControls={registerTimerControls} onFloat={isApp && canPip ? floatTimers : undefined} />
+      )}
+      {pipWin && createPortal(
+        <div className="flow-shell flow-timers-pip">
+          <FlowTimers flowId={flowId} onState={setTimerSnap} registerControls={registerTimerControls} />
+        </div>,
+        pipWin.document.body,
+      )}
 
       <div className="flow-work__body">
         {/* Outline navigator: the flow's "# " headings, clickable, overlaid on
