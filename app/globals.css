@@ -3762,6 +3762,38 @@ body.flow-work-full .gh-drawer-backdrop,
 body.flow-work-full .flow-nav-hotzone,
 body.flow-work-full .flow-rail { display: none !important; }
 
+/* Installed-app tab pop-out: hovering a view tab reveals a small ↗ that opens
+   that view in its own window (FishFlower only — browser tabs tear off natively). */
+.flow-tabwrap { position: relative; display: inline-flex; }
+.flow-tab__pop {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: #2a2c31;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.flow-tabwrap:hover .flow-tab__pop,
+.flow-tab__pop:focus-visible { opacity: 1; }
+.flow-tab__pop:hover { background: var(--accent); color: var(--accent-ink, #fff); border-color: transparent; }
+html.gh-light .flow-shell .flow-tab__pop { background: #fff; border-color: var(--fl-line-2); color: var(--fl-soft); box-shadow: 0 2px 8px oklch(0.2 0 0 / 0.14); }
+html.gh-light .flow-shell .flow-tab__pop:hover { background: var(--accent); color: var(--accent-ink); border-color: transparent; }
+
+/* A popped-out pane window: the whole window is one view. */
+.flow-work--pane { padding: 0; }
+.flow-pane__body--pop { flex: 1; padding: 14px 18px 60px; }
+
 /* Split view: side-by-side panes, each independently scrollable. */
 .flow-work__panes { flex: 1; min-width: 0; display: flex; min-height: 0; overflow-x: auto; }
 .flow-pane {

@@ -1,7 +1,7 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { enqueueInsert, enqueueUpdate, enqueueDelete } from "@/lib/flowSync";
 import { blockToHtml, cardHtml } from "@/lib/richText";
@@ -17,7 +17,7 @@ import FlowDock from "@/app/components/flow/FlowDock";
 import FlowShortcuts from "@/app/components/flow/FlowShortcuts";
 import FlowPalette, { type PaletteCommand } from "@/app/components/flow/FlowPalette";
 import SyncStatus from "@/app/components/flow/SyncStatus";
-import { Columns2, Ellipsis, X } from "lucide-react";
+import { Columns2, Ellipsis, SquareArrowOutUpRight, X } from "lucide-react";
 import type { EditorInsert, Flow, FlowSnippet, FlowCell, FlowTocItem, SlashOption } from "@/app/flow/shared";
 
 const SNIP_SEL = "id, owner_id, label, body, points, shortcut, parent_id, created_at";
@@ -26,6 +26,17 @@ type FolderInk = { fid: string; aff: string | null; neg: string | null };
 type ViewKind = "flow" | "speech" | "send" | "read";
 type DockTab = "extensions" | "share";
 type Pane = { key: string; view: ViewKind; flowId: string };
+const VIEW_LABELS: Record<ViewKind, string> = { flow: "Flow", speech: "Speech", send: "Send doc", read: "Read doc" };
+const isViewKind = (v: string | null): v is ViewKind => v === "flow" || v === "speech" || v === "send" || v === "read";
+
+// Are we running as the installed app (standalone display mode)? Subscribed via
+// useSyncExternalStore so it also tracks moving a tab between browser and app.
+function subscribeDisplayMode(cb: () => void): () => void {
+  const m = window.matchMedia("(display-mode: standalone)");
+  m.addEventListener("change", cb);
+  return () => m.removeEventListener("change", cb);
+}
+const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches;
 
 // Remembered workspace layout (which view/panel you left open) so a reload — or
 // switching flows — lands you back where you were instead of always on Flow.
@@ -180,6 +191,16 @@ export default function FlowWorkspace() {
   const router = useRouter();
   const { id } = useParams();
   const flowId = id as string;
+  // "?pane=speech" renders this window as ONE full-bleed view — the popped-out
+  // window a tab's ↗ button opens in the installed app. No header/tabs/timers;
+  // Realtime keeps it in sync with the main window (same machinery partners use).
+  const search = useSearchParams();
+  const paneParam = search.get("pane");
+  const paneView: ViewKind | null = isViewKind(paneParam) ? paneParam : null;
+  // Installed-app detection (FishFlower): the pop-out affordance only shows in
+  // the standalone window — a browser tab can already be torn off natively.
+  // (false during SSR, so the server HTML never includes the buttons.)
+  const isApp = useSyncExternalStore(subscribeDisplayMode, isStandalone, () => false);
 
   const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("Partner");
@@ -269,19 +290,27 @@ export default function FlowWorkspace() {
   // split survives reloads and follows you across flows. Any time it's an actual
   // split (≥2 panes) we also stash it as the remembered split a tab can rebuild.
   // Widths come from the ref (latest committed) so resizing rewrites on drag end.
+  // A popped-out pane window never writes — it must not overwrite the saved layout.
   useEffect(() => {
+    if (paneView) return;
     const specs = panes.map((p) => ({ view: p.view, flowId: p.flowId }));
     const widths = panes.map((p) => flexesRef.current[p.key] ?? 1);
     const patch: Partial<SavedUi> = { layout: specs, layoutFlow: flowId, widths };
     if (panes.length >= 2) { patch.split = specs; patch.splitWidths = widths; patch.splitFlow = flowId; }
     saveUi(patch);
-  }, [panes, flowId]);
+  }, [panes, flowId, paneView]);
 
-  // Fullscreen workspace: hide the site nav/rail so panes fill the whole screen.
+  // Fullscreen workspace (and popped-out pane windows): hide the site nav/rail
+  // so the work surface fills the whole screen/window.
   useEffect(() => {
-    document.body.classList.toggle("flow-work-full", fullscreen);
+    document.body.classList.toggle("flow-work-full", fullscreen || !!paneView);
     return () => document.body.classList.remove("flow-work-full");
-  }, [fullscreen]);
+  }, [fullscreen, paneView]);
+
+  // A popped-out window is titled by what it shows, e.g. "Blocks — Speech".
+  useEffect(() => {
+    if (paneView && flow) document.title = `${flow.title} — ${VIEW_LABELS[paneView]}`;
+  }, [paneView, flow]);
 
   // Clear the pending undo/toast timers if the workspace unmounts.
   useEffect(() => () => {
@@ -308,6 +337,7 @@ export default function FlowWorkspace() {
     const c = timerSnap?.main;
     if (!c?.running || c.endsAt == null) return;
     const endsAt = c.endsAt;
+    // eslint-disable-next-line react-hooks/purity -- reading the clock to schedule a one-shot timer is effect work, not render logic
     const wait = endsAt - Date.now();
     if (wait <= 0) return;
     const t = setTimeout(() => {
@@ -429,6 +459,21 @@ export default function FlowWorkspace() {
     // Explicitly closing down to one pane dismantles the split — forget it so a tab
     // click doesn't resurrect it (tab-navigation collapses keep the memory).
     if (next.length < 2) saveUi({ split: [], splitWidths: [], splitFlow: "" });
+  }
+  // Pop a view out into its own window (installed app only) and switch this
+  // window away from it, so the doc isn't showing twice. The popup is the same
+  // page in "?pane=" mode; reusing the window name refocuses an existing popup
+  // instead of stacking new ones.
+  function popOut(view: ViewKind) {
+    const w = window.open(`/flow/${flowId}?pane=${view}`, `fishflower-${view}-${flowId}`, "popup=yes,width=980,height=800");
+    w?.focus();
+    setFlexes({});
+    setPanes((prev) => {
+      const rest = prev.filter((p) => p.view !== view);
+      if (rest.length) return rest;
+      const fallback: ViewKind = view === "flow" ? "speech" : "flow";
+      return [{ key: `p${paneSeq.current++}`, view: fallback, flowId }];
+    });
   }
   // Drag a divider to stretch/shrink the two panes on either side. Conserves the
   // pair's combined width, so other panes stay put. flex-grow ratios = width ratios
@@ -780,19 +825,20 @@ export default function FlowWorkspace() {
     return snip ? blockToHtml(snip.label, snip.points, snip.body) : null;
   }
 
-  // Alt+←/→ switches between flows in the same folder.
+  // Alt+←/→ switches between flows in the same folder. A popped-out pane window
+  // keeps its "?pane=" mode across the switch (it stays a single-view window).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight") && siblings.length > 1) {
         e.preventDefault();
         const i = siblings.findIndex((f) => f.id === flowId);
         const next = siblings[(i + (e.key === "ArrowRight" ? 1 : -1) + siblings.length) % siblings.length];
-        if (next && next.id !== flowId) router.push(`/flow/${next.id}`);
+        if (next && next.id !== flowId) router.push(`/flow/${next.id}${paneView ? `?pane=${paneView}` : ""}`);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [siblings, flowId, router]);
+  }, [siblings, flowId, router, paneView]);
 
   // "?" opens the keyboard-shortcut overlay (but not while you're typing).
   useEffect(() => {
@@ -830,6 +876,37 @@ export default function FlowWorkspace() {
     return (
       <div className="flow-loading">
         <div className="gh-loading-dots"><span /><span /><span /></div>
+      </div>
+    );
+  }
+
+  // Popped-out pane window: the whole window is this one view, full-bleed —
+  // no header, tabs, timers, dock, or legend. Edits sync with the main window
+  // over the same Realtime channels partners use. (flow-work--full reuses the
+  // fullscreen chrome-hiding; the body class is set in the effect above.)
+  if (paneView) {
+    return (
+      <div className="flow-work flow-work--full flow-work--pane">
+        <div className="flow-pane__body flow-pane__body--pop">
+          {paneView === "flow" && (
+            <FlowGrid flowId={flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} onReorder={onReorder} depthColors={paneInk(flowId)} />
+          )}
+          {paneView === "speech" && (
+            <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} userId={userId} userName={userName} />
+          )}
+          {paneView === "send" && (
+            <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} slashOptions={slashOptions} flowId={flowId} userId={userId} userName={userName} onReorderCards={reorderFlowFromDoc} />
+          )}
+          {paneView === "read" && (
+            <ReadDocView sendHtml={sendHtml} timer={timerSnap} onCutCard={cutReadCard} />
+          )}
+        </div>
+        {cutUndo && (
+          <div className="flow-undo" role="status">
+            <span>{cutUndo.label}</span>
+            <button className="flow-undo__btn" onClick={undoCut}>Undo</button>
+          </div>
+        )}
       </div>
     );
   }
@@ -891,10 +968,17 @@ export default function FlowWorkspace() {
           </div>
         )}
         <div className="flow-work__tabs" role="group" aria-label="View">
-          <button className={`flow-tab ${isViewShown("flow") ? "is-active" : ""}`} onClick={() => setView("flow")}>Flow</button>
-          <button className={`flow-tab ${isViewShown("speech") ? "is-active" : ""}`} onClick={() => setView("speech")}>Speech</button>
-          <button className={`flow-tab ${isViewShown("send") ? "is-active" : ""}`} onClick={() => setView("send")}>Send doc</button>
-          <button className={`flow-tab ${isViewShown("read") ? "is-active" : ""}`} onClick={() => setView("read")}>Read doc</button>
+          {(["flow", "speech", "send", "read"] as ViewKind[]).map((v) => (
+            <span className="flow-tabwrap" key={v}>
+              <button className={`flow-tab ${isViewShown(v) ? "is-active" : ""}`} onClick={() => setView(v)}>{VIEW_LABELS[v]}</button>
+              {/* Installed app only: hover a tab to pop that view into its own window. */}
+              {isApp && (
+                <button className="flow-tab__pop" onClick={() => popOut(v)} title={`Open ${VIEW_LABELS[v]} in its own window`} aria-label={`Pop out ${VIEW_LABELS[v]}`}>
+                  <SquareArrowOutUpRight size={10} />
+                </button>
+              )}
+            </span>
+          ))}
           <button
             className={`flow-tab flow-tab--split ${menu?.kind === "split" ? "is-active" : ""}`}
             onClick={(e) => openMenu("split", e)}
