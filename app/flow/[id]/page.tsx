@@ -201,6 +201,22 @@ export default function FlowWorkspace() {
   // the standalone window — a browser tab can already be torn off natively.
   // (false during SSR, so the server HTML never includes the buttons.)
   const isApp = useSyncExternalStore(subscribeDisplayMode, isStandalone, () => false);
+  // Views currently living in their own popped-out window. Their tabs don't
+  // render here; closing a popup returns its tab (the handles are polled —
+  // there's no cross-window close event).
+  const [popped, setPopped] = useState<Set<ViewKind>>(new Set());
+  const popWindows = useRef<Map<ViewKind, Window>>(new Map());
+  useEffect(() => {
+    if (!popped.size) return;
+    const iv = setInterval(() => {
+      const closed: ViewKind[] = [];
+      for (const [view, w] of popWindows.current) if (w.closed) closed.push(view);
+      if (!closed.length) return;
+      for (const v of closed) popWindows.current.delete(v);
+      setPopped((prev) => { const n = new Set(prev); for (const v of closed) n.delete(v); return n; });
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [popped.size]);
 
   const [userId, setUserId] = useState("");
   const [userName, setUserName] = useState("Partner");
@@ -460,18 +476,23 @@ export default function FlowWorkspace() {
     // click doesn't resurrect it (tab-navigation collapses keep the memory).
     if (next.length < 2) saveUi({ split: [], splitWidths: [], splitFlow: "" });
   }
-  // Pop a view out into its own window (installed app only) and switch this
-  // window away from it, so the doc isn't showing twice. The popup is the same
-  // page in "?pane=" mode; reusing the window name refocuses an existing popup
-  // instead of stacking new ones.
+  // Pop a view out into its own window (installed app only). This window stops
+  // rendering that view entirely — its tab disappears until the popup closes —
+  // so the doc is never showing twice. The popup is the same page in "?pane="
+  // mode; reusing the window name refocuses an existing popup over stacking.
   function popOut(view: ViewKind) {
     const w = window.open(`/flow/${flowId}?pane=${view}`, `fishflower-${view}-${flowId}`, "popup=yes,width=980,height=800");
-    w?.focus();
+    if (!w) return;   // popup blocked — keep the tab
+    w.focus();
+    popWindows.current.set(view, w);
+    const nextPopped = new Set(popped).add(view);
+    setPopped(nextPopped);
     setFlexes({});
     setPanes((prev) => {
       const rest = prev.filter((p) => p.view !== view);
       if (rest.length) return rest;
-      const fallback: ViewKind = view === "flow" ? "speech" : "flow";
+      // Land on a view that isn't itself popped out (or flow, if all four are).
+      const fallback = (["flow", "speech", "send", "read"] as ViewKind[]).find((v) => !nextPopped.has(v)) ?? "flow";
       return [{ key: `p${paneSeq.current++}`, view: fallback, flowId }];
     });
   }
@@ -917,16 +938,18 @@ export default function FlowWorkspace() {
   const tocMinDepth = tocItems.length ? Math.min(...tocItems.map((h) => h.depth)) : 0;
 
   // Everything reachable from the command palette (Ctrl/Cmd+K): views, splits,
-  // tools, and a jump to any other flow in this folder.
+  // tools, and a jump to any other flow in this folder. Views living in a
+  // popped-out window are omitted — this window doesn't render them.
+  const inWindowViews = (["flow", "speech", "send", "read"] as ViewKind[]).filter((v) => !popped.has(v));
   const paletteCommands: PaletteCommand[] = [
-    { trigger: "flow outline points", label: "Go to Flow", group: "View", run: () => setView("flow") },
-    { trigger: "speech write", label: "Go to Speech", group: "View", run: () => setView("speech") },
-    { trigger: "send doc cards", label: "Go to Send doc", group: "View", run: () => setView("send") },
-    { trigger: "read doc speech ready", label: "Go to Read doc", group: "View", run: () => setView("read") },
-    { trigger: "split add flow", label: "Split: add Flow", group: "Split", run: () => addPane("flow") },
-    { trigger: "split add speech", label: "Split: add Speech", group: "Split", run: () => addPane("speech") },
-    { trigger: "split add send doc", label: "Split: add Send doc", group: "Split", run: () => addPane("send") },
-    { trigger: "split add read doc", label: "Split: add Read doc", group: "Split", run: () => addPane("read") },
+    ...(popped.has("flow") ? [] : [{ trigger: "flow outline points", label: "Go to Flow", group: "View", run: () => setView("flow") }]),
+    ...(popped.has("speech") ? [] : [{ trigger: "speech write", label: "Go to Speech", group: "View", run: () => setView("speech") }]),
+    ...(popped.has("send") ? [] : [{ trigger: "send doc cards", label: "Go to Send doc", group: "View", run: () => setView("send") }]),
+    ...(popped.has("read") ? [] : [{ trigger: "read doc speech ready", label: "Go to Read doc", group: "View", run: () => setView("read") }]),
+    ...(popped.has("flow") ? [] : [{ trigger: "split add flow", label: "Split: add Flow", group: "Split", run: () => addPane("flow") }]),
+    ...(popped.has("speech") ? [] : [{ trigger: "split add speech", label: "Split: add Speech", group: "Split", run: () => addPane("speech") }]),
+    ...(popped.has("send") ? [] : [{ trigger: "split add send doc", label: "Split: add Send doc", group: "Split", run: () => addPane("send") }]),
+    ...(popped.has("read") ? [] : [{ trigger: "split add read doc", label: "Split: add Read doc", group: "Split", run: () => addPane("read") }]),
     { trigger: "timers clock prep speech", label: showTimers ? "Hide timers" : "Show timers", group: "Tools", run: () => setShowTimers(!showTimers) },
     { trigger: "speech timer start pause toggle clock", label: "Start/pause speech timer", group: "Tools", hint: "⌥S", run: () => toggleTimer("main") },
     { trigger: "pro prep timer start pause", label: "Start/pause Pro prep", group: "Tools", hint: "⌥P", run: () => toggleTimer("pro") },
@@ -968,7 +991,8 @@ export default function FlowWorkspace() {
           </div>
         )}
         <div className="flow-work__tabs" role="group" aria-label="View">
-          {(["flow", "speech", "send", "read"] as ViewKind[]).map((v) => (
+          {/* A popped-out view's tab doesn't render — it's back when its window closes. */}
+          {(["flow", "speech", "send", "read"] as ViewKind[]).filter((v) => !popped.has(v)).map((v) => (
             <span className="flow-tabwrap" key={v}>
               <button className={`flow-tab ${isViewShown(v) ? "is-active" : ""}`} onClick={() => setView(v)}>{VIEW_LABELS[v]}</button>
               {/* Installed app only: hover a tab to pop that view into its own window. */}
@@ -1094,10 +1118,10 @@ export default function FlowWorkspace() {
             {menu.kind === "split" ? (
               <>
                 <div className="flow-menu__label">Add view</div>
-                <button className="flow-menu__item" role="menuitem" onClick={() => { addPane("flow"); setMenu(null); }}>Flow</button>
-                <button className="flow-menu__item" role="menuitem" onClick={() => { addPane("speech"); setMenu(null); }}>Speech</button>
-                <button className="flow-menu__item" role="menuitem" onClick={() => { addPane("send"); setMenu(null); }}>Send doc</button>
-                <button className="flow-menu__item" role="menuitem" onClick={() => { addPane("read"); setMenu(null); }}>Read doc</button>
+                {/* Views living in a popped-out window can't be added here too. */}
+                {inWindowViews.map((v) => (
+                  <button key={v} className="flow-menu__item" role="menuitem" onClick={() => { addPane(v); setMenu(null); }}>{VIEW_LABELS[v]}</button>
+                ))}
                 {siblings.filter((s) => !panes.some((p) => p.view === "flow" && p.flowId === s.id)).length > 0 && (
                   <>
                     <div className="flow-menu__label">Add flow</div>
