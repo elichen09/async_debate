@@ -4147,10 +4147,24 @@ html.gh-light .flow-outline__filter { background: oklch(0.12 0.04 232 / 0.06); c
 .flow-timer__float:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 html.gh-light .flow-timer__float { color: var(--muted); }
 html.gh-light .flow-timer__float:hover { background: oklch(0.12 0.04 232 / 0.08); color: var(--ink); }
-/* The floating mini window itself (Document PiP): the strip IS the window. */
+/* The floating always-on-top window (Document PiP). One per app: it holds the
+   timer strip or a single popped-out view. */
 .flow-pipbody { margin: 0; background: #1b1c20; overflow: hidden; }
 html.gh-light .flow-pipbody { background: #f2f0ed; }
-.flow-timers-pip .flow-timers { border: none; padding: 8px 10px; background: transparent; }
+.flow-pip { height: 100vh; display: flex; flex-direction: column; }
+
+/* Floating timers: one clock per row — label left, big time right, controls at
+   the end — sized to breathe in the small window and stretch as it resizes. */
+.flow-pip--timers { padding: 10px; }
+.flow-pip--timers .flow-timers { flex: 1; min-height: 0; flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 8px; padding: 0; border: none; background: transparent; }
+.flow-pip--timers .flow-timer { flex: 1; display: flex; align-items: center; gap: 8px; padding: 4px 12px; }
+.flow-pip--timers .flow-timer__label { flex: 1; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.flow-pip--timers .flow-timer__time { font-size: 23px; min-width: 76px; text-align: right; }
+.flow-pip--timers .flow-timer--main .flow-timer__time { font-size: 27px; }
+.flow-pip--timers .flow-timer__btn, .flow-pip--timers .flow-timer__adj { width: 28px; height: 26px; border-radius: 7px; }
+
+/* A floating view: the whole window is the view, scrolling inside. */
+.flow-pip--pane .flow-pane__body--pop { min-height: 0; }
 .flow-timer { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; }
 .flow-timer--main { border-color: rgba(255, 255, 255, 0.2); }
 .flow-timer.is-running { border-color: var(--accent); }

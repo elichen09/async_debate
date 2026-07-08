@@ -26,6 +26,8 @@ type Sibling = { id: string; title: string; folder_id: string | null; side: "aff
 type FolderInk = { fid: string; aff: string | null; neg: string | null };
 type ViewKind = "flow" | "speech" | "send" | "read";
 type DockTab = "extensions" | "share";
+// What the single floating (Document PiP) window holds: the timers or a view.
+type PipKind = "timers" | ViewKind;
 type Pane = { key: string; view: ViewKind; flowId: string };
 const VIEW_LABELS: Record<ViewKind, string> = { flow: "Flow", speech: "Speech", send: "Send doc", read: "Read doc" };
 const isViewKind = (v: string | null): v is ViewKind => v === "flow" || v === "speech" || v === "send" || v === "read";
@@ -213,41 +215,52 @@ export default function FlowWorkspace() {
   // the standalone window — a browser tab can already be torn off natively.
   // (false during SSR, so the server HTML never includes the buttons.)
   const isApp = useSyncExternalStore(subscribeDisplayMode, isStandalone, () => false);
-  // Floating timers (installed app): the strip lives in a small always-on-top
-  // Document Picture-in-Picture window instead of under the header. The SAME
-  // component just portals there, so hotkeys, the pace chip, and auto-snapshots
-  // keep working; closing the mini window docks the strip back inline.
+  // The one floating always-on-top window (the platform allows a single
+  // Document Picture-in-Picture window per app). It holds either the timer
+  // strip or ONE popped-out view — opening a new float replaces the old one,
+  // which docks back. The content is portaled from THIS React tree, so
+  // hotkeys, Realtime sync, the pace chip, and auto-snapshots keep working.
   const canPip = useSyncExternalStore(noopSubscribe, hasDocPiP, () => false);
-  const [pipWin, setPipWin] = useState<Window | null>(null);
-  useEffect(() => () => { pipWin?.close(); }, [pipWin]);
-  async function floatTimers() {
+  const [pip, setPip] = useState<{ kind: PipKind; win: Window } | null>(null);
+  useEffect(() => () => { pip?.win.close(); }, [pip]);
+  // The view currently floating (if any) — its tab is hidden in this window.
+  const pipView: ViewKind | null = pip && pip.kind !== "timers" ? pip.kind : null;
+  async function openPip(kind: PipKind): Promise<boolean> {
     const dpip = window.documentPictureInPicture;
-    if (!dpip) return;
+    if (!dpip) return false;
     try {
-      const pip = await dpip.requestWindow({ width: 560, height: 60 });
+      const win = await dpip.requestWindow(
+        kind === "timers" ? { width: 330, height: 190 } : { width: 860, height: 660 },
+      );
       // A fresh PiP document has no styles or theme — copy both from this one.
-      pip.document.documentElement.className = document.documentElement.className;
+      win.document.documentElement.className = document.documentElement.className;
       for (const sheet of Array.from(document.styleSheets)) {
         try {
           const css = Array.from(sheet.cssRules).map((r) => r.cssText).join("");
-          const style = pip.document.createElement("style");
+          const style = win.document.createElement("style");
           style.textContent = css;
-          pip.document.head.appendChild(style);
+          win.document.head.appendChild(style);
         } catch {
           // Cross-origin sheet: reference it instead of inlining.
           if (sheet.href) {
-            const link = pip.document.createElement("link");
+            const link = win.document.createElement("link");
             link.rel = "stylesheet";
             link.href = sheet.href;
-            pip.document.head.appendChild(link);
+            win.document.head.appendChild(link);
           }
         }
       }
-      pip.document.body.className = "flow-pipbody";
-      pip.addEventListener("pagehide", () => setPipWin(null));
-      setPipWin(pip);
-    } catch { /* needs a user gesture, or the browser said no — strip stays inline */ }
+      win.document.body.className = "flow-pipbody";
+      // Guarded by window identity: when a new float replaces this one, the old
+      // window's pagehide must not clear the just-set state.
+      win.addEventListener("pagehide", () => setPip((p) => (p && p.win === win ? null : p)));
+      setPip({ kind, win });
+      return true;
+    } catch {
+      return false; // needs a user gesture, or the browser said no
+    }
   }
+  const floatTimers = () => { void openPip("timers"); };
 
   // Views currently living in their own popped-out window. Their tabs don't
   // render here; closing a popup returns its tab (the handles are polled —
@@ -300,7 +313,7 @@ export default function FlowWorkspace() {
   const setShowTimers = (v: boolean) => {
     setShowTimersState(v);
     saveUi({ timers: v });
-    if (!v) pipWin?.close();   // hiding the timers also docks/closes the float
+    if (!v && pip?.kind === "timers") pip.win.close();   // hiding the timers also closes their float
   };
   const openMenu = (kind: "split" | "more", e: React.MouseEvent) => {
     // Capture the rect now — the synthetic event's currentTarget is nulled out by
@@ -528,23 +541,28 @@ export default function FlowWorkspace() {
     // click doesn't resurrect it (tab-navigation collapses keep the memory).
     if (next.length < 2) saveUi({ split: [], splitWidths: [], splitFlow: "" });
   }
-  // Pop a view out into its own window (installed app only). This window stops
-  // rendering that view entirely — its tab disappears until the popup closes —
-  // so the doc is never showing twice. The popup is the same page in "?pane="
-  // mode; reusing the window name refocuses an existing popup over stacking.
-  function popOut(view: ViewKind) {
-    const w = window.open(`/flow/${flowId}?pane=${view}`, `fishflower-${view}-${flowId}`, "popup=yes,width=980,height=800");
-    if (!w) return;   // popup blocked — keep the tab
-    w.focus();
-    popWindows.current.set(view, w);
-    const nextPopped = new Set(popped).add(view);
-    setPopped(nextPopped);
+  // Pop a view out (installed app only): into the floating always-on-top PiP
+  // window when the engine supports it (replacing whatever floated before —
+  // one float per app), else a plain popup via the "?pane=" route. Either way
+  // this window stops rendering the view — its tab disappears until the
+  // float/popup closes — so the doc is never showing twice.
+  async function popOut(view: ViewKind) {
+    if (canPip) {
+      if (!(await openPip(view))) return;
+    } else {
+      const w = window.open(`/flow/${flowId}?pane=${view}`, `fishflower-${view}-${flowId}`, "popup=yes,width=980,height=800");
+      if (!w) return;   // popup blocked — keep the tab
+      w.focus();
+      popWindows.current.set(view, w);
+      setPopped((prev) => new Set(prev).add(view));
+    }
+    const gone = new Set(popped).add(view);
     setFlexes({});
     setPanes((prev) => {
       const rest = prev.filter((p) => p.view !== view);
       if (rest.length) return rest;
       // Land on a view that isn't itself popped out (or flow, if all four are).
-      const fallback = (["flow", "speech", "send", "read"] as ViewKind[]).find((v) => !nextPopped.has(v)) ?? "flow";
+      const fallback = (["flow", "speech", "send", "read"] as ViewKind[]).find((v) => !gone.has(v)) ?? "flow";
       return [{ key: `p${paneSeq.current++}`, view: fallback, flowId }];
     });
   }
@@ -992,18 +1010,21 @@ export default function FlowWorkspace() {
   // Everything reachable from the command palette (Ctrl/Cmd+K): views, splits,
   // tools, and a jump to any other flow in this folder. Views living in a
   // popped-out window are omitted — this window doesn't render them.
-  const inWindowViews = (["flow", "speech", "send", "read"] as ViewKind[]).filter((v) => !popped.has(v));
+  // A view is "out" when it lives in another window — a fallback popup (popped)
+  // or the floating PiP window (pipView). Out views render nowhere in here.
+  const isOut = (v: ViewKind) => popped.has(v) || v === pipView;
+  const inWindowViews = (["flow", "speech", "send", "read"] as ViewKind[]).filter((v) => !isOut(v));
   const paletteCommands: PaletteCommand[] = [
-    ...(popped.has("flow") ? [] : [{ trigger: "flow outline points", label: "Go to Flow", group: "View", run: () => setView("flow") }]),
-    ...(popped.has("speech") ? [] : [{ trigger: "speech write", label: "Go to Speech", group: "View", run: () => setView("speech") }]),
-    ...(popped.has("send") ? [] : [{ trigger: "send doc cards", label: "Go to Send doc", group: "View", run: () => setView("send") }]),
-    ...(popped.has("read") ? [] : [{ trigger: "read doc speech ready", label: "Go to Read doc", group: "View", run: () => setView("read") }]),
-    ...(popped.has("flow") ? [] : [{ trigger: "split add flow", label: "Split: add Flow", group: "Split", run: () => addPane("flow") }]),
-    ...(popped.has("speech") ? [] : [{ trigger: "split add speech", label: "Split: add Speech", group: "Split", run: () => addPane("speech") }]),
-    ...(popped.has("send") ? [] : [{ trigger: "split add send doc", label: "Split: add Send doc", group: "Split", run: () => addPane("send") }]),
-    ...(popped.has("read") ? [] : [{ trigger: "split add read doc", label: "Split: add Read doc", group: "Split", run: () => addPane("read") }]),
+    ...(isOut("flow") ? [] : [{ trigger: "flow outline points", label: "Go to Flow", group: "View", run: () => setView("flow") }]),
+    ...(isOut("speech") ? [] : [{ trigger: "speech write", label: "Go to Speech", group: "View", run: () => setView("speech") }]),
+    ...(isOut("send") ? [] : [{ trigger: "send doc cards", label: "Go to Send doc", group: "View", run: () => setView("send") }]),
+    ...(isOut("read") ? [] : [{ trigger: "read doc speech ready", label: "Go to Read doc", group: "View", run: () => setView("read") }]),
+    ...(isOut("flow") ? [] : [{ trigger: "split add flow", label: "Split: add Flow", group: "Split", run: () => addPane("flow") }]),
+    ...(isOut("speech") ? [] : [{ trigger: "split add speech", label: "Split: add Speech", group: "Split", run: () => addPane("speech") }]),
+    ...(isOut("send") ? [] : [{ trigger: "split add send doc", label: "Split: add Send doc", group: "Split", run: () => addPane("send") }]),
+    ...(isOut("read") ? [] : [{ trigger: "split add read doc", label: "Split: add Read doc", group: "Split", run: () => addPane("read") }]),
     { trigger: "timers clock prep speech", label: showTimers ? "Hide timers" : "Show timers", group: "Tools", run: () => setShowTimers(!showTimers) },
-    ...(isApp && canPip && !pipWin ? [{ trigger: "float timers mini window always on top pip", label: "Float timers", group: "Tools", run: () => { setShowTimersState(true); saveUi({ timers: true }); floatTimers(); } }] : []),
+    ...(isApp && canPip && pip?.kind !== "timers" ? [{ trigger: "float timers mini window always on top pip", label: "Float timers", group: "Tools", run: () => { setShowTimersState(true); saveUi({ timers: true }); floatTimers(); } }] : []),
     { trigger: "speech timer start pause toggle clock", label: "Start/pause speech timer", group: "Tools", hint: "⌥S", run: () => toggleTimer("main") },
     { trigger: "pro prep timer start pause", label: "Start/pause Pro prep", group: "Tools", hint: "⌥P", run: () => toggleTimer("pro") },
     { trigger: "con prep timer start pause", label: "Start/pause Con prep", group: "Tools", hint: "⌥C", run: () => toggleTimer("con") },
@@ -1045,7 +1066,7 @@ export default function FlowWorkspace() {
         )}
         <div className="flow-work__tabs" role="group" aria-label="View">
           {/* A popped-out view's tab doesn't render — it's back when its window closes. */}
-          {(["flow", "speech", "send", "read"] as ViewKind[]).filter((v) => !popped.has(v)).map((v) => (
+          {inWindowViews.map((v) => (
             <span className="flow-tabwrap" key={v}>
               <button className={`flow-tab ${isViewShown(v) ? "is-active" : ""}`} onClick={() => setView(v)}>{VIEW_LABELS[v]}</button>
               {/* Installed app only: hover a tab to pop that view into its own window. */}
@@ -1074,14 +1095,35 @@ export default function FlowWorkspace() {
         </div>
       </header>
 
-      {showTimers && !pipWin && (
+      {showTimers && pip?.kind !== "timers" && (
         <FlowTimers flowId={flowId} onState={setTimerSnap} registerControls={registerTimerControls} onFloat={isApp && canPip ? floatTimers : undefined} />
       )}
-      {pipWin && createPortal(
-        <div className="flow-shell flow-timers-pip">
-          <FlowTimers flowId={flowId} onState={setTimerSnap} registerControls={registerTimerControls} />
-        </div>,
-        pipWin.document.body,
+      {/* The floating always-on-top window: the timer strip, or one popped-out
+          view — same live components, portaled across. */}
+      {pip && createPortal(
+        pip.kind === "timers" ? (
+          <div className="flow-shell flow-pip flow-pip--timers">
+            <FlowTimers flowId={flowId} onState={setTimerSnap} registerControls={registerTimerControls} />
+          </div>
+        ) : (
+          <div className="flow-shell flow-pip flow-pip--pane">
+            <div className="flow-pane__body flow-pane__body--pop">
+              {pip.kind === "flow" && (
+                <FlowGrid flowId={flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} onReorder={onReorder} depthColors={paneInk(flowId)} />
+              )}
+              {pip.kind === "speech" && (
+                <FlowSpeech flowId={flowId} initialBody={flow.speech_body} registerInsert={registerInsert} resolveSlashText={resolveSlashText} slashOptions={slashOptions} userId={userId} userName={userName} />
+              )}
+              {pip.kind === "send" && (
+                <SendDoc html={sendHtml} version={sendVersion} onChange={handleSendChange} resolveSlashHtml={resolveSlashHtml} slashOptions={slashOptions} flowId={flowId} userId={userId} userName={userName} onReorderCards={reorderFlowFromDoc} />
+              )}
+              {pip.kind === "read" && (
+                <ReadDocView sendHtml={sendHtml} timer={timerSnap} onCutCard={cutReadCard} />
+              )}
+            </div>
+          </div>
+        ),
+        pip.win.document.body,
       )}
 
       <div className="flow-work__body">
