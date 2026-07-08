@@ -3417,6 +3417,20 @@ html.gh-light [style*="background: rgba(255, 255, 255"] { background-color: oklc
 /* The site's vertical nav rail stays hidden here; expose the ☰ menu instead so
    the full nav drawer is reachable on desktop too. */
 html.flow-route .gh-siderail { display: none; }
+
+/* Running as the installed FishFlower app (standalone PWA): the app is ONLY
+   the flow. Hide the site's top bar — and with it the ☰ drawer, the one route
+   out to the rest of the site — and reclaim its 44px strip so the flow fills
+   the window edge to edge. Scoped to flow pages; the /login detour (out of the
+   app's scope, shown with browser UI) keeps its normal chrome. */
+@media all and (display-mode: standalone) {
+  html.flow-route .gh-topnav { display: none; }
+  html.flow-route .db-main { padding-top: 0; }
+  html.flow-route .flow-nav-hotzone,
+  html.flow-route .flow-rail,
+  html.flow-route .flow-dock,
+  html.flow-route .flow-snip { top: 0; }
+}
 /* Full-bleed workspace: the rail is hidden here, so reclaim the side padding
    .db-main reserves for it (otherwise a dead strip sits on the right). */
 html.flow-route .db-main { padding-left: 0 !important; padding-right: 0 !important; }
