@@ -1,0 +1,16 @@
+{
+  "name": "FishFlower",
+  "short_name": "FishFlower",
+  "description": "Debate flowing — a fast, offline-friendly outline flow with timers, extensions, and speech docs.",
+  "id": "/flow",
+  "start_url": "/flow",
+  "scope": "/flow",
+  "display": "standalone",
+  "background_color": "#f2f0ed",
+  "theme_color": "#f2f0ed",
+  "icons": [
+    { "src": "/flow-icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/flow-icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/flow-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
