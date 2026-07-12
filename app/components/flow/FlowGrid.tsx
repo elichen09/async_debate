@@ -3,10 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { fuzzyRank } from "@/lib/fuzzy";
-import { GripVertical, ChevronRight, ChevronDown, Flag, ArrowRight, List, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2, EyeOff, Eye, Search, Ellipsis, Copy, Heading } from "lucide-react";
+import { GripVertical, ChevronRight, ChevronDown, Flag, ArrowRight, List, ListPlus, IndentDecrease, IndentIncrease, Highlighter, AlertTriangle, X, Trash2, EyeOff, Eye, Search, Ellipsis, Copy, Heading, Paintbrush } from "lucide-react";
 import { useConfirm } from "@/app/components/flow/ConfirmProvider";
 import { SlashList } from "@/app/components/flow/SlashMenu";
-import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, outlineLabels, isHeadingCell, headingTitle, type FlowCell, type EditorInsert, type FlowDragPayload, type SlashOption, type FlowTocItem } from "@/app/flow/shared";
+import { FLOW_DRAG_MIME, FLOW_DEPTH_COLORS, outlineLabels, isHeadingCell, headingTitle, cellInk, type FlowCell, type EditorInsert, type FlowDragPayload, type SlashOption, type FlowTocItem } from "@/app/flow/shared";
 import { enqueueInsert, enqueueUpdate, enqueueDelete, saveSnapshot, loadSnapshot, applyPending } from "@/lib/flowSync";
 
 const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -61,7 +61,7 @@ interface FlowGridProps {
   registerTocJump?: (fn: ((id: string) => void) | null) => void;
 }
 
-const SEL = "id, flow_id, col, row_index, depth, highlighted, content, status, updated_by, updated_at";
+const SEL = "id, flow_id, col, row_index, depth, highlighted, content, status, ink, updated_by, updated_at";
 const INDENT = 26; // px per outline level
 
 // The two status marks a point can carry (one at a time). Flag = "needs a
@@ -117,7 +117,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     if (isHeadingCell(c.content)) {
       return `<div style="margin-left:${indent}px;color:${depthInk[0]};font-weight:700;font-size:1.15em">${escHtml(headingTitle(c.content)) || "<br>"}</div>`;
     }
-    return `<div style="margin-left:${indent}px;color:${depthInk[c.depth % 2]}">${escHtml(`${label} ${c.content}`.trim()) || "<br>"}</div>`;
+    return `<div style="margin-left:${indent}px;color:${depthInk[cellInk(c)]}">${escHtml(`${label} ${c.content}`.trim()) || "<br>"}</div>`;
   };
   // Hydrate instantly from the local snapshot (mounts client-side, after the session
   // loads, so there's no SSR mismatch) — the flow shows even on a cold offline load,
@@ -374,13 +374,26 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       for (const [cid, c] of batch) saveContent(cid, c);
     }, 250);
   }
-  function saveMeta(id: string, patch: { depth?: number; highlighted?: boolean; status?: string | null }) {
+  function saveMeta(id: string, patch: { depth?: number; highlighted?: boolean; status?: string | null; ink?: number | null }) {
     enqueueUpdate("flow_cells", id, { ...patch, updated_by: userId, updated_at: new Date().toISOString() });
   }
 
   function setStatus(id: string, status: string | null) {
     setLocal(id, { status });
     saveMeta(id, { status });
+  }
+
+  // Cycle a point's manual color: automatic (by depth) → pin color 1 → pin
+  // color 2 → back to automatic. With a multi-selection containing the point,
+  // every selected point gets the same pin — so a block flips together. The
+  // selection is kept, so pressing again keeps cycling the whole group.
+  function cycleInk(cell: FlowCell) {
+    const next = cell.ink == null ? 0 : cell.ink === 0 ? 1 : null;
+    const ids = selected.has(cell.id) ? [...selected] : [cell.id];
+    for (const id of ids) {
+      setLocal(id, { ink: next });
+      saveMeta(id, { ink: next });
+    }
   }
   // A point's id plus all of its deeper descendants (the subtree under it).
   function subtreeIds(id: string): string[] {
@@ -405,7 +418,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const id = crypto.randomUUID();
     const cell: FlowCell = {
       id, flow_id: flowId, col: 0, row_index: row, depth,
-      highlighted: false, content, status: null,
+      highlighted: false, content, status: null, ink: null,
       updated_by: userId, updated_at: new Date().toISOString(),
     };
     if (focus) focusId.current = id;
@@ -738,7 +751,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
     const labels = outlineLabels(sorted());
     const payload: FlowDragPayload = {
       sourceFlowId: flowId,
-      points: group.map((c) => ({ content: c.content, depth: c.depth - min, highlighted: c.highlighted, status: c.status ?? null })),
+      points: group.map((c) => ({ content: c.content, depth: c.depth - min, highlighted: c.highlighted, status: c.status ?? null, ink: c.ink ?? null })),
     };
     const text = group.map((c) => "\t".repeat(c.depth - min) + `${labels.get(c.id) ?? ""} ${c.content}`.trim()).join("\n");
     const html = group.map((c) => lineHtml(c, labels.get(c.id) ?? "", min)).join("");
@@ -778,6 +791,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       content: p.content,
       highlighted: !!p.highlighted,
       status: p.status ?? null,
+      ink: p.ink ?? null,
       updated_by: userId,
       updated_at: new Date().toISOString(),
     }));
@@ -1046,8 +1060,8 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       {loadError && (
         <p className="flow-outline__error">
           <AlertTriangle size={13} /> Couldn’t load the flow: {loadError}. If this mentions “depth”,
-          “highlighted”, or “status”, run the flow_cells migrations in Supabase
-          (flows.sql and flow_cell_status.sql).
+          “highlighted”, “status”, or “ink”, run the flow_cells migrations in Supabase
+          (flows.sql, flow_cell_status.sql, and flow_cell_ink.sql).
         </p>
       )}
       {!loadError && labeled.length === 0 && (
@@ -1195,7 +1209,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
       {visible.map(({ cell, label, hasKids }) => (
         <div
           key={cell.id}
-          className={`flow-node flow-node--c${cell.depth % 2} ${isHeadingCell(cell.content) ? "flow-node--head" : ""} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${cell.status === "extended" ? "flow-node--ext" : ""} ${dropId === cell.id ? "is-drop" : ""} ${dragId === cell.id || (dragId && selected.size > 1 && selected.has(dragId) && selected.has(cell.id)) ? "is-drag" : ""} ${findQ ? (isFindHit(cell) ? "is-findhit" : "is-findmiss") : ""}`}
+          className={`flow-node flow-node--c${cellInk(cell)} ${isHeadingCell(cell.content) ? "flow-node--head" : ""} ${cell.highlighted ? "flow-node--hl" : ""} ${selected.has(cell.id) ? "is-sel" : ""} ${remoteEditors[cell.id]?.length ? "is-remote" : ""} ${cell.status === "flag" ? "flow-node--flag" : ""} ${cell.status === "extended" ? "flow-node--ext" : ""} ${dropId === cell.id ? "is-drop" : ""} ${dragId === cell.id || (dragId && selected.size > 1 && selected.has(dragId) && selected.has(cell.id)) ? "is-drag" : ""} ${findQ ? (isFindHit(cell) ? "is-findhit" : "is-findmiss") : ""}`}
           style={{ marginLeft: cell.depth * INDENT, ...(remoteEditors[cell.id]?.length ? { boxShadow: `inset 0 0 0 1.5px ${remoteEditors[cell.id][0].color}` } : cell.status === "flag" ? { boxShadow: `inset 3px 0 0 ${FLAG_COLOR}` } : cell.status === "extended" ? { boxShadow: `inset 3px 0 0 ${EXT_COLOR}` } : {}) }}
           onDragOver={(e) => {
             if (dragId) { if (dragId !== cell.id) { e.preventDefault(); setDropId(cell.id); } }
@@ -1302,6 +1316,16 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
                   runMark(cell, ta.value.replace(/(^|\s)\/ext(end)?\s*$/i, "").trim(), "extended");
                   return;
                 }
+                // "/color" (or "/ink") → cycle this point's pinned color (and any
+                // selected points with it), strip the command.
+                if (/(^|\s)\/(color|ink)\s*$/i.test(ta.value)) {
+                  const base = ta.value.replace(/(^|\s)\/(color|ink)\s*$/i, "").trim();
+                  setLocal(cell.id, { content: base });
+                  saveContent(cell.id, base);
+                  cycleInk(cell);
+                  setSlash(null);
+                  return;
+                }
                 // "/heading" (or "/head") → turn the line into a section heading
                 // (prefixes "# "), keeping its text. Same as typing "# " yourself.
                 if (/(^|\s)\/head(ing)?\s*$/i.test(ta.value)) {
@@ -1392,6 +1416,7 @@ export default function FlowGrid({ flowId, userId, userName = "Partner", registe
             <button className="flow-node__btn flow-node__btn--sub" onClick={() => addChild(cell)} title="Add sub-point inside" aria-label="Add sub-point"><ListPlus size={13} /></button>
             <button className="flow-node__btn" onClick={() => reIndent(cell, -1)} title="Outdent (Shift+Tab)" aria-label="Outdent"><IndentDecrease size={13} /></button>
             <button className="flow-node__btn" onClick={() => reIndent(cell, 1)} title="Indent (Tab)" aria-label="Indent"><IndentIncrease size={13} /></button>
+            <button className={`flow-node__btn ${cell.ink === 0 ? "is-ink0" : cell.ink === 1 ? "is-ink1" : ""}`} onClick={() => cycleInk(cell)} title="Pin this point's color — auto → color 1 → color 2 (or type /color); applies to the selection too" aria-label="Cycle point color"><Paintbrush size={13} /></button>
             <button className="flow-node__btn" onClick={() => toggleHighlight(cell)} title="Highlight (Ctrl+E)" aria-label="Highlight"><Highlighter size={13} /></button>
             <button className="flow-node__btn" onClick={() => delNode(cell)} title="Delete" aria-label="Delete"><X size={13} /></button>
           </div>

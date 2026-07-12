@@ -47,9 +47,16 @@ export interface FlowCell {
   highlighted: boolean;
   content: string;
   status?: string | null;   // dropped | extended | turn | answered | conceded
+  ink?: number | null;      // manual color override: 0 | 1 pins a side color; null = by depth
   updated_by: string | null;
   updated_at: string;
 }
+
+// Which of the two side colors a point paints in: its manual override when set,
+// else the depth alternation. Shared by the grid, snapshot viewer, and export
+// so a pinned color looks the same everywhere.
+export const cellInk = (c: { ink?: number | null; depth: number }): 0 | 1 =>
+  c.ink === 0 || c.ink === 1 ? c.ink : ((c.depth % 2) as 0 | 1);
 
 // A formatted run/paragraph captured from a .docx so the Send doc can rebuild it
 // with its original highlight / color / font.
@@ -121,6 +128,7 @@ export interface FlowDragPoint {
   depth: number;            // relative to the dragged group (top point = 0)
   highlighted?: boolean;
   status?: string | null;
+  ink?: number | null;      // carried so a pinned color survives the move
 }
 export interface FlowDragPayload {
   sourceFlowId: string;

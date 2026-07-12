@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Camera, ChevronDown, ChevronRight, Copy, Trash2, Check } from "lucide-react";
 import { listSnaps, takeSnap, deleteSnap, type FlowSnap } from "@/lib/flowSnaps";
-import { FLOW_DEPTH_COLORS, outlineLabels, isHeadingCell, headingTitle } from "@/app/flow/shared";
+import { FLOW_DEPTH_COLORS, outlineLabels, isHeadingCell, headingTitle, cellInk } from "@/app/flow/shared";
 
 // When in the round it was taken: time for today's snapshots, date + time after.
 function fmtWhen(at: number): string {
@@ -55,7 +55,7 @@ export default function FlowSnapshots({ flowId, onClose }: { flowId: string; onC
     const html = lines
       .map(({ c, line }) => isHeadingCell(c.content)
         ? `<div style="margin-left:${(c.depth - min) * 24}px;color:${FLOW_DEPTH_COLORS[0]};font-weight:700;font-size:1.15em">${esc(headingTitle(c.content)) || "<br>"}</div>`
-        : `<div style="margin-left:${(c.depth - min) * 24}px;color:${FLOW_DEPTH_COLORS[c.depth % 2]}">${esc(line) || "<br>"}</div>`)
+        : `<div style="margin-left:${(c.depth - min) * 24}px;color:${FLOW_DEPTH_COLORS[cellInk(c)]}">${esc(line) || "<br>"}</div>`)
       .join("");
     try {
       await navigator.clipboard.write([
@@ -133,7 +133,7 @@ export default function FlowSnapshots({ flowId, onClose }: { flowId: string; onC
                           );
                         }
                         return (
-                          <div key={c.id} className="flow-snaps__pt" style={{ marginLeft: c.depth * 18, color: FLOW_DEPTH_COLORS[c.depth % 2] }}>
+                          <div key={c.id} className="flow-snaps__pt" style={{ marginLeft: c.depth * 18, color: FLOW_DEPTH_COLORS[cellInk(c)] }}>
                             <span className="flow-snaps__num">{labels.get(c.id)}</span>
                             <span className={c.highlighted ? "flow-snaps__hl" : undefined}>{c.content || "(empty)"}</span>
                           </div>

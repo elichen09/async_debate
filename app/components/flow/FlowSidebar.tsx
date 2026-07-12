@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { parseFlowHeadings } from "@/lib/docxImport";
+import { listTemplates, deleteTemplate, createFlowFromTemplate, type FlowTemplate } from "@/lib/flowTemplates";
 import { useConfirm } from "@/app/components/flow/ConfirmProvider";
-import { FolderPlus, ChevronRight, ChevronDown, Upload, AlertTriangle, X, ShieldCheck } from "lucide-react";
+import { FolderPlus, ChevronRight, ChevronDown, Upload, AlertTriangle, X, ShieldCheck, LayoutTemplate } from "lucide-react";
 import { isFlowMaster } from "@/lib/flowAccess";
 import { type Flow, type FlowFolder } from "@/app/flow/shared";
 
@@ -29,6 +30,9 @@ export default function FlowSidebar() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  // "From template": the saved-templates list, loaded on first open.
+  const [showTmpls, setShowTmpls] = useState(false);
+  const [templates, setTemplates] = useState<FlowTemplate[] | null>(null);
 
   // Auto-hide the site's vertical nav rail while in the flow workspace.
   useEffect(() => {
@@ -133,6 +137,42 @@ export default function FlowSidebar() {
 
     setCreating(false);
     router.push(`/flow/${flow.id}`);
+  }
+
+  // Open (and lazily load) or close the template list. Reloaded on every open so
+  // a template saved from the workspace shows up without a refresh.
+  async function toggleTemplates() {
+    if (showTmpls) { setShowTmpls(false); return; }
+    setError("");
+    setShowTmpls(true);
+    setTemplates(null);
+    const { templates: list, error: e } = await listTemplates();
+    if (e) { setError(e); setShowTmpls(false); return; }
+    setTemplates(list);
+  }
+
+  async function createFromTemplate(t: FlowTemplate) {
+    if (creating) return;
+    setError("");
+    setCreating(true);
+    const { flowId, error: e } = await createFlowFromTemplate(t);
+    setCreating(false);
+    if (e || !flowId) { setError(e ?? "Could not create flow."); return; }
+    setShowTmpls(false);
+    router.push(`/flow/${flowId}`);
+  }
+
+  async function removeTemplate(t: FlowTemplate) {
+    const ok = await confirm({
+      title: `Delete the “${t.name}” template?`,
+      message: "Flows already created from it keep their points.",
+      confirmLabel: "Delete template",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setTemplates((prev) => (prev ?? []).filter((x) => x.id !== t.id));
+    const e = await deleteTemplate(t.id);
+    if (e) setError(e);
   }
 
   async function createFolder() {
@@ -304,6 +344,33 @@ export default function FlowSidebar() {
         <button className="flow-rail__new" onClick={() => createFlow("aff")} disabled={creating}>+ aff</button>
         <button className="flow-rail__new" onClick={() => createFlow("neg")} disabled={creating}>+ neg</button>
       </div>
+      <button className="flow-rail__import" onClick={toggleTemplates} disabled={creating} aria-expanded={showTmpls}>
+        <LayoutTemplate size={14} /> From template
+      </button>
+      {showTmpls && (
+        <div className="flow-rail__tmpls">
+          {templates === null ? (
+            <p className="flow-rail__tmpl-empty">Loading…</p>
+          ) : templates.length === 0 ? (
+            <p className="flow-rail__tmpl-empty">No templates yet — open a flow and pick “Save as template” from its ⋯ menu.</p>
+          ) : (
+            templates.map((t) => (
+              <div key={t.id} className="flow-rail__item">
+                <button className="flow-rail__link" onClick={() => createFromTemplate(t)} title={`New flow from “${t.name}”`}>
+                  <span className={`flow-rail__dot flow-rail__dot--${t.side ?? "other"}`} />
+                  {t.name}
+                </button>
+                <button
+                  className="flow-icon-btn flow-rail__del"
+                  onClick={(e) => { e.stopPropagation(); removeTemplate(t); }}
+                  title="Delete template"
+                  aria-label="Delete template"
+                ><X size={14} /></button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
       <button className="flow-rail__import" onClick={() => fileRef.current?.click()} disabled={creating}>
         <Upload size={14} /> Import .docx
       </button>

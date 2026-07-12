@@ -7,7 +7,7 @@
 // exactly — highlights, colors, fonts, sizes, and alignment all survive.
 import { Document, Packer, Paragraph, TextRun, AlignmentType } from "docx";
 import { htmlToDocxParagraphs } from "@/lib/sendDocExport";
-import { outlineLabels, isHeadingCell, headingTitle, type FlowCell } from "@/app/flow/shared";
+import { outlineLabels, isHeadingCell, headingTitle, cellInk, type FlowCell } from "@/app/flow/shared";
 
 // Half-point sizes (docx unit). BODY is the base; bump it to scale everything.
 const BODY = 26;            // 13pt body / outline / speech
@@ -40,7 +40,7 @@ function outlineToParagraphs(cells: FlowCell[]): Paragraph[] {
         children: [new TextRun({ text: headingTitle(cell.content) || "(untitled heading)", bold: true, size: BODY + 4, color: DEPTH_HEX[0] })],
       });
     }
-    const color = DEPTH_HEX[cell.depth % 2];
+    const color = DEPTH_HEX[cellInk(cell)];   // honors a manually pinned point color
     return new Paragraph({
       indent: { left: cell.depth * 360 }, // 360 twips = 0.25" per level
       spacing: { after: 40 },

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
+import { getFlowPrefs, getFlowPrefsServer, onFlowPrefs } from "@/lib/flowPrefs";
 
 /* Animated analog film grain for the flow workspace. Replaces the old graph-paper
    ForceGridScene: pins the light palette (the html.gh-light overrides are
@@ -19,6 +20,9 @@ const MAX_ALPHA = 20; // peak speck opacity (0-255); softened further by CSS blu
 
 export default function FlowFilmGrain() {
   const ref = useRef<HTMLCanvasElement>(null);
+  // The grain can be switched off in the workspace tools menu (a per-device view
+  // preference). The palette-pinning effect below still runs — only the canvas goes.
+  const grainOn = useSyncExternalStore(onFlowPrefs, () => getFlowPrefs().grain, () => getFlowPrefsServer().grain);
 
   // Keep the workspace on the light scene, minus the graph paper and particles.
   useEffect(() => {
@@ -81,8 +85,9 @@ export default function FlowFilmGrain() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [grainOn]);   // re-run when the canvas (re)mounts after a toggle
 
+  if (!grainOn) return null;
   return <canvas ref={ref} className="flow-grain" aria-hidden />;
 }
 

@@ -4,7 +4,9 @@ import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStor
 import { createPortal } from "react-dom";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { enqueueInsert, enqueueUpdate, enqueueDelete } from "@/lib/flowSync";
+import { enqueueInsert, enqueueUpdate, enqueueDelete, loadSnapshot } from "@/lib/flowSync";
+import { getFlowPrefs, getFlowPrefsServer, onFlowPrefs, setFlowPrefs, FLOW_FONT_DEFAULT, FLOW_ZOOM_DEFAULT, FLOW_ZOOM_STEP } from "@/lib/flowPrefs";
+import { saveTemplate } from "@/lib/flowTemplates";
 import { blockToHtml, cardHtml } from "@/lib/richText";
 import FlowGrid from "@/app/components/flow/FlowGrid";
 import FlowSpeech from "@/app/components/flow/FlowSpeech";
@@ -302,6 +304,12 @@ export default function FlowWorkspace() {
   const [showSnaps, setShowSnaps] = useState(false);
   const [snapToast, setSnapToast] = useState("");
   const snapToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Per-device view prefs (grain / full width / text size / zoom) — shared with
+  // the layout's grain canvas through the flowPrefs store.
+  const prefs = useSyncExternalStore(onFlowPrefs, getFlowPrefs, getFlowPrefsServer);
+  // "Save as template" dialog: null = closed, else the name being edited.
+  const [tmplName, setTmplName] = useState<string | null>(null);
+  const [tmplBusy, setTmplBusy] = useState(false);
   // Folder-level aff/neg font colors, keyed by the folder they were loaded for
   // (a stale folder's colors simply don't match, so no reset-on-switch needed).
   // colorsOk goes false when the columns are missing (flow_colors.sql not run).
@@ -502,6 +510,43 @@ export default function FlowWorkspace() {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // --- Document zoom (view pref) ---
+  // Ctrl/Cmd +/−/0 and Ctrl+scroll over a pane zoom the documents (like a doc
+  // editor), overriding the browser's page zoom while you're in the workspace.
+  // Handlers read the store directly so the listeners never go stale.
+  const zoomBy = (d: number) => setFlowPrefs({ zoom: getFlowPrefs().zoom + d });   // store clamps
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      if (e.key === "=" || e.key === "+") { e.preventDefault(); zoomBy(FLOW_ZOOM_STEP); }
+      else if (e.key === "-" || e.key === "_") { e.preventDefault(); zoomBy(-FLOW_ZOOM_STEP); }
+      else if (e.key === "0") { e.preventDefault(); setFlowPrefs({ zoom: FLOW_ZOOM_DEFAULT }); }
+    }
+    function onWheel(e: WheelEvent) {
+      if (!e.ctrlKey) return;   // ctrl+scroll / trackpad pinch only
+      if (!(e.target as Element | null)?.closest?.(".flow-pane__body")) return;
+      e.preventDefault();
+      zoomBy(e.deltaY < 0 ? FLOW_ZOOM_STEP : -FLOW_ZOOM_STEP);
+    }
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("wheel", onWheel); };
+  }, []);
+
+  // --- Save this flow's outline as a reusable template ---
+  // Reads the flow's local mirror (same source snapshots use), so it works offline
+  // for the read — the template row itself needs a connection.
+  async function saveTemplateNow(name: string) {
+    if (tmplBusy) return;
+    const cells = loadSnapshot<FlowCell>(flowId) ?? [];
+    if (!cells.length) { setTmplName(null); flashSnapToast("Nothing to save yet — the flow is empty"); return; }
+    setTmplBusy(true);
+    const err = await saveTemplate(name, flow?.side ?? null, cells);
+    setTmplBusy(false);
+    setTmplName(null);
+    flashSnapToast(err ? `Couldn't save template: ${err}` : `Template saved — ${name.trim() || "Template"}`);
+  }
 
   // --- View / split controls ---
   // A tab switches to its view. Clicking it focuses that view — collapsing a split
@@ -977,8 +1022,8 @@ export default function FlowWorkspace() {
   // fullscreen chrome-hiding; the body class is set in the effect above.)
   if (paneView) {
     return (
-      <div className="flow-work flow-work--full flow-work--pane">
-        <div className="flow-pane__body flow-pane__body--pop">
+      <div className={`flow-work flow-work--full flow-work--pane ${prefs.fullWidth ? "flow-work--wide" : ""}`} style={{ "--flow-fs": `${prefs.fontSize}px` } as React.CSSProperties}>
+        <div className="flow-pane__body flow-pane__body--pop" style={{ zoom: prefs.zoom / 100 }}>
           {paneView === "flow" && (
             <FlowGrid flowId={flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} onReorder={onReorder} depthColors={paneInk(flowId)} />
           )}
@@ -1033,6 +1078,14 @@ export default function FlowWorkspace() {
     ...(flow.folder_id ? [{ trigger: "aff neg font colors folder ink", label: "Aff & neg colors", group: "Tools", run: () => setShowColors(true) }] : []),
     { trigger: "extensions blocks library panel", label: dock === "extensions" ? "Close Extensions" : "Open Extensions", group: "Tools", run: () => setDock(dock === "extensions" ? null : "extensions") },
     { trigger: "share collaborators invite partner", label: dock === "share" ? "Close Share" : "Open Share", group: "Tools", run: () => setDock(dock === "share" ? null : "share") },
+    { trigger: "template save reuse skeleton outline", label: "Save flow as template", group: "Tools", run: () => setTmplName(flow.title) },
+    { trigger: "full width wide stretch space margins", label: prefs.fullWidth ? "Exit full width" : "Full width", group: "View", run: () => setFlowPrefs({ fullWidth: !prefs.fullWidth }) },
+    { trigger: "grain background film texture off", label: prefs.grain ? "Turn off background grain" : "Turn on background grain", group: "View", run: () => setFlowPrefs({ grain: !prefs.grain }) },
+    { trigger: "text bigger font size increase", label: "Bigger text", group: "View", run: () => setFlowPrefs({ fontSize: getFlowPrefs().fontSize + 1 }) },
+    { trigger: "text smaller font size decrease", label: "Smaller text", group: "View", run: () => setFlowPrefs({ fontSize: getFlowPrefs().fontSize - 1 }) },
+    { trigger: "zoom in bigger magnify", label: "Zoom in", group: "View", hint: "⌃+", run: () => zoomBy(FLOW_ZOOM_STEP) },
+    { trigger: "zoom out smaller", label: "Zoom out", group: "View", hint: "⌃−", run: () => zoomBy(-FLOW_ZOOM_STEP) },
+    { trigger: "zoom reset 100", label: "Reset zoom", group: "View", hint: "⌃0", run: () => setFlowPrefs({ zoom: FLOW_ZOOM_DEFAULT }) },
     { trigger: "fullscreen focus", label: fullscreen ? "Exit fullscreen" : "Fullscreen", group: "Tools", run: () => setFullscreen((f) => !f) },
     { trigger: "keyboard shortcuts help", label: "Keyboard shortcuts", group: "Tools", hint: "?", run: () => setShowShortcuts(true) },
     { trigger: "export download docx word save flow speech send doc", label: "Export to .docx", group: "Tools", run: () => exportDocx() },
@@ -1047,7 +1100,7 @@ export default function FlowWorkspace() {
   ];
 
   return (
-    <div className={`flow-work ${fullscreen ? "flow-work--full" : ""}`}>
+    <div className={`flow-work ${fullscreen ? "flow-work--full" : ""} ${prefs.fullWidth ? "flow-work--wide" : ""}`} style={{ "--flow-fs": `${prefs.fontSize}px` } as React.CSSProperties}>
       <header className="flow-work__head">
         <h1 className="flow-work__title">{flow.title}</h1>
         {siblings.length > 1 && (
@@ -1106,8 +1159,8 @@ export default function FlowWorkspace() {
             <FlowTimers flowId={flowId} onState={setTimerSnap} registerControls={registerTimerControls} />
           </div>
         ) : (
-          <div className="flow-shell flow-pip flow-pip--pane">
-            <div className="flow-pane__body flow-pane__body--pop">
+          <div className="flow-shell flow-pip flow-pip--pane" style={{ "--flow-fs": `${prefs.fontSize}px` } as React.CSSProperties}>
+            <div className="flow-pane__body flow-pane__body--pop" style={{ zoom: prefs.zoom / 100 }}>
               {pip.kind === "flow" && (
                 <FlowGrid flowId={flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} onReorder={onReorder} depthColors={paneInk(flowId)} />
               )}
@@ -1173,7 +1226,7 @@ export default function FlowWorkspace() {
                     <button className="flow-pane__close" onClick={() => closePane(pane.key)} aria-label="Close pane" title="Close pane"><X size={15} /></button>
                   </div>
                 )}
-                <div className="flow-pane__body">
+                <div className="flow-pane__body" style={{ zoom: prefs.zoom / 100 }}>
                   {pane.view === "flow" && (
                     <FlowGrid flowId={pane.flowId} userId={userId} userName={userName} registerInsert={registerInsert} registerAddPoints={(fn) => { addPointsRef.current = fn; }} resolveSlashPoints={resolveSlashPoints} onSlashBlock={onSlashBlock} onCellsDeleted={onCellsDeleted} slashOptions={slashOptions} onSendPoints={sendPointsToSend} onReorder={onReorder} depthColors={paneInk(pane.flowId)} onTocItems={soloFlow ? handleTocItems : undefined} onTocActive={soloFlow ? handleTocActive : undefined} registerTocJump={soloFlow ? registerTocJump : undefined} />
                   )}
@@ -1253,6 +1306,34 @@ export default function FlowWorkspace() {
                     <span>Aff &amp; neg colors</span>
                   </button>
                 )}
+                <button className="flow-menu__item" role="menuitem" onClick={() => { setTmplName(flow.title); setMenu(null); }}>
+                  <span>Save as template…</span>
+                </button>
+                <div className="flow-menu__sep" />
+                {/* View prefs (this device): toggles close the menu, steppers stay
+                    open so repeated presses land without re-opening it. */}
+                <button className={`flow-menu__item ${prefs.fullWidth ? "is-on" : ""}`} role="menuitem" onClick={() => { setFlowPrefs({ fullWidth: !prefs.fullWidth }); setMenu(null); }}>
+                  <span>Full width</span>{prefs.fullWidth && <span className="flow-menu__check">✓</span>}
+                </button>
+                <button className={`flow-menu__item ${prefs.grain ? "is-on" : ""}`} role="menuitem" onClick={() => { setFlowPrefs({ grain: !prefs.grain }); setMenu(null); }}>
+                  <span>Background grain</span>{prefs.grain && <span className="flow-menu__check">✓</span>}
+                </button>
+                <div className="flow-menu__row">
+                  <span>Text size</span>
+                  <span className="flow-menu__step">
+                    <button className="flow-menu__stepbtn" onClick={() => setFlowPrefs({ fontSize: prefs.fontSize - 1 })} aria-label="Smaller text">−</button>
+                    <button className="flow-menu__stepval" onClick={() => setFlowPrefs({ fontSize: FLOW_FONT_DEFAULT })} title="Reset to default">{prefs.fontSize}px</button>
+                    <button className="flow-menu__stepbtn" onClick={() => setFlowPrefs({ fontSize: prefs.fontSize + 1 })} aria-label="Bigger text">+</button>
+                  </span>
+                </div>
+                <div className="flow-menu__row">
+                  <span>Zoom</span>
+                  <span className="flow-menu__step">
+                    <button className="flow-menu__stepbtn" onClick={() => zoomBy(-FLOW_ZOOM_STEP)} aria-label="Zoom out">−</button>
+                    <button className="flow-menu__stepval" onClick={() => setFlowPrefs({ zoom: FLOW_ZOOM_DEFAULT })} title="Reset zoom (Ctrl+0)">{prefs.zoom}%</button>
+                    <button className="flow-menu__stepbtn" onClick={() => zoomBy(FLOW_ZOOM_STEP)} aria-label="Zoom in">+</button>
+                  </span>
+                </div>
                 <div className="flow-menu__sep" />
                 <button className="flow-menu__item" role="menuitem" onClick={() => { setShowPalette(true); setMenu(null); }}>
                   <span>Command palette</span><span className="flow-menu__kbd">⇧⇧</span>
@@ -1286,6 +1367,38 @@ export default function FlowWorkspace() {
           onSave={saveFolderInk}
           onClose={() => setShowColors(false)}
         />
+      )}
+
+      {/* Save-as-template: name it (defaults to the flow's title) and freeze the
+          outline. Applied from the sidebar's "From template" when creating flows. */}
+      {tmplName !== null && (
+        <div className="flow-rtcal-backdrop" onClick={() => setTmplName(null)} role="presentation">
+          <div className="flow-rtcal" role="dialog" aria-modal="true" aria-label="Save flow as template" onClick={(e) => e.stopPropagation()}>
+            <span className="flow-rtcal__step">This flow</span>
+            <h3>Save as template</h3>
+            <p className="flow-rtcal__sub">
+              Freezes this outline so new flows can start from it — pick it from
+              &ldquo;From template&rdquo; in the sidebar. Later edits to this flow don&apos;t change the template.
+            </p>
+            <input
+              className="db-input"
+              value={tmplName}
+              autoFocus
+              placeholder="Template name"
+              onChange={(e) => setTmplName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveTemplateNow(tmplName);
+                else if (e.key === "Escape") setTmplName(null);
+              }}
+            />
+            <div className="flow-rtcal__actions">
+              <button className="db-btn db-btn--glass db-btn--sm" onClick={() => setTmplName(null)}>Cancel</button>
+              <button className="db-btn db-btn--accent db-btn--sm" disabled={tmplBusy} onClick={() => saveTemplateNow(tmplName)}>
+                {tmplBusy ? "Saving…" : "Save template"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Persistent shortcut legend — quick-navigate hints, like the reference.

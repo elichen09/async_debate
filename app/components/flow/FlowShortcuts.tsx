@@ -15,6 +15,7 @@ const GROUPS: { title: string; rows: { keys: string[]; desc: string }[] }[] = [
       { keys: ["Ctrl", "E"], desc: "Highlight a key point" },
       { keys: ["/", "flag", "↵"], desc: "Flag a point and its sub-points (red) — come back to this" },
       { keys: ["/", "extend", "↵"], desc: "Mark a point extended (green →) — carried through a later speech" },
+      { keys: ["/", "color", "↵"], desc: "Pin a point's color manually (auto → color 1 → color 2) — for writing your own side's points at any indent" },
       { keys: ["#", "␣"], desc: "Start a point with \"# \" to make a section heading (or type /heading) — headings list in the outline sidebar; click one to jump there" },
       { keys: ["Ctrl", "V"], desc: "Paste a multi-line outline — each line becomes a point, tabs indent" },
     ],
@@ -39,6 +40,7 @@ const GROUPS: { title: string; rows: { keys: string[]; desc: string }[] }[] = [
     title: "Workspace",
     rows: [
       { keys: ["⇧", "⇧"], desc: "Command palette — double-tap Shift to search actions, views, and flows" },
+      { keys: ["Ctrl", "+ / −"], desc: "Zoom the documents in and out (Ctrl+0 resets; Ctrl+scroll works too)" },
       { keys: ["＋"], desc: "Split: open another view or flow side-by-side (next to the tabs)" },
       { keys: ["⋯"], desc: "Tools & panels: Extensions, Share, Timers, Fullscreen" },
       { keys: ["?"], desc: "Open this shortcuts list" },
